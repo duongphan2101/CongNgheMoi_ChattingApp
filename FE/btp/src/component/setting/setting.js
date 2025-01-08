@@ -60,7 +60,8 @@ return (
           <button className="sidebar-bottom-btn btn"><i className="sidebar-bottom_icon bi bi-person-circle text-light"></i></button>
           <button className="sidebar-bottom-btn btn" onClick={() => setCurrentView('chat')}>
             <i className="sidebar-bottom_icon bi bi-chat-dots text-light"></i></button>
-          <button className="sidebar-bottom-btn btn"><i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i></button>
+          <button className="sidebar-bottom-btn btn" onClick={() => setCurrentView('contacts')}>
+            <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i></button>
           <button className="sidebar-bottom-btn btn" onClick={() => setCurrentView('cloud')}>
             <i className="sidebar-bottom_icon bi bi-cloud text-light"></i></button>
           <button className="sidebar-bottom-btn btn active" onClick={() => setCurrentView('setting')}>
