@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './chat_style.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-function Chat() {
+function Chat({setCurrentView}) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([
     { text: 'Hi, how are you?', time: '11:40 AM', sender: 'sent' },
@@ -70,8 +70,9 @@ function Chat() {
           <button className="sidebar-bottom-btn btn active"><i className="sidebar-bottom_icon bi bi-chat-dots text-light"></i></button>
           <button className="sidebar-bottom-btn btn"><i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i></button>
           <button className="sidebar-bottom-btn btn"><i className="sidebar-bottom_icon bi bi-cloud text-light"></i></button>
-          <button className="sidebar-bottom-btn btn"><i className="sidebar-bottom_icon bi bi-gear text-light"></i></button>
-        </div>
+          <button className="sidebar-bottom-btn btn" onClick={() => setCurrentView('setting')}>
+               <i className="sidebar-bottom_icon bi bi-gear text-light"></i></button>        
+</div>
       </div>
 
       {/* Chat Box */}
