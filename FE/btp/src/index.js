@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 import Chat from "./component/chatting/chat";
 import Setting from "./component/setting/setting";
+import Cloud from "./component/cloud/cloud";
 
 function App() {
   const [currentView, setCurrentView] = useState("chat");
@@ -12,6 +13,8 @@ function App() {
         return <Chat setCurrentView={setCurrentView} />;
       case "setting":
         return <Setting setCurrentView={setCurrentView} />;
+      case "cloud":
+        return <Cloud setCurrentView={setCurrentView} />;
       default:
         return <Chat setCurrentView={setCurrentView} />;
     }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import './chat_style.css';
+import './cloud_style.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import a1 from '../../assets/imgs/9306614.jpg';
 import a2 from '../../assets/imgs/9334176.jpg';
@@ -8,9 +8,8 @@ import a3 from '../../assets/imgs/1.jpg';
 function Chat({setCurrentView}) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([
-    { text: 'Hi, how are you?', time: '11:40 AM', sender: 'sent' },
-    { text: 'Hi, I am good. Thank you, how about you?', time: '11:41 AM', sender: 'received' },
-    { text: 'I am good too, thank you for your chat template.', time: '11:44 AM', sender: 'sent' }
+    { text: 'This is my cloud', time: '11:40 AM', sender: 'sent' },
+    { text: 'Template', time: '11:44 AM', sender: 'sent' }
   ]);
 
   const handleInputChange = (event) => {
@@ -27,10 +26,10 @@ function Chat({setCurrentView}) {
   return (
     <div className="container chat-container">
       {/* Intro Animation */}
-      <div className="intro-animation">
+      {/* <div className="intro-animation">
         <p>Welcome!</p>
         <p style={{ fontSize: '34px', fontWeight: 'bold' }}>VChat</p>
-      </div>
+      </div> */}
 
       {/* Sidebar */}
       <div className="sidebar">
@@ -70,13 +69,12 @@ function Chat({setCurrentView}) {
 
         <div className="sidebar-bottom d-flex justify-content-around align-items-center">
           <button className="sidebar-bottom-btn btn"><i className="sidebar-bottom_icon bi bi-person-circle text-light"></i></button>
-          <button className="sidebar-bottom-btn btn active" onClick={() => setCurrentView('chat')}>
+          <button className="sidebar-bottom-btn btn" onClick={() => setCurrentView('chat')}>
             <i className="sidebar-bottom_icon bi bi-chat-dots text-light"></i></button>
           <button className="sidebar-bottom-btn btn"><i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i></button>
-          <button className="sidebar-bottom-btn btn" onClick={() => setCurrentView('cloud')}>
-            <i className="sidebar-bottom_icon bi bi-cloud text-light"></i></button>
+          <button className="sidebar-bottom-btn btn active" onClick={() => setCurrentView('cloud')}><i className="sidebar-bottom_icon bi bi-cloud text-light"></i></button>
           <button className="sidebar-bottom-btn btn" onClick={() => setCurrentView('setting')}>
-            <i className="sidebar-bottom_icon bi bi-gear text-light"></i></button>        
+               <i className="sidebar-bottom_icon bi bi-gear text-light"></i></button>        
 </div>
       </div>
 
@@ -84,16 +82,11 @@ function Chat({setCurrentView}) {
       <div className="chat-box container">
         <div className="chat-header row">
           <div className="col-sm-3 d-flex align-items-center">
-            <img className="chat-header_avt" src={a1} alt="" />
-            <p className="chat-header_name px-2 m-0">Khalid</p>
+            <i className="sidebar-bottom_icon bi bi-cloud text-light"></i>
+            <p className="chat-header_name px-2 m-0">Cloud</p>
           </div>
-          <div className="col-sm-6">
-            <button className="btn"><i className="chat-header_icon mx-2 bi bi-camera-video"></i></button>
-            <button className="btn"><i className="chat-header_icon mx-2 bi bi-telephone"></i></button>
-          </div>
-          <div className="col-sm-3 d-flex justify-content-end">
-            <button className="btn"><i className="chat-header_icon bi bi-three-dots-vertical"></i></button>
-          </div>
+          <div className="col-sm-6"></div>
+          <div className="col-sm-3"></div>
         </div>
 
         <div className="chat-messages">
