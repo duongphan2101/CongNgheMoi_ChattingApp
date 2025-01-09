@@ -37,6 +37,7 @@ body {
     background-color: transparent;
     justify-content: space-between;
 }
+
 .sidebar {
     width: 35%;
     background-color: rgba(44, 62, 80, 0.5);
@@ -45,13 +46,13 @@ body {
     flex-direction: column;
 }
 
-.sidebar-header{
+.sidebar-header {
     padding: 15px;
     border-top-left-radius: 10px;
     border-top-right-radius: 10px;
 }
 
-.sidebar-header_search{
+.sidebar-header_search {
     padding: 5px;
     display: flex;
     background-color: rgba(52, 73, 94, 1);
@@ -107,6 +108,7 @@ body {
     justify-content: space-between;
     border-radius: 10px;
 }
+
 .chat-header {
     background-color: rgba(0, 0, 0, 0.05);
     padding: 15px;
@@ -121,10 +123,12 @@ body {
     flex-grow: 1;
     overflow-y: auto;
 }
+
 .message {
     margin-bottom: 10px;
     display: flex;
 }
+
 .message.sent {
     justify-self: end;
     align-items: center;
@@ -151,7 +155,7 @@ body {
     margin-left: 10px;
 }
 
-.message-info span{
+.message-info span {
     color: lightgrey;
     font-size: 14px;
     margin: auto;
@@ -171,6 +175,7 @@ body {
     border-radius: 10px;
     align-items: center;
 }
+
 .chat-input input {
     flex-grow: 1;
     margin-right: 10px;
@@ -179,6 +184,7 @@ body {
     outline: none;
     color: white;
 }
+
 .user {
     display: flex;
     align-items: center;
@@ -203,7 +209,6 @@ body {
     width: 50px;
     border-radius: 50%;
 }
-
 
 .chat-header_icon {
     font-size: 24px;
@@ -243,7 +248,7 @@ body {
     font-size: 2rem;
     z-index: 10;
     animation: slideUp 3s ease forwards;
-}
+}  
 
 @keyframes slideUp {
     0% {
@@ -253,3 +258,105 @@ body {
         transform: translateY(-100%);
     }
 }
+
+/* Modal Customizations */
+.modal {
+    background-color: rgba(53, 48, 48, 0.8);
+    transition: all 0.3s ease-in-out;
+}
+
+.modal.fade.show {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.modal-dialog {
+    transform: scale(0.9);
+    animation: scaleIn 0.3s ease-in-out;
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0.9);
+    }
+    to {
+        transform: scale(1);
+    }
+}
+
+.modal-header {
+    border-bottom: 1px solid #1d1a1a;
+    background-color: #252f41;
+    padding: 15px;
+}
+
+.modal-body {
+    background-color: #252f41;
+    padding: 20px;
+}
+
+.modal-body .btn-link {
+    color: #fff;
+    font-size: 1.2rem;
+  }
+
+.modal-content {
+    background-color: #252f41; /* Màu nền tối */
+    color: #fff; /* Màu chữ sáng */
+  }
+
+.modal-body img {
+    border: 2px solid #303336;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.modal-footer {
+    border-top: 1px solid #1b1616;
+    background-color: #252f41;
+    padding: 15px;
+}
+.personal-info p {
+    font-size: 10px;
+    margin-bottom: 10rem;
+  }
+
+.personal-info small {
+    display: block;
+    color: #14171a;
+    margin-top: 8px;
+}
+
+.custom-button {
+    background-color: #007bff; /* Màu xanh mặc định */
+    color: #ffffff !important; /* Màu chữ trắng rõ ràng, đảm bảo không bị tàn hình */
+    border: none; /* Không viền */
+    transition: all 0.3s ease; /* Hiệu ứng mượt khi thay đổi */
+  }
+  
+  .custom-button:hover {
+    background-color: #0056b3; /* Màu đậm hơn khi di chuột */
+    box-shadow: 0px 4px 10px rgba(0, 123, 255, 0.5); /* Hiệu ứng nổi bật */
+    transform: scale(1.05); /* Phóng to nhẹ khi hover */
+  }
+  
+
+
+.edit-modal-footer {
+    background-color: #252f41; /* Đen gần xám */
+    padding: 1rem; /* Tuỳ chọn: thêm khoảng cách */
+    text-align: right; /* Tuỳ chọn: căn nút sang phải */
+}
+
+.btn-hover:hover {
+    filter: brightness(1.1); /* Tăng độ sáng lên 10% */
+    transition: filter 0.3s ease; /* Hiệu ứng mượt mà khi hover */
+}
+  
