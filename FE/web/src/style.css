@@ -94,8 +94,8 @@ body {
     transition: padding-bottom 0.3s ease; 
 }
 
-.sidebar-bottom-btn:hover,
-.sidebar-bottom-btn.active {
+/* .sidebar-bottom-btn.active , */
+.sidebar-bottom-btn:hover{
     padding-bottom: 30px;
 }
 
