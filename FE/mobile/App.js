@@ -2,84 +2,116 @@
 import React from 'react';
 import { View,StyleSheet, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import started from './component/started';
 import login from './component/login';
 import register from './component/register';
+import chat from './component/chat';
+import profile from './component/profile';
+import contacts from './component/contacts';
+import cloud from './component/cloud';
+import setting from './component/setting';
+import Header from './component/Header';
+import chatting from './component/chatting';
 
-const Stack = createStackNavigator();
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
+import FontAwesome from '@expo/vector-icons/FontAwesome'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import Entypo from '@expo/vector-icons/Entypo'
+import Ionicons from '@expo/vector-icons/Ionicons'
+
+const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabNavigator({navigation, route}) {
-  const { userData } = route.params;
+function TabNavigator({ navigation, route }) {
   return (
-    <Tab.Navigator initialRouteName='Home' screenOptions={{
-      tabBarActiveTintColor: 'pink',
-      tabBarInactiveTintColor: 'black',
-    }}>
+    <Tab.Navigator
+      initialRouteName='chatScr'
+      screenOptions={{
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: 'white',
+        tabBarInactiveTintColor: 'white',
+        tabBarStyle: { 
+          backgroundColor: '#007AFF', 
+          height: 90,
+          paddingTop: 20,
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+      }}
+    >
+
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        initialParams={{ userData }}
-        options={{
-          header: () => (
-            <View style={styles.headerContainer}>
-              <Text style={styles.headerTitle}>Video Sharing App</Text>
-              <Icon2 name="bell-o" size={25} color="black" />
-            </View>
-          ),
-          tabBarIcon: ({ color }) => <Icon2 name="home" size={30} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Search"
-        initialParams={{ userData }}
-        component={SearchScreen}
-        options={{
-          headerShown: false,
-          tabBarIcon: ({ color }) => <Icon2 name="search" size={30} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Plus"
-        initialParams={{ userData }}
-        component={plus}
+        name="profileScr"
+        component={profile}
         options={{
           headerShown: false,
-          tabBarIcon: ({ color }) => <Icon3 name="circle-with-plus" size={35} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Friends"
-        initialParams={{ userData }}
-        component={FriendsScreen}
-        options={{
-          // headerShown: false,
-          tabBarIcon: ({ color }) => <Icon2 name="users" size={25} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        initialParams={{ userData }}
-        component={ProfileScreen}
-        options={{
-          header: () => (
-            <View style={styles.headerProflieContainer}>
-                <View style={{ flexDirection: 'row' }}>
-                    <Icon2 style={{ paddingHorizontal: 10 }} name="navicon" size={20} color="black" onPress={()=> navigation.navigate('Login')}/>
-                    <Icon2 style={{ paddingHorizontal: 10 }} name="user-plus" size={20} color="black" />
-                </View>
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={()=> navigation.navigate('EditProfile', {user: userData})}>
-                    <Icon2 style={{ color: 'pink', paddingHorizontal: 5 }} name="pencil" size={20} />
-                    <Text style={{ color: 'pink', paddingHorizontal: 5 }}>Edit Profile</Text>
-                </TouchableOpacity>
-            </View>
+          tabBarIcon: ({ color, focused }) => (
+            <FontAwesome name="user" size={30} color={color}
+              style={{ transform: [{ translateY: focused ? -10 : 0 }] }}
+            />
           ),
-          tabBarIcon: ({ color }) => <Icon2 name="user-circle-o" size={30} color={color} />,
         }}
       />
+
+      <Tab.Screen
+        name="chatScr"
+        component={chat}
+        options={{
+          header: () => <Header />,
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons name="message-processing" size={30} color={color}
+              style={{ transform: [{ translateY: focused ? -10 : 0 }] }}
+            />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="contactsScr"
+        component={contacts}
+        options={{
+          header: () => <Header />,
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialIcons name="contacts" size={30} color={color}
+              style={{ transform: [{ translateY: focused ? -10 : 0 }] }}
+            />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="cloudScr"
+        component={cloud}
+        options={{
+          // header: () => <Header />,
+          headerShown: false,
+          tabBarStyle: { display: 'none' },
+          tabBarIcon: ({ color, focused }) => (
+            <Entypo name="cloud" size={30} color={color}
+              style={{ transform: [{ translateY: focused ? -10 : 0 }] }}
+            />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="settingScr"
+        component={setting}
+        options={{
+          header: () => <Header />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name="settings" size={28} color={color}
+              style={{ transform: [{ translateY: focused ? -10 : 0 }] }}
+            />
+          ),
+        }}
+      />
+
     </Tab.Navigator>
   );
 }
@@ -106,6 +138,19 @@ export default function App() {
             options={{
               headerShown: false}}
           />
+          <Stack.Screen 
+            name='router' 
+            component={TabNavigator}
+            options={{
+              headerShown: false}}
+          />
+          <Stack.Screen 
+            name='chatting' 
+            component={chatting}
+            options={{
+              headerShown: false}}
+          />
+          
       </Stack.Navigator>
     </NavigationContainer>
   );

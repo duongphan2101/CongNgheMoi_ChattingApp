@@ -27,7 +27,7 @@ export default function App({ navigation }) {
           />
         </View>
 
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('router')}>
           <Text style={{ fontSize: 18, color: '#fff', fontWeight: 'bold'}}>
             Login
           </Text>
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     width: '100%'
   }, button: {
     backgroundColor: '#007AFF',
-    backgroundColor: 'black',
+    // backgroundColor: 'black',
     padding: 15,
     borderRadius: 10,
     marginTop: 20,
