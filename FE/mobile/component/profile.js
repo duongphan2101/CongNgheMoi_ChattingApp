@@ -1,42 +1,41 @@
+import React from 'react';
 import { StyleSheet, Text, View, Image, TouchableOpacity, TextInput } from 'react-native';
-import AntDesign from '@expo/vector-icons/AntDesign';
 import Feather from '@expo/vector-icons/Feather';
 
 export default function ProfileScreen({ navigation }) {
+  const handleSaveChanges = () => {
+    console.log('Changes saved');
+  };
+
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Image source={require('../assets/icon.png')} style={styles.avatar} />
-        <Text style={styles.username}>This User</Text>
+        <View style={styles.headerContent}>
+          <View style={styles.avatarContainer}>
+            <Image source={require('../assets/icon.png')} style={styles.avatar} />
+          </View>
+          <Text style={styles.username}>This User</Text>
+        </View>
       </View>
-      
+
+      {/* Form nhập thông tin */}
       <View style={styles.form}>
+        <Text style={styles.label}>Tên</Text>
         <View style={styles.inputField}>
           <Feather name="user" size={20} color="gray" />
           <TextInput placeholder="Tên" placeholderTextColor="gray" style={styles.input} />
         </View>
+
+        <Text style={styles.label}>Ngày sinh</Text>
         <View style={styles.inputField}>
           <Feather name="calendar" size={20} color="gray" />
-          <TextInput placeholder="Ngày sinh" placeholderTextColor="gray" style={styles.input} />
+          <TextInput placeholder="Ngày sinh" placeholderTextColor="gray" style={styles.input} keyboardType="numeric" />
         </View>
-      </View>
-      
-      <View style={styles.dotsContainer}>
-        <View style={styles.dot} />
-        <View style={styles.dot} />
-        <View style={styles.dot} />
-      </View>
-      
-      <TouchableOpacity style={styles.saveButton}>
-        <Text style={styles.saveButtonText}>Lưu thay đổi</Text>
-      </TouchableOpacity>
-
-      <View style={styles.footer}>
-        <AntDesign name="home" size={24} color="#fff" />
-        <AntDesign name="message1" size={24} color="#fff" />
-        <AntDesign name="user" size={24} color="#fff" />
-        <AntDesign name="cloud" size={24} color="#fff" />
-        <AntDesign name="setting" size={24} color="#fff" />
+        {/* Nút lưu thay đổi */}
+        <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
+          <Text style={styles.saveButtonText}>Lưu thay đổi</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -47,57 +46,64 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9F9F9',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   header: {
     width: '100%',
     backgroundColor: '#2D5D7B',
-    alignItems: 'center',
-    paddingVertical: 30,
+    paddingBottom: 10, // Điều chỉnh để avatar nằm dưới cùng
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-end', // Đẩy avatar xuống đáy header
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    marginTop: 140, // Tạo khoảng cách trên cùng cho bố cục đẹp hơn
+    marginLeft: -100,
+  },
+  avatarContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: -60, // Đẩy avatar xuống thêm một chút
+},
   avatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 3,
-    borderColor: '#fff',
-    marginTop: -45,
+    width: 120,
+    height: 120,
+    borderRadius: 100,
   },
   username: {
     color: '#fff',
-    fontSize: 18,
-    marginTop: 10,
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginLeft: 15, // Tạo khoảng cách giữa avatar và tên
+    marginBottom: 10, // Canh lề đẹp hơn
   },
   form: {
     width: '90%',
-    marginTop: 20,
+    marginTop: 80,
+  },
+  label: {
+    fontSize: 16,
+    color: 'gray',
+    fontWeight: 'bold',
+    marginBottom: 5,
   },
   inputField: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'grey',
-    marginTop: 20,
+    marginBottom: 20,
     borderRadius: 10,
-    padding: 10,
+    padding: 12,
     backgroundColor: '#EAEAEA',
   },
   input: {
-    padding: 10,
-    marginLeft: 10,
+    paddingLeft: 10,
     flex: 1,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: 20,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'black',
-    marginHorizontal: 4,
   },
   saveButton: {
     backgroundColor: '#90EE90',
@@ -105,20 +111,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    width: '80%',
-  },
+    width: '100%',
+    position: 'bottom', // Cố định vị trí
+    bottom: -300, // Điều chỉnh để gần footer
+},
   saveButtonText: {
     fontSize: 18,
     color: '#fff',
     fontWeight: 'bold',
   },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    backgroundColor: '#007AFF',
-    padding: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
 });
+
