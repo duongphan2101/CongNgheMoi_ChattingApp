@@ -1,0 +1,261 @@
+
+.chat-box {
+    background-color: rgba(52, 73, 94, 0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-radius: 10px;
+    height: 100%;
+    width: 100%;
+}
+
+.chat-header {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+}
+
+.chat-messages {
+    padding: 15px;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.message {
+    margin-bottom: 10px;
+    display: flex;
+}
+
+.message.sent {
+    justify-self: end;
+    align-items: center;
+}
+
+.message.sent p {
+    background-color: #6fd39f;
+    padding: 15px;
+    border-radius: 25px;
+    color: black;
+    margin-right: 10px;
+}
+
+.message.received {
+    justify-self: start;
+    align-items: center;
+}
+
+.message.received p {
+    background-color: #8bb9f2;
+    padding: 15px;
+    border-radius: 25px;
+    color: black;
+    margin-left: 10px;
+}
+
+.message-info span {
+    color: lightgrey;
+    font-size: 14px;
+    margin: auto;
+    display: flex;
+    justify-content: center;
+}
+
+.chat-bottom {
+    background-color: rgba(0, 0, 0, 0.01);
+    padding: 15px;
+}
+
+.chat-input {
+    display: flex;
+    padding: 10px;
+    background-color: rgb(52, 73, 94);
+    border-radius: 10px;
+    align-items: center;
+}
+
+.chat-input input {
+    flex-grow: 1;
+    margin-right: 10px;
+    background-color: transparent;
+    border: none;
+    outline: none;
+    color: white;
+}
+
+.user {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+}
+
+.user:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.user.active {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.user img {
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.user-avt {
+    height: 50px;
+    width: 50px;
+    border-radius: 50%;
+}
+
+.chat-header_icon {
+    font-size: 24px;
+    color: white;
+}
+
+.chat-header_avt {
+    height: 60px;
+    width: 60px;
+    border-radius: 50%;
+}
+
+.chat-message_avt {
+    height: 40px;
+    width: 40px;
+    border-radius: 50%;
+}
+
+.chat-header_name {
+    font-size: 18px;
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+.intro-animation {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, #6a11cb, #2575fc);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    font-size: 2rem;
+    z-index: 10;
+    animation: slideUp 3s ease forwards;
+}  
+
+@keyframes slideUp {
+    0% {
+        transform: translateY(0);
+    }
+    100% {
+        transform: translateY(-100%);
+    }
+}
+
+.modal {
+    background-color: rgba(53, 48, 48, 0.8);
+    transition: all 0.3s ease-in-out;
+}
+
+.modal.fade.show {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.modal-dialog {
+    transform: scale(0.9);
+    animation: scaleIn 0.3s ease-in-out;
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0.9);
+    }
+    to {
+        transform: scale(1);
+    }
+}
+
+.modal-header {
+    border-bottom: 1px solid #1d1a1a;
+    background-color: #252f41;
+    padding: 15px;
+}
+
+.modal-body {
+    background-color: #252f41;
+    padding: 20px;
+}
+
+.modal-body .btn-link {
+    color: #fff;
+    font-size: 1.2rem;
+  }
+
+.modal-content {
+    background-color: #252f41;
+    color: #fff;
+  }
+
+.modal-body img {
+    border: 2px solid #303336;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.modal-footer {
+    border-top: 1px solid #1b1616;
+    background-color: #252f41;
+    padding: 15px;
+}
+.personal-info p {
+    font-size: 10px;
+    margin-bottom: 10rem;
+  }
+
+.personal-info small {
+    display: block;
+    color: #14171a;
+    margin-top: 8px;
+}
+
+.custom-button {
+    background-color: #007bff;
+    color: #ffffff !important; 
+    border: none;
+    transition: all 0.3s ease;
+  }
+  
+  .custom-button:hover {
+    background-color: #0056b3;
+    box-shadow: 0px 4px 10px rgba(0, 123, 255, 0.5);
+    transform: scale(1.05);
+  }
+  
+
+
+.edit-modal-footer {
+    background-color: #252f41;
+    padding: 1rem;
+    text-align: right;
+}
+
+.btn-hover:hover {
+    filter: brightness(1.1);
+    transition: filter 0.3s ease;
+}
+  

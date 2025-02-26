@@ -1,0 +1,92 @@
+.settings {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 360px;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    height: 100px;
+    align-items: center;
+    margin: 10px 0;
+    background-color: transparent;
+    padding: 10px;
+    border-radius: 5px;
+    color: white;
+}
+
+.setting-item:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+label {
+    font-size: 18px;
+}
+
+select {
+    background-color: #0a0a0b42;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 20px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 20px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #66bb6a;
+}
+
+input:checked + .slider:before {
+    transform: translateX(14px);
+}
+
+.mode-select {
+    padding: 10px;
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+
+.mode-select option {
+    padding: 10px;
+    background-color: transparent;
+    color: #333; 
+    font-size: 14px;
+}

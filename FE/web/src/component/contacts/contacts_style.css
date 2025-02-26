@@ -1,16 +1,14 @@
-body {
+/* body {
     background: linear-gradient(to right, #6a11cb, #2575fc);
     color: white;
     font-family: Arial, sans-serif;
 }
 
-/* Modern browsers */
 * {
     scrollbar-width: thin;
     scrollbar-color: #888 transparent;
 }
 
-/* WebKit-based browsers */
 *::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -252,4 +250,91 @@ body {
     100% {
         transform: translateY(-100%);
     }
+} */
+
+.contacts-list {
+    padding: 15px;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.contact-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    margin-bottom: 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    transition: background-color 0.3s ease;
+}
+
+.contact-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.contact-avatar {
+    position: relative;
+    margin-right: 15px;
+}
+
+.status-indicator {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid rgba(44, 62, 80, 0.5);
+}
+
+.status-indicator.online {
+    background-color: #28a745;
+}
+
+.status-indicator.offline {
+    background-color: #6c757d;
+}
+
+.contact-info h5 {
+    color: white;
+    font-size: 1rem;
+}
+
+.contact-info small {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.contact-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    color: white;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.action-btn:hover {
+    opacity: 1;
+    color: white;
+}
+
+.search-container {
+    padding: 0 15px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 20px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    outline: none;
+}
+
+.search-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
 }
