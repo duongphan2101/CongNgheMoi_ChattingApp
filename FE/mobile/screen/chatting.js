@@ -1,11 +1,15 @@
 import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList, TextInput } from 'react-native';
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons'
-
+import { useTheme } from "../contexts/themeContext";
+import colors from "../themeColors";
 export default function App({navigation, route}) {
   
-  const { user } = route.params;
+  const { theme, toggleTheme } = useTheme();
+  const themeColors = colors[theme];
 
+  const { user } = route.params;
+  const styles = getStyles(themeColors);
   return (
     <View style={styles.container}>
 
@@ -47,11 +51,11 @@ export default function App({navigation, route}) {
 
         <View style={styles.bottomtab}>
            <TouchableOpacity style={styles.touch}>
-              <Ionicons name="image" size={40} color="#007AFF" />
+              <Ionicons name="image" size={40} color={themeColors.primary} />
             </TouchableOpacity>
             <TextInput style={styles.textInput} placeholder='Nhập nội dung ...' placeholderTextColor={'#ccc'} />
             <TouchableOpacity style={styles.touch}>
-              <Ionicons name="send" size={40} color="#007AFF" />
+              <Ionicons name="send" size={40} color={themeColors.primary} />
             </TouchableOpacity>
         </View>
 
@@ -59,14 +63,14 @@ export default function App({navigation, route}) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: themeColors.background,
   },
   head: {
     width: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: themeColors.primary,
     height: 100,
     paddingTop: 40,
     paddingHorizontal: 20
@@ -92,7 +96,7 @@ const styles = StyleSheet.create({
   },
   bottomtab: {
     height: 90,
-    backgroundColor: '#fff',
+    backgroundColor: themeColors.background,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -109,6 +113,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     borderColor: '#ccc',
     borderWidth: 1,
+    color: themeColors.text
   },
   contextChat: {
     paddingVertical: 20,

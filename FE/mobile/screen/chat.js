@@ -1,7 +1,12 @@
 import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList } from 'react-native';
 import React, {useState} from 'react';
+import { useTheme } from "../contexts/themeContext";
+import colors from "../themeColors";
 
 export default function App({navigation}) {
+
+  const { theme, toggleTheme } = useTheme();
+  const themeColors = colors[theme];
 
   const [user, setUser] = useState([
     {id: 1, name: 'Jayson', avatar: 'https://imgur.com/RLtzJy5.jpg', mess: 'Hi bro, i am Jayson'},
@@ -9,7 +14,7 @@ export default function App({navigation}) {
     {id: 3, name: 'Lucia', avatar: 'https://imgur.com/RLtzJy5.jpg', mess: 'you are so handsome'},
     {id: 4, name: 'Mya', avatar: 'https://imgur.com/RLtzJy5.jpg', mess: 'i love you'},
   ]);
-
+  const styles = getStyles(themeColors);
   return (
     <View style={styles.container}>
         <View style={styles.listChattingUsers}>
@@ -31,10 +36,10 @@ export default function App({navigation}) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: themeColors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -58,9 +63,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 5,
+    color: themeColors.text,
   },
   mess: {
-    color: '#ccc',
+    color: themeColors.text,
   },
   userInfo: {
     justifyContent: 'center',

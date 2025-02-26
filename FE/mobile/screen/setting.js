@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, Switch, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, Switch, TouchableOpacity, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import { useTheme } from "../contexts/themeContext";
+import colors from "../themeColors";
+import { useTranslation } from "react-i18next";
 
 const App = () => {
-  const [isEnabled, setIsEnabled] = useState(false);
-  const [selectedMode, setSelectedMode] = useState('Light mode');
-  const [selectedLanguage, setSelectedLanguage] = useState('Tiếng Việt');
+  const { theme, toggleTheme } = useTheme();
+  const themeColors = colors[theme];
 
+  const { i18n, t } = useTranslation();
+
+  const [isEnabled, setIsEnabled] = useState(false);
+
+  const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
   const toggleSwitch = () => setIsEnabled(previousState => !previousState);
 
   const handleLogout = () => {
@@ -16,16 +23,24 @@ const App = () => {
     ]);
   };
 
+  const changeLanguage = (language) => {
+    setSelectedLanguage(language);
+    i18n.changeLanguage(language); // Cập nhật ngôn ngữ trong i18n
+  };
+
+  // Hàm tạo style dựa trên theme
+  const styles = getStyles(themeColors);
+
   return (
     <View style={styles.container}>
       <View style={styles.optionsContainer}>
-        {/* Chế Độ */}
+        {/* Chế Độ (Theme Mode) */}
         <View style={styles.optionContainer}>
           <Text style={styles.optionText}>Chế Độ</Text>
           <Picker
-            selectedValue={selectedMode}
+            selectedValue={theme === "light" ? "Light mode" : "Dark mode"}
             style={styles.picker}
-            onValueChange={(itemValue) => setSelectedMode(itemValue)}
+            onValueChange={() => toggleTheme()} 
           >
             <Picker.Item label="Light mode" value="Light mode" />
             <Picker.Item label="Dark mode" value="Dark mode" />
@@ -34,14 +49,14 @@ const App = () => {
 
         {/* Ngôn Ngữ */}
         <View style={styles.optionContainer}>
-          <Text style={styles.optionText}>Ngôn Ngữ</Text>
+          <Text style={styles.optionText}>{t("Ngôn ngữ")}</Text>
           <Picker
             selectedValue={selectedLanguage}
             style={styles.picker}
-            onValueChange={(itemValue) => setSelectedLanguage(itemValue)}
+            onValueChange={(itemValue) => changeLanguage(itemValue)}
           >
-            <Picker.Item label="Tiếng Việt" value="Tiếng Việt" />
-            <Picker.Item label="English" value="English" />
+            <Picker.Item label="Tiếng Việt" value="vi" />
+            <Picker.Item label="English" value="en" />
           </Picker>
         </View>
 
@@ -57,93 +72,54 @@ const App = () => {
         </View>
 
         {/* Đăng xuất Button */}
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>        
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
       </View>
-
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+// Hàm tạo styles dựa trên theme
+const getStyles = (themeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', 
-  },
-  header: {
-    backgroundColor: '#0078D7', 
-    padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    backgroundColor: '#7399C3',
-   
-  },
-  searchButton: {
-    marginLeft: 10,
-    backgroundColor: '#0078D7',
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: themeColors.background,
   },
   optionsContainer: {
-    flex: 1, 
-    paddingBottom: 60, 
+    flex: 1,
+    paddingBottom: 60,
   },
   optionContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 15,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#D9D9D9',
   },
   optionText: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: themeColors.text,
   },
   picker: {
     height: 30,
-    width: 100,
-    borderWidth: 1,
-    borderColor: '#D9D9D9', 
-    borderRadius: 10, 
-    backgroundColor: '#D9D9D9',
+    width: 120,
+    borderRadius: 10,
+    color: themeColors.text,
+    backgroundColor: themeColors.background
   },
   logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 15,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#D9D9D9',
+    color: themeColors.text,
   },
   logoutText: {
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  footer: {
-    backgroundColor: '#0078D7',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 10,
-    paddingHorizontal: 10, 
-  },
-  footerIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 50, 
-  },
-  activeIcon: {
-    marginBottom: 10, 
+    color: themeColors.text,
   },
 });
 

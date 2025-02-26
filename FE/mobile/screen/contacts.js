@@ -1,9 +1,13 @@
 import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList } from 'react-native';
 import React, {useState} from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons'
-import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import { useTheme } from "../contexts/themeContext";
+import colors from "../themeColors";
 
 export default function App({navigation}) {
+
+  const { theme, toggleTheme } = useTheme();
+  const themeColors = colors[theme];
   const [contacts, setContacts] = useState([
     {
       id: 1, 
@@ -35,6 +39,8 @@ export default function App({navigation}) {
     },
   ]);
 
+  const styles = getStyles(themeColors);
+
   const renderContact = ({ item }) => (
     <TouchableOpacity 
       style={styles.contactItem} 
@@ -55,10 +61,10 @@ export default function App({navigation}) {
       
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="call" size={20} color="#007AFF" />
+          <Ionicons name="call" size={20} color={themeColors.primary} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="videocam" size={24} color="#007AFF" />
+          <Ionicons name="videocam" size={24} color={themeColors.primary} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -83,10 +89,10 @@ export default function App({navigation}) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: themeColors.background,
   },
   addContactContainer: {
     padding: 15,
@@ -101,7 +107,7 @@ const styles = StyleSheet.create({
   addContactText: {
     marginLeft: 10,
     fontSize: 16,
-    color: '#007AFF',
+    color: themeColors.text,
     fontWeight: '500',
   },
   contactsList: {
@@ -140,6 +146,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 5,
+    color: themeColors.text,
   },
   phone: {
     fontSize: 14,

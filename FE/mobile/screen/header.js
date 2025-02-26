@@ -2,7 +2,15 @@ import React from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 
+import { useTheme } from "../contexts/themeContext";
+import colors from "../themeColors";
+
 const Header = () => {
+  const { theme, toggleTheme } = useTheme();
+  const themeColors = colors[theme];
+
+  const styles = getStyles(themeColors);
+
   return (
     <View style={styles.headerContainer}>
       <View style={styles.block}>
@@ -15,10 +23,10 @@ const Header = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors) => StyleSheet.create({
   headerContainer: {
     height: 100,
-    backgroundColor: '#007AFF',
+    backgroundColor: themeColors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 40

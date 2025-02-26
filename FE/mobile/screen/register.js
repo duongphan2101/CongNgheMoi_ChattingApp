@@ -1,7 +1,13 @@
 import { StyleSheet, Text, View, Image, TouchableOpacity, TextInput } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Feather from '@expo/vector-icons/Feather';
+import { useTheme } from "../contexts/themeContext";
+import colors from "../themeColors";
+
 export default function App({ navigation }) {
+  const { theme, toggleTheme } = useTheme();
+  const themeColors = colors[theme];
+  const styles = getStyles(themeColors);
   return (
     <View style={styles.container}>
 
@@ -11,25 +17,25 @@ export default function App({ navigation }) {
       
       <Image style={{ height: '50%', width: '100%', resizeMode: 'contains' }} source={require('../assets/slice2.png')} />
       <View style={[styles.container, 
-        { padding: 20, width: '100%', backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20 }]}>
+        { padding: 20, width: '100%', backgroundColor: themeColors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20 }]}>
 
         <View style={styles.input}>
-          <Feather name="phone" size={24} color="grey" />
-          <TextInput placeholder="Phone Number" placeholderTextColor={'grey'}
+          <Feather name="phone" size={24} color={themeColors.text} />
+          <TextInput placeholder="Phone Number" placeholderTextColor={themeColors.text}
             style={{ padding: 5, marginLeft: 10, flex: 1}}
           />
         </View>
 
         <View style={styles.input}>
-          <Feather name="lock" size={24} color="grey" />
-          <TextInput placeholder="Password" placeholderTextColor={'grey'} secureTextEntry={true} 
+          <Feather name="lock" size={24} color={themeColors.text} />
+          <TextInput placeholder="Password" placeholderTextColor={themeColors.text} secureTextEntry={true} 
             style={{ padding: 5, marginLeft: 10, flex: 1}}
           />
         </View>
 
         <View style={styles.input}>
-          <Feather name="user" size={24} color="grey" />
-          <TextInput placeholder="User Name" placeholderTextColor={'grey'}
+          <Feather name="user" size={24} color={themeColors.text} />
+          <TextInput placeholder="User Name" placeholderTextColor={themeColors.text}
             style={{ padding: 5, marginLeft: 10, flex: 1}}
           />
         </View>
@@ -41,7 +47,7 @@ export default function App({ navigation }) {
         </TouchableOpacity>
 
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20 }}>
-          <Text>
+          <Text style={{ color: themeColors.text }}>
             Already have an account? 
             <TouchableOpacity onPress={() => navigation.navigate('login')}>
               <Text style={{color: '#007AFF'}}> Login</Text>
@@ -55,10 +61,10 @@ export default function App({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    // backgroundColor: ,
     backgroundColor: '#D9D9D9',
     alignItems: 'center',
     justifyContent: 'center',
@@ -77,7 +83,7 @@ const styles = StyleSheet.create({
     padding: 5,
     width: '100%'
   }, button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: themeColors.primary,
     // backgroundColor: 'black',
     padding: 15,
     borderRadius: 10,

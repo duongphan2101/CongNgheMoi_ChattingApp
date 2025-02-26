@@ -1,12 +1,17 @@
 import React from 'react';
 import { StyleSheet, Text, View, Image, TouchableOpacity, TextInput } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTheme } from "../contexts/themeContext";
+import colors from "../themeColors";
 
 export default function ProfileScreen({ navigation }) {
   const handleSaveChanges = () => {
     console.log('Changes saved');
   };
 
+  const { theme, toggleTheme } = useTheme();
+  const themeColors = colors[theme];
+  const styles = getStyles(themeColors);
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -41,33 +46,33 @@ export default function ProfileScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: themeColors.background,
     alignItems: 'center',
   },
   header: {
     width: '100%',
     backgroundColor: '#2D5D7B',
-    paddingBottom: 10, // Điều chỉnh để avatar nằm dưới cùng
+    paddingBottom: 10,
   },
   headerContent: {
     flexDirection: 'row',
-    alignItems: 'flex-end', // Đẩy avatar xuống đáy header
+    alignItems: 'flex-end',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    marginTop: 140, // Tạo khoảng cách trên cùng cho bố cục đẹp hơn
+    marginTop: 140,
     marginLeft: -100,
   },
   avatarContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#fff',
+    backgroundColor: themeColors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: -60, // Đẩy avatar xuống thêm một chút
+    marginBottom: -60,
 },
   avatar: {
     width: 120,
@@ -75,11 +80,11 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   username: {
-    color: '#fff',
+    color: themeColors.text,
     fontSize: 22,
     fontWeight: 'bold',
-    marginLeft: 15, // Tạo khoảng cách giữa avatar và tên
-    marginBottom: 10, // Canh lề đẹp hơn
+    marginLeft: 15,
+    marginBottom: 10,
   },
   form: {
     width: '90%',
@@ -99,7 +104,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 10,
     padding: 12,
-    backgroundColor: '#EAEAEA',
+    backgroundColor: themeColors.background,
   },
   input: {
     paddingLeft: 10,
@@ -112,8 +117,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    position: 'bottom', // Cố định vị trí
-    bottom: -300, // Điều chỉnh để gần footer
+    position: 'bottom',
+    bottom: -50,
 },
   saveButtonText: {
     fontSize: 18,

@@ -1,11 +1,15 @@
 import { StyleSheet, Text, View, Image, TouchableOpacity } from 'react-native';
-
+import { useTheme } from "../contexts/themeContext";
+import colors from "../themeColors";
 export default function App({navigation}) {
+  const { theme, toggleTheme } = useTheme();
+  const themeColors = colors[theme];
+  const styles = getStyles(themeColors);
   return (
     <View style={styles.container}>
         <Image style={{height: '60%', width: '100%', resizeMode: 'contains'}} source={require('../assets/slice1.png')}/>
         <View style={[styles.container, {padding: 20}]}>
-            <Text style={{fontSize: 30, fontWeight: 'bold'}}>
+            <Text style={styles.title}>
                 Welcome to App
             </Text>
 
@@ -27,14 +31,14 @@ export default function App({navigation}) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: themeColors.background,
     alignItems: 'center',
     justifyContent: 'center',
   }, button : {
-    backgroundColor: '#007AFF',
+    backgroundColor: themeColors.primary,
     // backgroundColor: 'black',
     padding: 15,
     borderRadius: 10,
@@ -42,5 +46,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center', 
     width: '100%'
+  }, title: {
+    fontSize: 30, 
+    fontWeight: 'bold',
+    color: themeColors.text,
   }
 });
