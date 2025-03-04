@@ -2,12 +2,25 @@ import React, { useState } from "react";
 import "./setting_style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 
-function Setting({ setCurrentView }) {
+function Setting({ setIsLoggedIn, setCurrentView }) {
   const [notifications, setNotifications] = useState(false);
   const [language, setLanguage] = useState("Tiếng Việt");
   const [mode, setMode] = useState("Mặc định");
+
+  console.log("🔹 Setting.js - setIsLoggedIn:", setIsLoggedIn);
+  console.log("🔹 Setting.js - setCurrentView:", setCurrentView);
+
   const toggleNotifications = () => {
     setNotifications(!notifications);
+  };
+
+  const handleLogout = () => {
+    if (!setIsLoggedIn) {
+      console.error("setIsLoggedIn is undefined!");
+      return;
+    }
+    setIsLoggedIn(false); // Quay về màn hình Login
+    setCurrentView("login"); // Điều hướng về login
   };
 
   return (
@@ -53,10 +66,7 @@ function Setting({ setCurrentView }) {
             <option value="Light Mode">Light Mode</option>
           </select>
         </div>
-        <button
-          className="setting-item btn"
-          // onClick={() => setCurrentView("login")}
-        >
+        <button className="setting-item btn" onClick={handleLogout}>
           Đăng xuất
         </button>
       </div>
