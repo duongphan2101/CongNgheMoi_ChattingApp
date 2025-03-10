@@ -3,7 +3,7 @@ import "./chat_style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import a1 from "../../assets/imgs/9306614.jpg";
 // import a2 from "../../assets/imgs/9334176.jpg";
-import a3 from "../../assets/imgs/1.jpg";
+// import a3 from "../../assets/imgs/1.jpg";
 
 function Chat() {
   const [message, setMessage] = useState("");

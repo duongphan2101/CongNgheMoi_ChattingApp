@@ -3,7 +3,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./login_style.css";
 import login from "../../API/api_login";
 
-function Login({ setIsLoggedIn, setIsRegistering }) {
+function Login({ setIsLoggedIn, setIsRegistering, setIsForgotPassword }) { // Thêm prop setIsForgotPassword
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
 
@@ -18,8 +18,6 @@ function Login({ setIsLoggedIn, setIsRegistering }) {
       console.log("Login failed");
     }
   };
-  
-  
 
   return (
     <div className="container chat-container blox">
@@ -39,7 +37,11 @@ function Login({ setIsLoggedIn, setIsRegistering }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <p className="text-end mt-2" style={{ cursor: "pointer", color: "blue" }}>
+        <p
+          className="text-end mt-2"
+          style={{ cursor: "pointer", color: "blue" }}
+          onClick={() => setIsForgotPassword(true)} // Chuyển sang màn hình quên mật khẩu
+        >
           Forgot Password?
         </p>
         <button type="submit" className="btn btn-login btn-primary mt-2 form-control">
