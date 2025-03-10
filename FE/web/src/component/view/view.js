@@ -81,7 +81,7 @@ function View({ setIsLoggedIn}) {
     const handleSaveChanges = async () => {
       const token = localStorage.getItem("accessToken");
       if (!token) {
-        setNotification({ show: true, message: "Không có token, vui lòng đăng nhập lại!", type: "error" });
+        setNotification({show: true, message: "Không có token, vui lòng đăng nhập lại!", type: "error"});
         setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 3000);
         return;
       }
@@ -130,7 +130,7 @@ function View({ setIsLoggedIn}) {
 
     const handleAvatarUpload = async () => {
       const token = localStorage.getItem("accessToken");
-      const avatarFile = editInfo.avatar; // File được chọn lưu trong editInfo sau khi người dùng chọn file
+      const avatarFile = editInfo.avatar; //file được chọn lưu trong editInfo sau khi người dùng chọn file
       if (!token || !avatarFile) {
         setNotification({ show: true, message: "Vui lòng chọn ảnh trước!", type: "error" });
         setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 3000);
@@ -161,7 +161,7 @@ function View({ setIsLoggedIn}) {
         const data = await response.json();
         console.log("Upload success:", data);
     
-        setUserInfo(data.user); // Cập nhật lại thông tin user hiển thị
+        setUserInfo(data.user); //cập nhật lại thông tin user hiển thị
         setAvatarPreview(null);
         setNotification({ show: true, message: "Cập nhật avatar thành công!", type: "success" });
         setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
