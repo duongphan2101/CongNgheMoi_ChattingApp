@@ -33,7 +33,8 @@ function View({ setIsLoggedIn}) {
     const [userInfo, setUserInfo] = useState(null); 
     const [showModal, setShowModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [editInfo, setEditInfo] = useState(userInfo);
+    const [editInfo, setEditInfo] = useState(null);
+
     useEffect(() => {
         const fetchUser = async () => {
             const data = await getUser();
@@ -44,6 +45,12 @@ function View({ setIsLoggedIn}) {
             fetchUser();
         }
     }, [showModal]);
+
+    const handleEdit = () => {
+      setEditInfo(userInfo);
+      setShowEditModal(true);
+  };
+  
 
   
     const handleEditChange = (e) => {
@@ -183,6 +190,9 @@ function View({ setIsLoggedIn}) {
                     <p>
                       Điện thoại: <strong>{userInfo?.phoneNumber || "Chưa cập nhật"}</strong>
                     </p>
+                    <p>
+                      Email: <strong>{userInfo?.email || "Chưa cập nhật"}</strong>
+                    </p>
                   </div>
                 </div>
                 <div className="modal-footer bg-dark">
@@ -191,7 +201,7 @@ function View({ setIsLoggedIn}) {
                     className="btn w-100 py-3 custom-button"
                     onClick={() => {
                       setShowModal(false);
-                      setShowEditModal(true);
+                      handleEdit()
                     }}
                   >
                     <i className="bi bi-pencil me-2"></i> Cập nhật
@@ -227,7 +237,7 @@ function View({ setIsLoggedIn}) {
                         type="text"
                         className="form-control"
                         name="name"
-                        value={editInfo.fullName}
+                        value={editInfo?.fullName || "Chưa cập nhật"}
                         onChange={handleEditChange}
                       />
                     </div>
@@ -241,7 +251,7 @@ function View({ setIsLoggedIn}) {
                             name="gender"
                             id="genderMale"
                             value="Male"
-                            checked={editInfo.gender === "Male"}
+                            checked={editInfo?.gender === "Male"|| "Chưa cập nhật"}
                             onChange={handleEditChange}
                           />
                           <label
@@ -258,7 +268,7 @@ function View({ setIsLoggedIn}) {
                             name="gender"
                             id="genderFemale"
                             value="Female"
-                            checked={editInfo.gender === "Female"}
+                            checked={editInfo?.gender === "Female"|| "Chưa cập nhật"}
                             onChange={handleEditChange}
                           />
                           <label
@@ -276,7 +286,7 @@ function View({ setIsLoggedIn}) {
                         <select
                           className="form-select me-2"
                           name="day"
-                          value={editInfo.day}
+                          value={editInfo?.day|| "Chưa cập nhật"}
                           onChange={handleEditChange}
                         >
                           <option value="" disabled>
@@ -291,7 +301,7 @@ function View({ setIsLoggedIn}) {
                         <select
                           className="form-select me-2"
                           name="month"
-                          value={editInfo.month}
+                          value={editInfo?.month|| "Chưa cập nhật"}
                           onChange={handleEditChange}
                         >
                           <option value="" disabled>
@@ -306,7 +316,7 @@ function View({ setIsLoggedIn}) {
                         <select
                           className="form-select"
                           name="year"
-                          value={editInfo.year}
+                          value={editInfo?.year|| "Chưa cập nhật"}
                           onChange={handleEditChange}
                         >
                           <option value="" disabled>

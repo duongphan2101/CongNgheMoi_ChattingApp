@@ -19,7 +19,15 @@ function Chat() {
         ...messages,
         {
           text: message,
-          time: new Date().toLocaleTimeString(),
+          time: new Date().toLocaleString("en-US", {
+            // weekday: "short", // Viết tắt thứ (Mon, Tue, ...)
+            // year: "numeric",  // Năm (2025)
+            // month: "short",   // Viết tắt tháng (Jan, Feb, ...)
+            // day: "numeric",   // Ngày (1, 2, 3, ...)
+            hour: "numeric",  // Giờ
+            minute: "numeric", // Phút
+            hour12: true      // Sử dụng AM/PM
+          }),
           sender: "sent",
         },
       ]);

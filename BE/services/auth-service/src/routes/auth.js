@@ -201,11 +201,11 @@ router.post("/reset-password", async (req, res) => {
       Key: { phoneNumber },
     };
 
-    console.log("DynamoDB query params:", params);
+    // console.log("DynamoDB query params:", params);
 
     const { Item: user } = await dynamoDB.get(params).promise();
 
-    console.log("DynamoDB query result:", user);
+    // console.log("DynamoDB query result:", user);
 
     if (!user) {
       return res

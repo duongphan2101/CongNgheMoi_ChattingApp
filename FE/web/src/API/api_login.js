@@ -20,7 +20,6 @@ const login = async (phoneNumber, password) => {
 
       return data;
   } catch (error) {
-      console.error("Lỗi đăng nhập:", error);
       return null;
   }
 };

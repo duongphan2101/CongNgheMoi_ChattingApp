@@ -2,20 +2,23 @@ import React, { useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./login_style.css";
 import login from "../../API/api_login";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-function Login({ setIsLoggedIn, setIsRegistering, setIsForgotPassword }) { // Thêm prop setIsForgotPassword
+
+function Login({ setIsLoggedIn, setIsRegistering, setIsForgotPassword }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const data = await login(phoneNumber, password);
     if (data) {
-      console.log("Login successful:");
       setIsLoggedIn(true);
+      toast.success("Đăng nhập thành công!", { position: "top-right" });
     } else {
-      alert("Login failed");
-      console.log("Login failed");
+      toast.error("Đăng nhập thất bại, Vui lòng thử lại!", { position: "top-right" });
     }
   };
 
