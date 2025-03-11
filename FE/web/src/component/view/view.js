@@ -33,18 +33,30 @@ function View({ setIsLoggedIn}) {
     const [userInfo, setUserInfo] = useState(null); 
     const [showModal, setShowModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [editInfo, setEditInfo] = useState(null);
+
+    const [editInfo, setEditInfo] = useState({});
+    const [avatarPreview, setAvatarPreview] = useState(null); //lưu URL tạm thời của ảnh
 
     useEffect(() => {
-        const fetchUser = async () => {
-            const data = await getUser();
-            if (data) setUserInfo(data);
-        };
-    
-        if (showModal) {
-            fetchUser();
+      const fetchUser = async () => {
+        const data = await getUser();
+        if (data) {
+          setUserInfo(data);
+          const editData = { ...data };
+          if (data.dob) {
+            const [year, month, day] = data.dob.split("-");
+            editData.year = year;
+            editData.month = parseInt(month, 10);
+            editData.day = parseInt(day, 10);
+          }
+          setEditInfo(editData);
         }
-    }, [showModal]);
+      };
+    
+      if (showModal || showEditModal) {
+        fetchUser();
+      }
+    }, [showModal, showEditModal]);
 
     const handleEdit = () => {
       setEditInfo(userInfo);
@@ -55,14 +67,119 @@ function View({ setIsLoggedIn}) {
   
     const handleEditChange = (e) => {
       const { name, value } = e.target;
-      setEditInfo({ ...editInfo, [name]: value });
+      setEditInfo((prev) => ({ ...prev, [name]: value }));
     };
   
-    const handleSaveChanges = () => {
-      setUserInfo(editInfo);
-      setShowEditModal(false);
+    const [notification, setNotification] = useState({
+      show: false,
+      message: "",
+      type: "success", //success hoặc error
+    });
+
+    const handleAvatarChange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const previewUrl = URL.createObjectURL(file);
+        setAvatarPreview(previewUrl);
+        setEditInfo((prev) => ({ ...prev, avatar: file }));
+        console.log("File đã được chọn:", file);
+      }
     };
-  
+
+    const handleSaveChanges = async () => {
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        setNotification({show: true, message: "Không có token, vui lòng đăng nhập lại!", type: "error"});
+        setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 3000);
+        return;
+      }
+    
+      let dob = editInfo.dob;
+      if (editInfo.year && editInfo.month && editInfo.day) {
+        const formattedMonth = String(editInfo.month).padStart(2, "0");
+        const formattedDay = String(editInfo.day).padStart(2, "0");
+        dob = `${editInfo.year}-${formattedMonth}-${formattedDay}`;
+      }
+    
+      console.log("Dữ liệu gửi đi:", {
+        fullName: editInfo.fullName,
+        dob: dob,
+        gender: editInfo.gender,
+      });
+    
+      try {
+        const response = await fetch("http://localhost:3824/user/update", {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fullName: editInfo.fullName,
+            dob: dob,
+            gender: editInfo.gender,
+          }),
+        });
+    
+        if (!response.ok) throw new Error("Cập nhật thất bại!");
+    
+        const updatedUser = await response.json();
+        setUserInfo(updatedUser.user);
+        setShowEditModal(false);
+        setShowModal(true);
+        setNotification({ show: true, message: "Cập nhật thông tin thành công!", type: "success" });
+        setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
+      } catch (error) {
+        console.error("Lỗi khi cập nhật:", error);
+        setNotification({ show: true, message: "Cập nhật thông tin thất bại!", type: "error" });
+        setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
+      }
+    };
+
+    const handleAvatarUpload = async () => {
+      const token = localStorage.getItem("accessToken");
+      const avatarFile = editInfo.avatar; //file được chọn lưu trong editInfo sau khi người dùng chọn file
+      if (!token || !avatarFile) {
+        setNotification({ show: true, message: "Vui lòng chọn ảnh trước!", type: "error" });
+        setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 3000);
+        return;
+      }
+    
+      console.log("Đang upload file:", avatarFile);
+    
+      const formData = new FormData();
+      formData.append("avatar", avatarFile);
+    
+      try {
+        const response = await fetch("http://localhost:3824/user/update-avatar", {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            // Không set header "Content-Type" khi gửi FormData
+          },
+          body: formData,
+        });
+    
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Server response error:", errorText);
+          throw new Error(`Cập nhật avatar thất bại: ${errorText}`);
+        }
+    
+        const data = await response.json();
+        console.log("Upload success:", data);
+    
+        setUserInfo(data.user); //cập nhật lại thông tin user hiển thị
+        setAvatarPreview(null);
+        setNotification({ show: true, message: "Cập nhật avatar thành công!", type: "success" });
+        setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
+      } catch (error) {
+        console.error("Lỗi khi cập nhật avatar:", error);
+        setNotification({ show: true, message: error.message || "Cập nhật avatar thất bại!", type: "error" });
+        setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
+      }
+    };    
+    
     return (
       <div className="wrapper">
         {/* Sidebar */}
@@ -163,36 +280,71 @@ function View({ setIsLoggedIn}) {
                   ></button>
                 </div>
                 <div className="modal-body text-center">
-                  <div className="d-flex justify-content-center position-relative">
-                    <img
-                      className="user-avt"
-                      src={userInfo?.avatar || a3}
-                      alt="User Avatar"
-                      style={{
-                        width: "80px",
-                        height: "80px",
-                        objectFit: "cover",
-                        border: "2px solid white",
+                <div className="d-flex justify-content-center position-relative avatar-wrapper">
+                  <img
+                    className="user-avt"
+                    src={avatarPreview || userInfo?.avatar || a3}
+                    alt="User Avatar"
+                    style={{
+                      width: "80px",
+                      height: "80px",
+                      objectFit: "cover",
+                      border: "2px solid white",
+                    }}
+                  />
+                  <label className="edit-avatar-icon" htmlFor="avatar-upload">
+                    <i className="bi bi-pencil-fill"></i>
+                  </label>
+                  <input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={handleAvatarChange}
+                  />
+                </div>
+                {avatarPreview && (
+                  <div className="mt-2">
+                    <button 
+                      className="btn btn-sm btn-primary me-2" 
+                      onClick={handleAvatarUpload}
+                    >
+                      Cập nhật ảnh
+                    </button>
+                    <button 
+                      className="btn btn-sm btn-secondary" 
+                      onClick={() => {
+                        setAvatarPreview(null);
+                        setEditInfo(prev => ({ ...prev, avatar: null }));
                       }}
-                    />
+                    >
+                      Hủy
+                    </button>
                   </div>
+                )}
                   <h5 className="fw-bold mt-3 mb-4">{userInfo ? userInfo.fullName : "Chưa có tên"}</h5>
                   <div className="text-start px-3">
                     <h6 className="text-center">
                       <strong>Thông tin cá nhân</strong>
                     </h6>
+{/* 
                     <p>
                       Giới tính: <strong>{userInfo?.gender || "Chưa cập nhật"}</strong>
-                    </p>
-                    <p>
+                    </p> */}
+                    {/* <p>
                       Ngày sinh: <strong>{userInfo?.dob || "Chưa cập nhật"}</strong>
                     </p>
                     <p>
                       Điện thoại: <strong>{userInfo?.phoneNumber || "Chưa cập nhật"}</strong>
-                    </p>
+                    </p> */}
                     <p>
                       Email: <strong>{userInfo?.email || "Chưa cập nhật"}</strong>
                     </p>
+
+                    <p>Giới tính: <strong>{userInfo?.gender === "Male" ? "Nam" : userInfo?.gender === "Female" ? "Nữ" : "Chưa cập nhật"}</strong></p>
+                    <p>Ngày sinh: <strong>{userInfo?.dob || "Chưa cập nhật"}</strong></p>
+                    <p>Điện thoại: <strong>{userInfo?.phoneNumber || "Chưa cập nhật"}</strong></p>
+
                   </div>
                 </div>
                 <div className="modal-footer bg-dark">
@@ -236,8 +388,10 @@ function View({ setIsLoggedIn}) {
                       <input
                         type="text"
                         className="form-control"
-                        name="name"
-                        value={editInfo?.fullName || "Chưa cập nhật"}
+
+                        name="fullName"
+                        value={editInfo.fullName || ""}
+
                         onChange={handleEditChange}
                       />
                     </div>
@@ -254,11 +408,8 @@ function View({ setIsLoggedIn}) {
                             checked={editInfo?.gender === "Male"|| "Chưa cập nhật"}
                             onChange={handleEditChange}
                           />
-                          <label
-                            className="form-check-label"
-                            htmlFor="genderMale"
-                          >
-                            Male
+                          <label className="form-check-label" htmlFor="genderMale">
+                            Nam
                           </label>
                         </div>
                         <div className="form-check form-check-inline">
@@ -271,11 +422,8 @@ function View({ setIsLoggedIn}) {
                             checked={editInfo?.gender === "Female"|| "Chưa cập nhật"}
                             onChange={handleEditChange}
                           />
-                          <label
-                            className="form-check-label"
-                            htmlFor="genderFemale"
-                          >
-                            Female
+                          <label className="form-check-label" htmlFor="genderFemale">
+                            Nữ
                           </label>
                         </div>
                       </div>
@@ -283,12 +431,14 @@ function View({ setIsLoggedIn}) {
                     <div className="mb-3">
                       <label className="form-label">Ngày sinh</label>
                       <div className="d-flex">
-                        <select
-                          className="form-select me-2"
-                          name="day"
-                          value={editInfo?.day|| "Chưa cập nhật"}
-                          onChange={handleEditChange}
-                        >
+
+                          <select
+                            className="form-select me-2"
+                            name="day"
+                            value={editInfo.day || ""}
+                            onChange={handleEditChange}
+                          >
+
                           <option value="" disabled>
                             Ngày
                           </option>
@@ -301,7 +451,7 @@ function View({ setIsLoggedIn}) {
                         <select
                           className="form-select me-2"
                           name="month"
-                          value={editInfo?.month|| "Chưa cập nhật"}
+                          value={editInfo.month || ""}
                           onChange={handleEditChange}
                         >
                           <option value="" disabled>
@@ -316,7 +466,7 @@ function View({ setIsLoggedIn}) {
                         <select
                           className="form-select"
                           name="year"
-                          value={editInfo?.year|| "Chưa cập nhật"}
+                          value={editInfo.year || ""}
                           onChange={handleEditChange}
                         >
                           <option value="" disabled>
@@ -367,6 +517,11 @@ function View({ setIsLoggedIn}) {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+        {notification.show && (
+          <div className={`notification ${notification.type}`}>
+            {notification.message}
           </div>
         )}
       </div>
