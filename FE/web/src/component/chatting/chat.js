@@ -32,7 +32,15 @@ function Chat() {
         ...messages,
         {
           text: message,
-          time: new Date().toLocaleTimeString(),
+          time: new Date().toLocaleString("en-US", {
+            // weekday: "short", // Viết tắt thứ (Mon, Tue, ...)
+            // year: "numeric",  // Năm (2025)
+            // month: "short",   // Viết tắt tháng (Jan, Feb, ...)
+            // day: "numeric",   // Ngày (1, 2, 3, ...)
+            hour: "numeric",  // Giờ
+            minute: "numeric", // Phút
+            hour12: true      // Sử dụng AM/PM
+          }),
           sender: "sent",
         },
       ]);
@@ -44,19 +52,11 @@ function Chat() {
   return (
       <div className="chat-box container">
         <div className="chat-header row">
-          <div className="col-sm-3 d-flex align-items-center">
+          <div className="col-sm-3 col-md-3 d-flex align-items-center">
             <img className="chat-header_avt" src={a1} alt="" />
             <p className="chat-header_name px-2 m-0">Khalid</p>
           </div>
-          <div className="col-sm-6">
-            <button className="btn">
-              <i className="chat-header_icon mx-2 bi bi-camera-video"></i>
-            </button>
-            <button className="btn">
-              <i className="chat-header_icon mx-2 bi bi-telephone"></i>
-            </button>
-          </div>
-          <div className="col-sm-3 d-flex justify-content-end">
+          <div className="col-sm-9 col-md-9 d-flex justify-content-end">
             <button className="btn">
               <i className="chat-header_icon bi bi-three-dots-vertical"></i>
             </button>

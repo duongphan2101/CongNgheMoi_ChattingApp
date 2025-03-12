@@ -33,8 +33,10 @@ function View({ setIsLoggedIn}) {
     const [userInfo, setUserInfo] = useState(null); 
     const [showModal, setShowModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
+
     const [editInfo, setEditInfo] = useState({});
     const [avatarPreview, setAvatarPreview] = useState(null); //lưu URL tạm thời của ảnh
+
     useEffect(() => {
       const fetchUser = async () => {
         const data = await getUser();
@@ -55,6 +57,12 @@ function View({ setIsLoggedIn}) {
         fetchUser();
       }
     }, [showModal, showEditModal]);
+
+    const handleEdit = () => {
+      setEditInfo(userInfo);
+      setShowEditModal(true);
+  };
+  
 
   
     const handleEditChange = (e) => {
@@ -319,9 +327,24 @@ function View({ setIsLoggedIn}) {
                     <h6 className="text-center">
                       <strong>Thông tin cá nhân</strong>
                     </h6>
+{/* 
+                    <p>
+                      Giới tính: <strong>{userInfo?.gender || "Chưa cập nhật"}</strong>
+                    </p> */}
+                    {/* <p>
+                      Ngày sinh: <strong>{userInfo?.dob || "Chưa cập nhật"}</strong>
+                    </p>
+                    <p>
+                      Điện thoại: <strong>{userInfo?.phoneNumber || "Chưa cập nhật"}</strong>
+                    </p> */}
+                    <p>
+                      Email: <strong>{userInfo?.email || "Chưa cập nhật"}</strong>
+                    </p>
+
                     <p>Giới tính: <strong>{userInfo?.gender === "Male" ? "Nam" : userInfo?.gender === "Female" ? "Nữ" : "Chưa cập nhật"}</strong></p>
                     <p>Ngày sinh: <strong>{userInfo?.dob || "Chưa cập nhật"}</strong></p>
                     <p>Điện thoại: <strong>{userInfo?.phoneNumber || "Chưa cập nhật"}</strong></p>
+
                   </div>
                 </div>
                 <div className="modal-footer bg-dark">
@@ -330,7 +353,7 @@ function View({ setIsLoggedIn}) {
                     className="btn w-100 py-3 custom-button"
                     onClick={() => {
                       setShowModal(false);
-                      setShowEditModal(true);
+                      handleEdit()
                     }}
                   >
                     <i className="bi bi-pencil me-2"></i> Cập nhật
@@ -365,8 +388,10 @@ function View({ setIsLoggedIn}) {
                       <input
                         type="text"
                         className="form-control"
+
                         name="fullName"
                         value={editInfo.fullName || ""}
+
                         onChange={handleEditChange}
                       />
                     </div>
@@ -380,7 +405,7 @@ function View({ setIsLoggedIn}) {
                             name="gender"
                             id="genderMale"
                             value="Male"
-                            checked={editInfo.gender === "Male"}
+                            checked={editInfo?.gender === "Male"|| "Chưa cập nhật"}
                             onChange={handleEditChange}
                           />
                           <label className="form-check-label" htmlFor="genderMale">
@@ -394,7 +419,7 @@ function View({ setIsLoggedIn}) {
                             name="gender"
                             id="genderFemale"
                             value="Female"
-                            checked={editInfo.gender === "Female"}
+                            checked={editInfo?.gender === "Female"|| "Chưa cập nhật"}
                             onChange={handleEditChange}
                           />
                           <label className="form-check-label" htmlFor="genderFemale">
@@ -406,12 +431,14 @@ function View({ setIsLoggedIn}) {
                     <div className="mb-3">
                       <label className="form-label">Ngày sinh</label>
                       <div className="d-flex">
+
                           <select
                             className="form-select me-2"
                             name="day"
                             value={editInfo.day || ""}
                             onChange={handleEditChange}
                           >
+
                           <option value="" disabled>
                             Ngày
                           </option>

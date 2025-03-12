@@ -45,6 +45,10 @@ body {
     flex-direction: column;
 }
 
+.sidebar-bottom{
+    background-color: transparent;
+}
+
 .sidebar-header {
     padding: 15px;
     border-top-left-radius: 10px;
@@ -105,6 +109,105 @@ body {
     flex-direction: column;
     overflow: auto;
 }
+
+
+/* 🖥 Responsive Tablet */
+@media screen and (max-width: 1024px) {
+    .wrapper {
+        flex-direction: column;
+        padding: 0;
+        height: 100vh;
+        margin: auto;
+        margin-top: 10px;
+    }
+
+    .sidebar {
+        width: 40%;
+        height: 40px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px;
+
+        position: fixed;
+        bottom: 5px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        margin: 0 auto;
+        background-color: rgba(44, 62, 80, 0.5);
+        border-radius: 15px;
+    }
+
+    .sidebar-bottom{
+        background-color: transparent;
+    }
+
+    .sidebar-header {
+        display: none;
+    }
+
+    .user-list {
+        display: none;
+    }
+
+    .sidebar-bottom {
+        width: 100%;
+        justify-content: space-around;
+    }
+
+    .sidebar-bottom-btn i {
+        font-size: 20px;
+    }
+
+    .content {
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+        width: 100%;
+    }
+}
+
+/* 📱 Responsive Mobile */
+@media screen and (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        height: 60px;
+        background: #222;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .user-list {
+        display: none; /* Ẩn danh sách người dùng */
+    }
+
+    .sidebar-header {
+        display: none; /* Ẩn tìm kiếm */
+    }
+
+    .sidebar-bottom {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
+    }
+
+    .content {
+        flex-grow: 1;
+        height: calc(100vh - 30px);
+        padding: 10px;
+        overflow-y: auto;
+        margin-bottom: 60px;
+    }
+    .wrapper{
+        margin-top: 5px;
+    }
+}
+
 
 .notification {
     position: fixed;

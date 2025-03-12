@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import * as React from "react";
+import { useState } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-
+import { ToastContainer} from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import Login from "./component/login/login";
 import Register from "./component/register/register";
 import View from "./component/view/view";
@@ -16,6 +18,7 @@ function App() {
 
   return (
     <Router>
+      <ToastContainer position="top-right" autoClose={3000} />
       <Routes>
         <Route path="/reset-password" element={<ForgotPassword setIsForgotPassword={setIsForgotPassword} />} />
         <Route path="/" element={

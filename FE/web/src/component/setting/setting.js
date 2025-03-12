@@ -11,8 +11,6 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  console.log("🔹 Setting.js - setIsLoggedIn:", setIsLoggedIn);
-  console.log("🔹 Setting.js - setCurrentView:", setCurrentView);
 
   const toggleNotifications = () => {
     setNotifications(!notifications);
@@ -20,7 +18,6 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
 
   const handleLogout = () => {
     if (!setIsLoggedIn) {
-      console.error("setIsLoggedIn is undefined!");
       return;
     }
     setIsLoggedIn(false); // Quay về màn hình Login
@@ -65,8 +62,8 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
           >
-            <option value="Tiếng Việt">Tiếng Việt</option>
-            <option value="English">English</option>
+            <option value="Vietnamese">Tiếng Việt</option>
+            <option value="English">Tiếng Anh</option>
           </select>
         </div>
         <div className="setting-item">
