@@ -82,7 +82,6 @@ function View({ setIsLoggedIn}) {
         const previewUrl = URL.createObjectURL(file);
         setAvatarPreview(previewUrl);
         setEditInfo((prev) => ({ ...prev, avatar: file }));
-        console.log("File đã được chọn:", file);
       }
     };
 
@@ -145,8 +144,6 @@ function View({ setIsLoggedIn}) {
         return;
       }
     
-      console.log("Đang upload file:", avatarFile);
-    
       const formData = new FormData();
       formData.append("avatar", avatarFile);
     
@@ -162,19 +159,16 @@ function View({ setIsLoggedIn}) {
     
         if (!response.ok) {
           const errorText = await response.text();
-          console.error("Server response error:", errorText);
           throw new Error(`Cập nhật avatar thất bại: ${errorText}`);
         }
     
         const data = await response.json();
-        console.log("Upload success:", data);
     
-        setUserInfo(data.user); //cập nhật lại thông tin user hiển thị
+        setUserInfo(data.user);
         setAvatarPreview(null);
         setNotification({ show: true, message: "Cập nhật avatar thành công!", type: "success" });
         setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
       } catch (error) {
-        console.error("Lỗi khi cập nhật avatar:", error);
         setNotification({ show: true, message: error.message || "Cập nhật avatar thất bại!", type: "error" });
         setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
       }

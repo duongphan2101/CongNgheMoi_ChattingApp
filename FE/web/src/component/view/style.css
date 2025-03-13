@@ -7,6 +7,7 @@ body {
 * {
     scrollbar-width: thin;
     scrollbar-color: #888 transparent;
+    box-sizing: border-box;
 }
 
 *::-webkit-scrollbar {
@@ -209,7 +210,7 @@ body {
 }
 
 
-.notification {
+/* .notification {
     position: fixed;
     top: 20px;
     right: 20px;
@@ -219,7 +220,7 @@ body {
     font-weight: bold;
     z-index: 1000;
     animation: slideIn 0.5s ease-in-out, fadeOut 0.5s ease-in-out 2.5s;
-}
+} */
 
 .notification.success {
     background-color: #28a745;

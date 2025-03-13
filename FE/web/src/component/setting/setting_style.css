@@ -13,7 +13,7 @@
     background-color: transparent;
     padding: 10px;
     border-radius: 5px;
-    color: rgb(0, 0, 0);
+    color: #fff;
 }
 
 .setting-item:hover {
@@ -22,6 +22,10 @@
 
 label {
     font-size: 18px;
+}
+
+.setting-item label {
+  color: #fff;
 }
 
 select {

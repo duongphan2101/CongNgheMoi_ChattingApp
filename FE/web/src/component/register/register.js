@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./register_style.css";
 import register from "../../API/api_register";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function Register({ setIsRegistering }) {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -10,22 +12,19 @@ function Register({ setIsRegistering }) {
   const [loading, setLoading] = useState(false);
 
   const validateInputs = () => {
-    let errors = [];
 
     if (!/^\d{10}$/.test(phoneNumber)) {
-      errors.push("⚠️ Số điện thoại phải có đúng 10 chữ số.");
+      toast.error("Số điện thoại phải có đúng 10 chữ số.");
+      return false;
     }
 
     if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(password)) {
-      errors.push("🔑 Mật khẩu phải có ít nhất 6 ký tự, bao gồm ít nhất một chữ cái và một số.");
+      toast.error("Mật khẩu phải có ít nhất 6 ký tự, bao gồm ít nhất một chữ cái và một số.");
+      return false;
     }
 
     if (!/^[a-zA-Z0-9]{3,}$/.test(userName)) {
-      errors.push("👤 Tên người dùng phải có ít nhất 3 ký tự và chỉ chứa chữ cái hoặc số.");
-    }
-
-    if (errors.length > 0) {
-      alert(errors.join("\n"));
+      toast.error("Tên người dùng phải có ít nhất 3 ký tự và chỉ chứa chữ cái hoặc số.");
       return false;
     }
     return true;
@@ -40,10 +39,10 @@ function Register({ setIsRegistering }) {
     setLoading(false);
 
     if (result) {
-      alert("Đăng ký thành công!");
+      toast.error("Đăng ký thành công!");
       setIsRegistering(false);
     } else {
-      alert("Đăng ký thất bại. Vui lòng thử lại!");
+      toast.error("Đăng ký thất bại. Vui lòng thử lại!");
     }
   };
 
