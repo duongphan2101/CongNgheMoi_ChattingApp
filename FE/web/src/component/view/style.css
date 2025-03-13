@@ -7,6 +7,7 @@ body {
 * {
     scrollbar-width: thin;
     scrollbar-color: #888 transparent;
+    box-sizing: border-box;
 }
 
 *::-webkit-scrollbar {
@@ -43,6 +44,10 @@ body {
     border-radius: 10px;
     display: flex;
     flex-direction: column;
+}
+
+.sidebar-bottom{
+    background-color: transparent;
 }
 
 .sidebar-header {
@@ -104,4 +109,165 @@ body {
     display: flex;
     flex-direction: column;
     overflow: auto;
+}
+
+
+/* 🖥 Responsive Tablet */
+@media screen and (max-width: 1024px) {
+    .wrapper {
+        flex-direction: column;
+        padding: 0;
+        height: 100vh;
+        margin: auto;
+        margin-top: 10px;
+    }
+
+    .sidebar {
+        width: 40%;
+        height: 40px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px;
+
+        position: fixed;
+        bottom: 5px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        margin: 0 auto;
+        background-color: rgba(44, 62, 80, 0.5);
+        border-radius: 15px;
+    }
+
+    .sidebar-bottom{
+        background-color: transparent;
+    }
+
+    .sidebar-header {
+        display: none;
+    }
+
+    .user-list {
+        display: none;
+    }
+
+    .sidebar-bottom {
+        width: 100%;
+        justify-content: space-around;
+    }
+
+    .sidebar-bottom-btn i {
+        font-size: 20px;
+    }
+
+    .content {
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+        width: 100%;
+    }
+}
+
+/* 📱 Responsive Mobile */
+@media screen and (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        height: 60px;
+        background: #222;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .user-list {
+        display: none; /* Ẩn danh sách người dùng */
+    }
+
+    .sidebar-header {
+        display: none; /* Ẩn tìm kiếm */
+    }
+
+    .sidebar-bottom {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
+    }
+
+    .content {
+        flex-grow: 1;
+        height: calc(100vh - 30px);
+        padding: 10px;
+        overflow-y: auto;
+        margin-bottom: 60px;
+    }
+    .wrapper{
+        margin-top: 5px;
+    }
+}
+
+
+/* .notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 5px;
+    color: white;
+    font-weight: bold;
+    z-index: 1000;
+    animation: slideIn 0.5s ease-in-out, fadeOut 0.5s ease-in-out 2.5s;
+} */
+
+.notification.success {
+    background-color: #28a745;
+}
+
+.notification.error {
+    background-color: #dc3545;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.avatar-wrapper {
+    position: relative;
+}
+
+.edit-avatar-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    padding: 5px;
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.avatar-wrapper:hover .edit-avatar-icon {
+    opacity: 1;
 }
