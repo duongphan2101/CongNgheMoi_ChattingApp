@@ -1,7 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const AWS = require("aws-sdk");
-const bcrypt = require("bcryptjs"); // Thư viện mã hóa mật khẩu
+const bcrypt = require("bcryptjs"); 
 const multer = require("multer");
 require("dotenv").config();
 
@@ -22,7 +22,7 @@ const upload = multer({
     limits: { fileSize: 1 * 1024 * 1024 }, // Giới hạn 1MB
 });
 
-// 🔹 API: Lấy thông tin user
+//  API: Lấy thông tin user
 router.get("/me", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -49,7 +49,7 @@ router.get("/me", async (req, res) => {
     }
 });
 
-// 🔹 API: Cập nhật thông tin user
+//  API: Cập nhật thông tin user
 router.put("/update", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -103,7 +103,7 @@ router.put("/update", async (req, res) => {
     }
 });
 
-// 🔹 API: Cập nhật avatar user
+//  API: Cập nhật avatar user
 router.put("/update-avatar", upload.single("avatar"), async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -147,47 +147,67 @@ router.put("/update-avatar", upload.single("avatar"), async (req, res) => {
     }
 });
 
-// 🔹 API: Đổi mật khẩu user
-router.put("/change-password", async (req, res) => {
+//  API: Đổi mật khẩu
+router.post("/change-passwordSetting", async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-        if (!token) return res.status(401).json({ message: "Không có token!" });
+        console.log("Received Headers:", req.headers);
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).json({ message: "Không có token!" });
+        }
+
+        const token = authHeader.split(" ")[1];
+        console.log("Extracted Token:", token);
+
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+            console.log("Decoded Token:", decoded);
+        } catch (error) {
+            return res.status(401).json({ message: "Token không hợp lệ hoặc đã hết hạn!" });
+        }
+
         const phoneNumber = decoded.phoneNumber;
+        console.log("PhoneNumber from Token:", phoneNumber);
 
-        const { oldPassword, newPassword, confirmPassword } = req.body;
-        if (!oldPassword || !newPassword || !confirmPassword) {
-            return res.status(400).json({ message: "Vui lòng điền đầy đủ thông tin!" });
-        }
-        if (newPassword !== confirmPassword) {
-            return res.status(400).json({ message: "Mật khẩu xác nhận không khớp!" });
-        }
+        const { oldPassword, newPassword } = req.body;
 
-        const params = { TableName: TABLE_NAME, Key: { phoneNumber } };
+      
+        const params = {
+            TableName: TABLE_NAME,
+            Key: { phoneNumber }
+        };
         const { Item: user } = await dynamoDB.get(params).promise();
 
-        if (!user) return res.status(404).json({ message: "Không tìm thấy user!" });
+        if (!user) {
+            return res.status(404).json({ message: "User không tồn tại!" });
+        }
+
 
         const isMatch = await bcrypt.compare(oldPassword, user.password);
-        if (!isMatch) return res.status(400).json({ message: "Mật khẩu cũ không đúng!" });
+        if (!isMatch) {
+            return res.status(401).json({ message: "Mật khẩu cũ không đúng!" });
+        }
 
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
         const updateParams = {
             TableName: TABLE_NAME,
             Key: { phoneNumber },
             UpdateExpression: "set password = :password",
-            ExpressionAttributeValues: { ":password": hashedPassword },
+            ExpressionAttributeValues: { ":password": hashedNewPassword },
             ReturnValues: "ALL_NEW",
         };
-
         await dynamoDB.update(updateParams).promise();
-        res.json({ message: "Đổi mật khẩu thành công!" });
+        
+
+        return res.status(200).json({ message: "Đổi mật khẩu thành công!" });
     } catch (error) {
         console.error("Lỗi đổi mật khẩu:", error);
-        res.status(500).json({ message: "Lỗi server!" });
+        res.status(500).json({ message: "Lỗi server!", error: error.message });
     }
 });
+
 
 module.exports = router;

@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import "./setting_style.css";
+import { toast } from "react-toastify";
 import "bootstrap/dist/css/bootstrap.min.css";
+
+import changePasswordSetting from "../../API/api_changePassSetting"; 
 
 function Setting({ setIsLoggedIn, setCurrentView }) {
   const [notifications, setNotifications] = useState(false);
@@ -28,13 +31,33 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
     setShowModal(true); 
 };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log("Old Password:", oldPassword);
-    console.log("New Password:", newPassword);
-    console.log("Confirm Password:", confirmPassword);  
-    setShowModal(false);
-  };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  if (newPassword !== confirmPassword) {
+      toast.error("Mật khẩu xác nhận không khớp!", { position: "top-right" });
+      return;
+  }
+
+  const token = localStorage.getItem("accessToken"); // Lấy token từ localStorage
+  if (!token) {
+      toast.error("Bạn cần đăng nhập để thay đổi mật khẩu!", { position: "top-right" });
+      return;
+  }
+
+  try {
+      await changePasswordSetting(oldPassword, newPassword, confirmPassword, token);
+      toast.success("Đổi mật khẩu thành công!", { position: "top-right" });
+      setShowModal(false); 
+  } catch (error) {
+      toast.error("Lỗi: " + error.message, { position: "top-right" });
+  }
+};
+
+
+
+
+
   return (
     <div className="chat-box container">
       <div className="chat-header row">
