@@ -7,6 +7,7 @@ import Register from "./component/register/register";
 import View from "./component/view/view";
 import Setting from "./component/setting/setting";
 import ForgotPassword from "./component/forgotpass/forgotpass";
+import SendLinkReset from "./component/sendLink/sendLinkReset";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -18,6 +19,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/reset-password" element={<ForgotPassword setIsForgotPassword={setIsForgotPassword} />} />
+        <Route path="/send-reset-link" element={<SendLinkReset setIsForgotPassword={setIsForgotPassword} />} />
         <Route path="/" element={
           isLoggedIn ? (
             currentView === "settings" ? (
@@ -26,7 +28,7 @@ function App() {
               <View setIsLoggedIn={setIsLoggedIn} setCurrentView={setCurrentView} />
             )
           ) : isForgotPassword ? (
-            <ForgotPassword setIsForgotPassword={setIsForgotPassword} /> // Hiển thị ForgotPassword
+            <SendLinkReset setIsForgotPassword={setIsForgotPassword} /> // Hiển thị SendLinkReset
           ) : isRegistering ? (
             <Register setIsRegistering={setIsRegistering} setCurrentView={setCurrentView} />
           ) : (
