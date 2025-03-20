@@ -10,6 +10,7 @@ import View from "./component/view/view";
 import Setting from "./component/setting/setting";
 import ForgotPassword from "./component/forgotpass/forgotpass";
 import SendLinkReset from "./component/sendLink/sendLinkReset";
+import ConfirmEmail from "./component/register/ConfirmEmail"; // Import the ConfirmEmail component
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -23,21 +24,30 @@ function App() {
       <Routes>
         <Route path="/reset-password" element={<ForgotPassword setIsForgotPassword={setIsForgotPassword} />} />
         <Route path="/send-reset-link" element={<SendLinkReset setIsForgotPassword={setIsForgotPassword} />} />
-        <Route path="/" element={
-          isLoggedIn ? (
-            currentView === "settings" ? (
-              <Setting setIsLoggedIn={setIsLoggedIn} setCurrentView={setCurrentView} />
+        <Route path="/confirm-email" element={<ConfirmEmail />} />
+        <Route
+          path="/"
+          element={
+            isLoggedIn ? (
+              currentView === "settings" ? (
+                <Setting setIsLoggedIn={setIsLoggedIn} setCurrentView={setCurrentView} />
+              ) : (
+                <View setIsLoggedIn={setIsLoggedIn} setCurrentView={setCurrentView} />
+              )
+            ) : isForgotPassword ? (
+              <SendLinkReset setIsForgotPassword={setIsForgotPassword} /> // Hiển thị SendLinkReset
+            ) : isRegistering ? (
+              <Register setIsRegistering={setIsRegistering} setCurrentView={setCurrentView} />
             ) : (
-              <View setIsLoggedIn={setIsLoggedIn} setCurrentView={setCurrentView} />
+              <Login
+                setIsLoggedIn={setIsLoggedIn}
+                setIsRegistering={setIsRegistering}
+                setIsForgotPassword={setIsForgotPassword}
+                setCurrentView={setCurrentView}
+              />
             )
-          ) : isForgotPassword ? (
-            <SendLinkReset setIsForgotPassword={setIsForgotPassword} /> // Hiển thị SendLinkReset
-          ) : isRegistering ? (
-            <Register setIsRegistering={setIsRegistering} setCurrentView={setCurrentView} />
-          ) : (
-            <Login setIsLoggedIn={setIsLoggedIn} setIsRegistering={setIsRegistering} setIsForgotPassword={setIsForgotPassword} setCurrentView={setCurrentView} />
-          )
-        } />
+          }
+        />
       </Routes>
     </Router>
   );
