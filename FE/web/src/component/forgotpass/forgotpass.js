@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { useLocation} from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import changePassword from "../../API/api_changePass"; // Import the changePassword function
-import sendLinkReset from "../../API/api_sendLinkReset"; // Import the sendLinkReset function
 
 function ForgotPassword({ setIsForgotPassword }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [linkSent, setLinkSent] = useState(false);
   const [token, setToken] = useState(null);
 
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
@@ -25,15 +24,6 @@ function ForgotPassword({ setIsForgotPassword }) {
       setPhoneNumber(phoneNumber);
     }
   }, [location.search]);
-
-  const validatePhoneNumber = () => {
-    const phoneRegex = /^0[0-9]{9}$/;
-    if (!phoneRegex.test(phoneNumber)) {
-      alert("⚠️ Vui lòng nhập số điện thoại hợp lệ.");
-      return false;
-    }
-    return true;
-  };
 
   const validateInputs = () => {
     let errors = [];
@@ -53,21 +43,6 @@ function ForgotPassword({ setIsForgotPassword }) {
     return true;
   };
 
-  const handleSendLink = async () => {
-    if (!validatePhoneNumber()) return;
-
-    setLoading(true);
-    try {
-      await sendLinkReset(phoneNumber); // Call the sendLinkReset function
-      setLinkSent(true);
-      alert("Link đặt lại mật khẩu đã được gửi đến email của bạn!");
-    } catch (error) {
-      alert("Gửi link đặt lại mật khẩu thất bại. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateInputs()) return;
@@ -77,7 +52,7 @@ function ForgotPassword({ setIsForgotPassword }) {
       await changePassword(phoneNumber, newPassword); // Call the changePassword function
       setLoading(false);
       alert("Mật khẩu đã được đặt lại thành công!");
-      setIsForgotPassword(false); // Quay lại màn đăng nhập
+      navigate("/");
     } catch (error) {
       setLoading(false);
       alert("Đặt lại mật khẩu thất bại. Vui lòng thử lại.");
@@ -88,25 +63,6 @@ function ForgotPassword({ setIsForgotPassword }) {
     <div className="container chat-container blox">
       <form className="container-fluid chat-form" onSubmit={handleSubmit}>
         <h1 className="text-center my-4 title">Quên mật khẩu</h1>
-
-        <div className="input-group mb-4">
-          <input
-            className="form-control inp"
-            type="text"
-            placeholder="Số điện thoại"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            disabled={linkSent}
-          />
-          <button
-            type="button"
-            className="btn btn-outline-primary"
-            onClick={handleSendLink}
-            disabled={loading || linkSent}
-          >
-            {loading && !linkSent ? "Đang gửi..." : "Gửi link đặt lại mật khẩu"}
-          </button>
-        </div>
 
         <input
           className="form-control inp mt-4"

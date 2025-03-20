@@ -150,26 +150,21 @@ router.put("/update-avatar", upload.single("avatar"), async (req, res) => {
 //  API: Đổi mật khẩu
 router.post("/change-passwordSetting", async (req, res) => {
     try {
-        console.log("Received Headers:", req.headers);
-
         const authHeader = req.headers.authorization;
         if (!authHeader) {
             return res.status(401).json({ message: "Không có token!" });
         }
 
         const token = authHeader.split(" ")[1];
-        console.log("Extracted Token:", token);
 
         let decoded;
         try {
             decoded = jwt.verify(token, process.env.JWT_SECRET);
-            console.log("Decoded Token:", decoded);
         } catch (error) {
             return res.status(401).json({ message: "Token không hợp lệ hoặc đã hết hạn!" });
         }
 
         const phoneNumber = decoded.phoneNumber;
-        console.log("PhoneNumber from Token:", phoneNumber);
 
         const { oldPassword, newPassword } = req.body;
 
@@ -204,10 +199,40 @@ router.post("/change-passwordSetting", async (req, res) => {
 
         return res.status(200).json({ message: "Đổi mật khẩu thành công!" });
     } catch (error) {
-        console.error("Lỗi đổi mật khẩu:", error);
         res.status(500).json({ message: "Lỗi server!", error: error.message });
     }
 });
+
+router.get("/searchUser", async (req, res) => {
+    try {
+        const { phoneNumber, fullName } = req.query;
+
+        if (!phoneNumber && !fullName) {
+            return res.status(400).json({ error: "Thiếu thông tin tìm kiếm!" });
+        }
+
+        const params = {
+            TableName: TABLE_NAME,
+            FilterExpression: "phoneNumber = :phone OR fullName = :name",
+            ExpressionAttributeValues: {
+                ":phone": phoneNumber || "NULL",
+                ":name": fullName || "NULL"
+            },
+        };
+
+        const users = await dynamoDB.scan(params).promise();
+        
+        if (!users.Items || users.Items.length === 0) {
+            return res.status(404).json({ message: "Không tìm thấy user!" });
+        }
+
+        res.json(users.Items);
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi server!" });
+    }
+});
+
+
 
 
 module.exports = router;
