@@ -1,19 +1,25 @@
 import React, { useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./register_style.css";
-import register from "../../API/api_register";
+import sendConfirmationEmail from "../../API/api_sendConfirmationEmail"; // Import the email confirmation API
 
 function Register({ setIsRegistering }) {
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState(""); // State for email error message
 
   const validateInputs = () => {
     let errors = [];
 
     if (!/^\d{10}$/.test(phoneNumber)) {
       errors.push("⚠️ Số điện thoại phải có đúng 10 chữ số.");
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.push("📧 Email không hợp lệ.");
     }
 
     if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(password)) {
@@ -33,19 +39,25 @@ function Register({ setIsRegistering }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setEmailError(""); // Reset email error message
+  
     if (!validateInputs()) return;
-
+  
     setLoading(true);
-    const result = await register(phoneNumber, password, userName);
+  
+    // Gửi thêm password và fullName trong request
+    const response = await sendConfirmationEmail(email, phoneNumber, password, userName);
+    
     setLoading(false);
-
-    if (result) {
-      alert("Đăng ký thành công!");
+  
+    if (response.success) {
+      alert(response.message);
       setIsRegistering(false);
     } else {
-      alert("Đăng ký thất bại. Vui lòng thử lại!");
+      setEmailError(response.message || "Đã xảy ra lỗi. Vui lòng thử lại.");
     }
   };
+  
 
   return (
     <div className="container chat-container blox">
@@ -59,6 +71,15 @@ function Register({ setIsRegistering }) {
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value)}
         />
+
+        <input
+          className={`form-control inp mt-4 ${emailError ? "is-invalid" : ""}`}
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        {emailError && <div className="text-danger mt-1">{emailError}</div>}
 
         <input
           className="form-control inp mt-4"
