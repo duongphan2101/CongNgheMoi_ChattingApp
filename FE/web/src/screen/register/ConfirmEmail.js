@@ -10,7 +10,7 @@ function ConfirmEmail() {
   useEffect(() => {
     const confirmEmail = async () => {
       const token = searchParams.get("token");
-
+      console.log("Token từ URL:", token); // Kiểm tra token từ URL
       if (!token) {
         setMessage("❌ Token không hợp lệ.");
         setSuccess(false);
@@ -50,7 +50,7 @@ function ConfirmEmail() {
       {success === null && <div className="spinner-border text-primary my-3"></div>}
 
       {success && (
-        <button className="btn btn-primary mt-3" onClick={() => navigate("/login")}>
+        <button className="btn btn-primary mt-3" onClick={() => navigate("/")}>
           Quay lại Đăng nhập
         </button>
       )}

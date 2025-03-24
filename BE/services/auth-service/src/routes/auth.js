@@ -20,150 +20,186 @@ const TABLE_NAME = "Users";
 const avatar_Default =
   "https://lab2s3aduong.s3.ap-southeast-1.amazonaws.com/man+avatar.png";
 
-  router.post("/send-confirmation-email", async (req, res) => {
+router.post("/send-confirmation-email", async (req, res) => {
+  try {
+    const { email, phoneNumber, password, fullName, gender, dob } = req.body;
+
+    if (!email || !phoneNumber || !password || !fullName) {
+      return res.status(400).json({ message: "Thiếu thông tin bắt buộc." });
+    }
+
+    // Kiểm tra xem số điện thoại đã tồn tại chưa
+    const paramsCheckPhone = {
+      TableName: TABLE_NAME,
+      Key: { phoneNumber },
+    };
+    const { Item: existingUserByPhone } = await dynamoDB
+      .get(paramsCheckPhone)
+      .promise();
+
+    if (existingUserByPhone) {
+      return res
+        .status(400)
+        .json({ message: "Số điện thoại đã được đăng ký." });
+    }
+
+    // Kiểm tra xem email đã tồn tại chưa
+    const paramsCheckEmail = {
+      TableName: TABLE_NAME,
+      IndexName: "EmailIndex", // Cần có Global Secondary Index (GSI) cho email
+      KeyConditionExpression: "email = :emailValue",
+      ExpressionAttributeValues: {
+        ":emailValue": email,
+      },
+    };
+    const existingUserByEmail = await dynamoDB
+      .query(paramsCheckEmail)
+      .promise();
+
+    if (existingUserByEmail.Items.length > 0) {
+      return res
+        .status(400)
+        .json({ message: "Email đã được đăng ký với tài khoản khác." });
+    }
+
+    // Nếu email và số điện thoại đều chưa tồn tại → Gửi email xác nhận
+    const confirmationToken = jwt.sign(
+      { email, phoneNumber, password, fullName, gender, dob },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    const confirmationLink = `http://localhost:3000/confirm-email?token=${confirmationToken}`;
+    console.log("🔗 Link xác nhận:", confirmationLink);
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Xác nhận đăng ký tài khoản",
+      text: `Cảm ơn bạn đã đăng ký. Vui lòng nhấn vào link sau để xác nhận: ${confirmationLink}`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return res.status(201).json({
+      message: "Vui lòng kiểm tra email để xác nhận tài khoản.",
+      success: true,
+    });
+  } catch (error) {
+    console.error("Lỗi khi gửi email xác nhận:", error);
+    return res.status(500).json({ message: "Lỗi server.", error });
+  }
+});
+
+router.get("/confirm-email", async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      console.error("⚠️ Token bị thiếu trong yêu cầu.");
+      return res.status(400).json({ message: "Thiếu token trong yêu cầu." });
+    }
+
+    console.log("📌 Token nhận được:", token);
+
+    // Xác thực token
+    let decoded;
     try {
-      const { email, phoneNumber, password, fullName, gender, dob } = req.body;
-  
-      if (!email || !phoneNumber || !password || !fullName) {
-        return res.status(400).json({ message: "Thiếu thông tin bắt buộc." });
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      console.error("❌ Lỗi xác thực token:", err.message);
+      const errorMessage =
+        err.name === "TokenExpiredError"
+          ? "Token đã hết hạn."
+          : "Token không hợp lệ.";
+      return res.status(400).json({ message: errorMessage });
+    }
+
+    console.log("✅ Token đã được giải mã:", decoded);
+
+    const { email, phoneNumber, password, fullName, gender, dob } = decoded;
+
+    if (!phoneNumber || !email || !password || !fullName) {
+      return res.status(400).json({
+        message: "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường thông tin.",
+      });
+    }
+
+    // Kiểm tra xem tài khoản đã tồn tại chưa
+    const paramsCheck = {
+      TableName: TABLE_NAME,
+      Key: { phoneNumber },
+    };
+
+    const { Item: existingUser } = await dynamoDB.get(paramsCheck).promise();
+
+    if (existingUser) {
+      if (existingUser.isConfirmed) {
+        return res.status(400).json({
+          message: "Tài khoản đã được xác nhận trước đó.",
+        });
       }
-  
-      // Kiểm tra xem số điện thoại đã tồn tại chưa
-      const paramsCheckPhone = {
+
+      // Cập nhật trạng thái thành đã xác nhận
+      const paramsUpdate = {
         TableName: TABLE_NAME,
         Key: { phoneNumber },
+        UpdateExpression: "SET isConfirmed = :true",
+        ConditionExpression: "attribute_not_exists(isConfirmed) OR isConfirmed = :false",
+        ExpressionAttributeValues: { ":true": true, ":false": false },
       };
-      const { Item: existingUserByPhone } = await dynamoDB.get(paramsCheckPhone).promise();
-  
-      if (existingUserByPhone) {
-        return res.status(400).json({ message: "Số điện thoại đã được đăng ký." });
-      }
-  
-      // Kiểm tra xem email đã tồn tại chưa
-      const paramsCheckEmail = {
-        TableName: TABLE_NAME,
-        IndexName: "EmailIndex", // Cần có Global Secondary Index (GSI) cho email
-        KeyConditionExpression: "email = :emailValue",
-        ExpressionAttributeValues: {
-          ":emailValue": email,
-        },
-      };
-      const existingUserByEmail = await dynamoDB.query(paramsCheckEmail).promise();
-  
-      if (existingUserByEmail.Items.length > 0) {
-        return res.status(400).json({ message: "Email đã được đăng ký với tài khoản khác." });
-      }
-  
-      // Nếu email và số điện thoại đều chưa tồn tại → Gửi email xác nhận
-      const confirmationToken = jwt.sign(
-        { email, phoneNumber, password, fullName, gender, dob },
-        process.env.JWT_SECRET,
-        { expiresIn: "1h" }
-      );
-  
-      const confirmationLink = `http://localhost:3000/confirm-email?token=${confirmationToken}`;
-      console.log("🔗 Link xác nhận:", confirmationLink);
-  
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
-  
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "Xác nhận đăng ký tài khoản",
-        text: `Cảm ơn bạn đã đăng ký. Vui lòng nhấn vào link sau để xác nhận: ${confirmationLink}`,
-      };
-  
-      await transporter.sendMail(mailOptions);
-  
-      return res.status(201).json({
-        message: "Vui lòng kiểm tra email để xác nhận tài khoản.",
+
+      await dynamoDB.update(paramsUpdate).promise();
+
+      return res.status(200).json({
+        message: "🎉 Tài khoản đã được xác nhận thành công!",
         success: true,
       });
-    } catch (error) {
-      console.error("Lỗi khi gửi email xác nhận:", error);
-      return res.status(500).json({ message: "Lỗi server.", error });
     }
-  });
-  
-  
-  router.get("/confirm-email", async (req, res) => {
-    try {
-      const { token } = req.query;
-  
-      if (!token) {
-        console.error("⚠️ Token bị thiếu trong yêu cầu.");
-        return res.status(400).json({ message: "Token là bắt buộc." });
-      }
-  
-      console.log("📌 Token nhận được:", token);
-  
-      // Xác thực token
-      let decoded;
-      try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET);
-      } catch (err) {
-        console.error("❌ Lỗi xác thực token:", err.message);
-        return res.status(400).json({ message: "Token không hợp lệ hoặc đã hết hạn." });
-      }
-  
-      console.log("✅ Token đã được giải mã:", decoded);
-  
-      const { email, phoneNumber, password, fullName, gender, dob } = decoded;
-  
-      // Kiểm tra dữ liệu hợp lệ
-      if (!phoneNumber || !email || !password || !fullName) {
-        return res.status(400).json({ message: "Dữ liệu không hợp lệ." });
-      }
-  
-      // Kiểm tra xem tài khoản đã tồn tại chưa
-      const params = {
-        TableName: TABLE_NAME,
-        Key: { phoneNumber },
-      };
-  
-      const { Item: existingUser } = await dynamoDB.get(params).promise();
-  
-      if (existingUser) {
-        return res.status(400).json({ message: "Số điện thoại đã tồn tại." });
-      }
-  
-      // Mã hóa mật khẩu trước khi lưu
-      const hashedPassword = await bcrypt.hash(password, 10);
-  
-      // Tạo tài khoản mới với thông tin đầy đủ
-      const newUser = {
-        userID: uuidv4(),
-        phoneNumber,
-        password: hashedPassword,
-        fullName,
-        email,
-        gender: gender || "unknown",
-        dob: dob || "unknown",
-        avatar: avatar_Default,
-        status: "active",
-        createAt: new Date().toISOString().split("T")[0],
-      };
-  
-      const paramsInsert = {
-        TableName: TABLE_NAME,
-        Item: newUser,
-      };
-  
-      await dynamoDB.put(paramsInsert).promise();
-  
-      return res.status(200).json({ message: "🎉 Tài khoản đã được tạo thành công!", success: true });
-    } catch (error) {
-      console.error("❌ Lỗi khi xác nhận tài khoản:", error.message);
-      return res.status(500).json({ message: "Lỗi server. Vui lòng thử lại sau!" });
-    }
-  });
-  
+
+    // Mã hóa mật khẩu
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Dữ liệu người dùng mới
+    const newUser = {
+      userID: uuidv4(),
+      phoneNumber,
+      password: hashedPassword,
+      fullName,
+      email,
+      gender: gender || "unknown",
+      isConfirmed: true,
+      dob: dob || "unknown",
+      avatar: avatar_Default,
+      status: "active",
+      createAt: new Date().toISOString().split("T")[0],
+    };
+
+    // Thêm tài khoản mới
+    const paramsInsert = {
+      TableName: TABLE_NAME,
+      Item: newUser,
+    };
+
+    await dynamoDB.put(paramsInsert).promise();
+
+    return res.status(200).json({
+      message: "🎉 Tài khoản đã được tạo thành công!",
+      success: true,
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi xác nhận tài khoản:", error.message);
+    return res.status(500).json({ message: "Lỗi server. Vui lòng thử lại sau!" });
+  }
+});
 
 // router.post("/register", async (req, res) => {
 //   try {
