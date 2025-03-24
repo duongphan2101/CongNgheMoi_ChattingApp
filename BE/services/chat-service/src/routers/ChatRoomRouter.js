@@ -1,6 +1,5 @@
 const express = require("express");
 const AWS = require("aws-sdk");
-const verifyToken = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
