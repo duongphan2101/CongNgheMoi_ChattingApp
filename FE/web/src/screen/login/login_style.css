@@ -1,0 +1,30 @@
+.blox {
+    width: 50%;
+    height: auto;
+    padding: 20px;
+    margin-top: 100px;
+    background-color: rgba(255, 255, 2555, .2);
+    border-radius: 10px;
+}
+
+.inp {
+    background-color: transparent;
+    outline: none;
+    border: 1px solid white;
+    color: white;
+}
+
+.btn-login:hover {
+    background-color: transparent;
+    color: white;
+}
+
+.link {
+    color: #2575fc;
+    cursor: pointer;
+}
+
+.link:hover {
+    color: #6a11cb;
+    text-shadow: 0 0 10px #6a11cb;
+}
