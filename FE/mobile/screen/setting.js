@@ -1,64 +1,101 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, Switch, TouchableOpacity, Alert } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import { StyleSheet, Text, View, Switch, TouchableOpacity, Alert, Modal } from 'react-native';
 import { useTheme } from "../contexts/themeContext";
 import colors from "../themeColors";
 import { useTranslation } from "react-i18next";
 
-const App = () => {
+const App = ({navigation}) => {
   const { theme, toggleTheme } = useTheme();
   const themeColors = colors[theme];
-
   const { i18n, t } = useTranslation();
 
   const [isEnabled, setIsEnabled] = useState(false);
-
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
+
+  // State điều khiển hiển thị Modal
+  const [themeModalVisible, setThemeModalVisible] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+
   const toggleSwitch = () => setIsEnabled(previousState => !previousState);
 
   const handleLogout = () => {
     Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
       { text: "Hủy", style: "cancel" },
-      { text: "Đồng ý", onPress: () => console.log("Đăng xuất thành công") },
+      { text: "Đồng ý", onPress: logout},
     ]);
   };
 
-  const changeLanguage = (language) => {
-    setSelectedLanguage(language);
-    i18n.changeLanguage(language); // Cập nhật ngôn ngữ trong i18n
+  const logout= () => {
+    console.log("Đăng xuất thành công") 
+    navigation.navigate("started");
+  }
+
+  // Đổi ngôn ngữ và lưu vào AsyncStorage
+  const changeLanguage = async (lang) => {
+    await AsyncStorage.setItem("appLanguage", lang);
+    i18n.changeLanguage(lang);
+    setSelectedLanguage(lang);
+    console.log('language ', selectedLanguage);
+    console.log('lang ', lang);
+    setLanguageModalVisible(false);
   };
 
-  // Hàm tạo style dựa trên theme
+  const selectTheme = (mode) => {
+    toggleTheme(mode);
+    setThemeModalVisible(false);
+  };
+
   const styles = getStyles(themeColors);
 
   return (
     <View style={styles.container}>
       <View style={styles.optionsContainer}>
-        {/* Chế Độ (Theme Mode) */}
+
+        {/* Chọn Theme */}
         <View style={styles.optionContainer}>
           <Text style={styles.optionText}>Chế Độ</Text>
-          <Picker
-            selectedValue={theme === "light" ? "Light mode" : "Dark mode"}
-            style={styles.picker}
-            onValueChange={() => toggleTheme()} 
-          >
-            <Picker.Item label="Light mode" value="Light mode" />
-            <Picker.Item label="Dark mode" value="Dark mode" />
-          </Picker>
+          <TouchableOpacity onPress={() => setThemeModalVisible(true)} style={styles.pickerButton}>
+            <Text style={styles.optionText}>{theme === "light" ? "Light mode" : "Dark mode"}</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Ngôn Ngữ */}
+        {/* Modal chọn Theme */}
+        <Modal visible={themeModalVisible} transparent animationType="slide">
+          <View style={styles.modalContainer}>
+            <TouchableOpacity onPress={() => selectTheme("light")} style={styles.modalItem}>
+              <Text style={styles.modalText}>Light mode</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => selectTheme("dark")} style={styles.modalItem}>
+              <Text style={styles.modalText}>Dark mode</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setThemeModalVisible(false)} style={styles.modalCancel}>
+              <Text style={styles.modalCancelText}>Hủy</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+
+        {/* Chọn Ngôn Ngữ */}
         <View style={styles.optionContainer}>
           <Text style={styles.optionText}>{t("Ngôn ngữ")}</Text>
-          <Picker
-            selectedValue={selectedLanguage}
-            style={styles.picker}
-            onValueChange={(itemValue) => changeLanguage(itemValue)}
-          >
-            <Picker.Item label="Tiếng Việt" value="vi" />
-            <Picker.Item label="English" value="en" />
-          </Picker>
+          <TouchableOpacity onPress={() => setLanguageModalVisible(true)} style={styles.pickerButton}>
+            <Text style={styles.optionText}>{selectedLanguage === "vi" ? "Tiếng Việt" : "English"}</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Modal chọn ngôn ngữ */}
+        <Modal visible={languageModalVisible} transparent animationType="slide">
+          <View style={styles.modalContainer}>
+            <TouchableOpacity onPress={() => changeLanguage("vi")} style={styles.modalItem}>
+              <Text style={styles.modalText}>Tiếng Việt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => changeLanguage("en")} style={styles.modalItem}>
+              <Text style={styles.modalText}>English</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setLanguageModalVisible(false)} style={styles.modalCancel}>
+              <Text style={styles.modalCancelText}>Hủy</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
 
         {/* Tắt Thông Báo */}
         <View style={styles.optionContainer}>
@@ -71,7 +108,7 @@ const App = () => {
           />
         </View>
 
-        {/* Đăng xuất Button */}
+        {/* Đăng xuất */}
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
@@ -80,7 +117,7 @@ const App = () => {
   );
 };
 
-// Hàm tạo styles dựa trên theme
+// Styles
 const getStyles = (themeColors) => StyleSheet.create({
   container: {
     flex: 1,
@@ -103,12 +140,42 @@ const getStyles = (themeColors) => StyleSheet.create({
     fontWeight: 'bold',
     color: themeColors.text,
   },
-  picker: {
-    height: 30,
-    width: 120,
+  pickerButton: {
+    padding: 10,
+    backgroundColor: themeColors.button,
+    borderRadius: 5,
+  },
+  // Modal
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalItem: {
+    padding: 15,
+    backgroundColor: "#fff",
+    marginBottom: 10,
+    width: 200,
+    alignItems: "center",
     borderRadius: 10,
-    color: themeColors.text,
-    backgroundColor: themeColors.background
+  },
+  modalText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  modalCancel: {
+    padding: 15,
+    backgroundColor: "red",
+    width: 200,
+    alignItems: "center",
+    borderRadius: 10,
+  },
+  modalCancelText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
   },
   logoutButton: {
     padding: 15,

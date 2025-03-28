@@ -5,20 +5,26 @@ function ConfirmEmail() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [message, setMessage] = useState("Đang xác nhận tài khoản...");
-  const [success, setSuccess] = useState(null); // null = đang tải, true = thành công, false = thất bại
+  const [success, setSuccess] = useState(null);
+
+  // Lấy địa chỉ IP của máy chủ
+  const SERVER_IP = window.location.hostname;
+  const SERVER_PORT = 3721;
+  const BASE_URL = `https://${SERVER_IP}:${SERVER_PORT}`;
+  console.log("BASE ", BASE_URL);
 
   useEffect(() => {
     const confirmEmail = async () => {
       const token = searchParams.get("token");
-
+      console.log("Token từ URL:", token);
       if (!token) {
-        setMessage("❌ Token không hợp lệ.");
+        setMessage("Token không hợp lệ.");
         setSuccess(false);
         return;
       }
 
       try {
-        const response = await fetch(`http://localhost:3721/auth/confirm-email?token=${token}`, {
+        const response = await fetch(`${BASE_URL}/auth/confirm-email?token=${token}`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         });
@@ -40,7 +46,7 @@ function ConfirmEmail() {
     };
 
     confirmEmail();
-  }, [searchParams]);
+  }, [searchParams,  BASE_URL]);
 
   return (
     <div className="container text-center my-4">
@@ -50,7 +56,7 @@ function ConfirmEmail() {
       {success === null && <div className="spinner-border text-primary my-3"></div>}
 
       {success && (
-        <button className="btn btn-primary mt-3" onClick={() => navigate("/login")}>
+        <button className="btn btn-primary mt-3" onClick={() => navigate("/")}>
           Quay lại Đăng nhập
         </button>
       )}

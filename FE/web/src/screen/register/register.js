@@ -4,7 +4,7 @@ import "./register_style.css";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-import sendConfirmationEmail from "../../API/api_sendConfirmationEmail";
+import sendConfirmationEmail from "../../API/api_register/api_sendConfirmationEmail";
 
 function Register({ setIsRegistering }) {
   const [phoneNumber, setPhoneNumber] = useState("");

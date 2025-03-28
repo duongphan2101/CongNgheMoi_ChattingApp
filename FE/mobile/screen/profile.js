@@ -109,9 +109,10 @@ const getStyles = (themeColors) => StyleSheet.create({
   input: {
     paddingLeft: 10,
     flex: 1,
+    color: themeColors.text
   },
   saveButton: {
-    backgroundColor: '#90EE90',
+    backgroundColor: themeColors.button,
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',

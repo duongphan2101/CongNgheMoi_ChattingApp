@@ -59,14 +59,14 @@ export default function App({navigation}) {
         <Text style={styles.phone}>{item.phone}</Text>
       </View>
       
-      <View style={styles.actions}>
+      {/* <View style={styles.actions}>
         <TouchableOpacity style={styles.actionButton}>
           <Ionicons name="call" size={20} color={themeColors.primary} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton}>
           <Ionicons name="videocam" size={24} color={themeColors.primary} />
         </TouchableOpacity>
-      </View>
+      </View> */}
     </TouchableOpacity>
   );
 

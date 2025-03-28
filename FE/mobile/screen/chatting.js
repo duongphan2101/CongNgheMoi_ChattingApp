@@ -22,14 +22,14 @@ export default function App({navigation, route}) {
               <Image source={{uri: user.avatar}} style={styles.avatar}/>
               <Text style={styles.name}>{user.name}</Text>
             </View>
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            {/* <View style={{flexDirection: 'row', alignItems: 'center'}}>
               <TouchableOpacity>
                 <Ionicons style={{marginRight: 20}} name="call" size={30} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity>
                 <Ionicons name="videocam" size={30} color="#fff" />
               </TouchableOpacity>
-            </View>
+            </View> */}
           </View>
         </View>
 

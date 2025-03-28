@@ -5,7 +5,7 @@ const AWS = require("aws-sdk");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 require("dotenv").config();
-
+const os = require("os");
 const router = express.Router();
 
 // Cấu hình AWS DynamoDB
@@ -20,18 +20,22 @@ const TABLE_NAME = "Users";
 const avatar_Default =
   "https://lab2s3aduong.s3.ap-southeast-1.amazonaws.com/man+avatar.png";
 
-const ngrok = require("ngrok");
-
-let NGROK_URL = "http://localhost:3000"; // Mặc định là localhost
-
-(async function () {
-  try {
-    NGROK_URL = await ngrok.connect(3000); // Mở cổng 3000 trên Ngrok
-    console.log("🌍 Ngrok URL:", NGROK_URL);
-  } catch (error) {
-    console.error("❌ Lỗi khi khởi động Ngrok:", error);
+// Hàm lấy IP LAN của máy chủ
+function getLocalIPAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const iface of Object.values(interfaces)) {
+    for (const config of iface) {
+      if (config.family === "IPv4" && !config.internal) {
+        return config.address;
+      }
+    }
   }
-})();
+  return "localhost";
+}
+
+const SERVER_IP = getLocalIPAddress();
+const SERVER_PORT = 3721;
+const BASE_URL = `http://${SERVER_IP}:${SERVER_PORT}`;
 
 router.post("/send-confirmation-email", async (req, res) => {
   try {
@@ -41,44 +45,29 @@ router.post("/send-confirmation-email", async (req, res) => {
       return res.status(400).json({ message: "Thiếu thông tin bắt buộc." });
     }
 
-    // Kiểm tra số điện thoại đã tồn tại chưa
-    const paramsCheckPhone = {
+    // Kiểm tra xem số điện thoại hoặc email đã tồn tại chưa
+    const paramsCheck = {
       TableName: TABLE_NAME,
       Key: { phoneNumber },
     };
-    const { Item: existingUserByPhone } = await dynamoDB.get(paramsCheckPhone).promise();
+    const { Item: existingUser } = await dynamoDB.get(paramsCheck).promise();
 
-    if (existingUserByPhone) {
-      return res.status(400).json({ message: "Số điện thoại đã được đăng ký." });
+    if (existingUser) {
+      return res.status(400).json({
+        message: "Số điện thoại hoặc email đã được đăng ký.",
+      });
     }
 
-    // Kiểm tra email đã tồn tại chưa
-    const paramsCheckEmail = {
-      TableName: TABLE_NAME,
-      IndexName: "EmailIndex", // Cần có GSI cho email
-      KeyConditionExpression: "email = :emailValue",
-      ExpressionAttributeValues: {
-        ":emailValue": email,
-      },
-    };
-    const existingUserByEmail = await dynamoDB.query(paramsCheckEmail).promise();
-
-    if (existingUserByEmail.Items.length > 0) {
-      return res.status(400).json({ message: "Email đã được đăng ký với tài khoản khác." });
-    }
-
-    // Tạo token xác nhận
+    // Tạo token chứa thông tin đăng ký
     const confirmationToken = jwt.sign(
       { email, phoneNumber, password, fullName, gender, dob },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
-    // Tạo link xác nhận với Ngrok
-    const confirmationLink = `${NGROK_URL}/confirm-email?token=${confirmationToken}`;
-    console.log("🔗 Link xác nhận:", confirmationLink);
+    // Tạo link xác nhận với IP động
+    const confirmationLink = `${BASE_URL}/auth/confirm-email?token=${confirmationToken}`;
 
-    // Gửi email
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -91,7 +80,7 @@ router.post("/send-confirmation-email", async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Xác nhận đăng ký tài khoản",
-      text: `Cảm ơn bạn đã đăng ký. Vui lòng nhấn vào link sau để xác nhận: ${confirmationLink}`,
+      text: `Vui lòng nhấn vào liên kết sau để xác nhận tài khoản của bạn: ${confirmationLink}`,
     };
 
     await transporter.sendMail(mailOptions);
@@ -106,53 +95,27 @@ router.post("/send-confirmation-email", async (req, res) => {
   }
 });
 
-
-
 router.get("/confirm-email", async (req, res) => {
   try {
     const { token } = req.query;
 
     if (!token) {
-      console.error("⚠️ Token bị thiếu trong yêu cầu.");
-      return res.status(400).json({ message: "Token là bắt buộc." });
+      return res.status(400).json({ message: "Token không hợp lệ." });
     }
 
-    console.log("📌 Token nhận được:", token);
-
-    // Xác thực token
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (err) {
-      console.error("❌ Lỗi xác thực token:", err.message);
-      return res.status(400).json({ message: "Token không hợp lệ hoặc đã hết hạn." });
+      const errorMessage = err.name === "TokenExpiredError" ? "Token đã hết hạn." : "Token không hợp lệ.";
+      return res.status(400).json({ message: errorMessage });
     }
-
-    console.log("✅ Token đã được giải mã:", decoded);
 
     const { email, phoneNumber, password, fullName, gender, dob } = decoded;
 
-    // Kiểm tra dữ liệu hợp lệ
-    if (!phoneNumber || !email || !password || !fullName) {
-      return res.status(400).json({ message: "Dữ liệu không hợp lệ." });
-    }
-
-    // Kiểm tra xem tài khoản đã tồn tại chưa
-    const params = {
-      TableName: TABLE_NAME,
-      Key: { phoneNumber },
-    };
-
-    const { Item: existingUser } = await dynamoDB.get(params).promise();
-
-    if (existingUser) {
-      return res.status(400).json({ message: "Số điện thoại đã tồn tại." });
-    }
-
-    // Mã hóa mật khẩu trước khi lưu
+    // Mã hóa mật khẩu và thêm người dùng mới
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Tạo tài khoản mới với thông tin đầy đủ
     const newUser = {
       userID: uuidv4(),
       phoneNumber,
@@ -173,9 +136,12 @@ router.get("/confirm-email", async (req, res) => {
 
     await dynamoDB.put(paramsInsert).promise();
 
-    return res.status(200).json({ message: "🎉 Tài khoản đã được tạo thành công!", success: true });
+    return res.status(200).json({
+      message: "Tài khoản đã được tạo thành công!",
+      success: true,
+    });
   } catch (error) {
-    console.error("❌ Lỗi khi xác nhận tài khoản:", error.message);
+    console.error("Lỗi khi xác nhận tài khoản:", error.message);
     return res.status(500).json({ message: "Lỗi server. Vui lòng thử lại sau!" });
   }
 });

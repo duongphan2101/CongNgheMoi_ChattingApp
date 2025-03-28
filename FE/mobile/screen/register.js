@@ -17,11 +17,12 @@ export default function App({ navigation }) {
   const [username, setUsername] = useState();
   const [isModalVisible, setModalVisible] = useState(false);
   const [message, setMessage] = useState();
+  
   const handleRegister = async () => {
-    console.log("Phone ", phoneNumber);
-    console.log("Email ", email);
-    console.log("UserName ", username);
-    console.log("Pass ", pass);
+    // console.log("Phone ", phoneNumber);
+    // console.log("Email ", email);
+    // console.log("UserName ", username);
+    // console.log("Pass ", pass);
 
     const reponse = await resgister(email, phoneNumber, pass, username);
     if (reponse.success) {
@@ -32,8 +33,6 @@ export default function App({ navigation }) {
       setModalVisible(true);
     }
   }
-
-
 
   return (
     <View style={styles.container}>
