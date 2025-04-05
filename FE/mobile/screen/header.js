@@ -14,7 +14,7 @@ const Header = () => {
   return (
     <View style={styles.headerContainer}>
       <View style={styles.block}>
-        <TextInput placeholder='Tìm kiếm' placeholderTextColor={'#fff'} style={styles.TextInputStyle}/>
+        <TextInput placeholder='Tìm kiếm' placeholderTextColor={'#fff'} style={styles.TextInputStyle} />
         <TouchableOpacity style={styles.touch}>
           <AntDesign name='search1' size={30} color='#fff'/>
         </TouchableOpacity>
@@ -38,7 +38,8 @@ const getStyles = (themeColors) => StyleSheet.create({
     paddingLeft: 20,
     borderColor: '#fff',
     borderWidth: 1,
-    backgroundColor: '#7399C3'
+    backgroundColor: '#7399C3',
+    color: themeColors.text,
   }, 
   block: {
     flexDirection: 'row',

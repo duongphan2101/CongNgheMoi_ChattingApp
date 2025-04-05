@@ -4,11 +4,13 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { ToastContainer} from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import Login from "./component/login/login";
-import Register from "./component/register/register";
-import View from "./component/view/view";
-import Setting from "./component/setting/setting";
-import ForgotPassword from "./component/forgotpass/forgotpass";
+import Login from "./screen/login/login";
+import Register from "./screen/register/register";
+import View from "./screen/view/view";
+import Setting from "./screen/setting/setting";
+import ForgotPassword from "./screen/forgotpass/forgotpass";
+import SendLinkReset from "./screen/sendLink/sendLinkReset";
+import ConfirmEmail from "./screen/register/ConfirmEmail"; // Import the ConfirmEmail component
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -21,21 +23,31 @@ function App() {
       <ToastContainer position="top-right" autoClose={3000} />
       <Routes>
         <Route path="/reset-password" element={<ForgotPassword setIsForgotPassword={setIsForgotPassword} />} />
-        <Route path="/" element={
-          isLoggedIn ? (
-            currentView === "settings" ? (
-              <Setting setIsLoggedIn={setIsLoggedIn} setCurrentView={setCurrentView} />
+        <Route path="/send-reset-link" element={<SendLinkReset setIsForgotPassword={setIsForgotPassword} />} />
+        <Route path="/confirm-email" element={<ConfirmEmail />} />
+        <Route
+          path="/"
+          element={
+            isLoggedIn ? (
+              currentView === "settings" ? (
+                <Setting setIsLoggedIn={setIsLoggedIn} setCurrentView={setCurrentView} />
+              ) : (
+                <View setIsLoggedIn={setIsLoggedIn} setCurrentView={setCurrentView} />
+              )
+            ) : isForgotPassword ? (
+              <SendLinkReset setIsForgotPassword={setIsForgotPassword} /> // Hiển thị SendLinkReset
+            ) : isRegistering ? (
+              <Register setIsRegistering={setIsRegistering} setCurrentView={setCurrentView} />
             ) : (
-              <View setIsLoggedIn={setIsLoggedIn} setCurrentView={setCurrentView} />
+              <Login
+                setIsLoggedIn={setIsLoggedIn}
+                setIsRegistering={setIsRegistering}
+                setIsForgotPassword={setIsForgotPassword}
+                setCurrentView={setCurrentView}
+              />
             )
-          ) : isForgotPassword ? (
-            <ForgotPassword setIsForgotPassword={setIsForgotPassword} /> // Hiển thị ForgotPassword
-          ) : isRegistering ? (
-            <Register setIsRegistering={setIsRegistering} setCurrentView={setCurrentView} />
-          ) : (
-            <Login setIsLoggedIn={setIsLoggedIn} setIsRegistering={setIsRegistering} setIsForgotPassword={setIsForgotPassword} setCurrentView={setCurrentView} />
-          )
-        } />
+          }
+        />
       </Routes>
     </Router>
   );

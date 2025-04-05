@@ -5,7 +5,6 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import chat from "../screen/chat";
 import profile from "../screen/profile";
 import contacts from "../screen/contacts";
-import cloud from "../screen/cloud";
 import setting from "../screen/setting";
 import Header from "../screen/header";
 
@@ -90,7 +89,7 @@ const TabNavigator = () => {
         }}
       />
 
-      <Tab.Screen
+      {/* <Tab.Screen
         name="cloudScr"
         component={cloud}
         options={{
@@ -105,7 +104,7 @@ const TabNavigator = () => {
             />
           ),
         }}
-      />
+      /> */}
 
       <Tab.Screen
         name="settingScr"

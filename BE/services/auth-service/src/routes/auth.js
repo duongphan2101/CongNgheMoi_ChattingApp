@@ -5,7 +5,7 @@ const AWS = require("aws-sdk");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 require("dotenv").config();
-
+const os = require("os");
 const router = express.Router();
 
 // Cấu hình AWS DynamoDB
@@ -20,39 +20,108 @@ const TABLE_NAME = "Users";
 const avatar_Default =
   "https://lab2s3aduong.s3.ap-southeast-1.amazonaws.com/man+avatar.png";
 
-router.post("/register", async (req, res) => {
-  try {
-    const { phoneNumber, password, fullName, email, gender, dob } = req.body;
+// Hàm lấy IP LAN của máy chủ
+function getLocalIPAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const iface of Object.values(interfaces)) {
+    for (const config of iface) {
+      if (config.family === "IPv4" && !config.internal) {
+        return config.address;
+      }
+    }
+  }
+  return "localhost";
+}
 
-    if (!phoneNumber || !password || !fullName) {
-      return res
-        .status(400)
-        .json({ message: "Vui lòng nhập đầy đủ thông tin!" });
+const SERVER_IP = getLocalIPAddress();
+const SERVER_PORT = 3721;
+const BASE_URL = `http://${SERVER_IP}:${SERVER_PORT}`;
+
+router.post("/send-confirmation-email", async (req, res) => {
+  try {
+    const { email, phoneNumber, password, fullName, gender, dob } = req.body;
+
+    if (!email || !phoneNumber || !password || !fullName) {
+      return res.status(400).json({ message: "Thiếu thông tin bắt buộc." });
     }
 
-    // Kiểm tra xem số điện thoại đã tồn tại chưa
+    // Kiểm tra xem số điện thoại hoặc email đã tồn tại chưa
     const paramsCheck = {
       TableName: TABLE_NAME,
       Key: { phoneNumber },
     };
-
     const { Item: existingUser } = await dynamoDB.get(paramsCheck).promise();
+
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "Số điện thoại đã được đăng ký!" });
+      return res.status(400).json({
+        message: "Số điện thoại hoặc email đã được đăng ký.",
+      });
     }
 
-    // Mã hóa mật khẩu
+    // Tạo token chứa thông tin đăng ký
+    const confirmationToken = jwt.sign(
+      { email, phoneNumber, password, fullName, gender, dob },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // Tạo link xác nhận với IP động
+    const confirmationLink = `${BASE_URL}/auth/confirm-email?token=${confirmationToken}`;
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Xác nhận đăng ký tài khoản",
+      text: `Vui lòng nhấn vào liên kết sau để xác nhận tài khoản của bạn: ${confirmationLink}`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return res.status(201).json({
+      message: "Vui lòng kiểm tra email để xác nhận tài khoản.",
+      success: true,
+    });
+  } catch (error) {
+    console.error("Lỗi khi gửi email xác nhận:", error);
+    return res.status(500).json({ message: "Lỗi server.", error });
+  }
+});
+
+router.get("/confirm-email", async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ message: "Token không hợp lệ." });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      const errorMessage = err.name === "TokenExpiredError" ? "Token đã hết hạn." : "Token không hợp lệ.";
+      return res.status(400).json({ message: errorMessage });
+    }
+
+    const { email, phoneNumber, password, fullName, gender, dob } = decoded;
+
+    // Mã hóa mật khẩu và thêm người dùng mới
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Tạo user mới
     const newUser = {
       userID: uuidv4(),
       phoneNumber,
       password: hashedPassword,
       fullName,
-      email: email || "unknown",
+      email,
       gender: gender || "unknown",
       dob: dob || "unknown",
       avatar: avatar_Default,
@@ -60,7 +129,6 @@ router.post("/register", async (req, res) => {
       createAt: new Date().toISOString().split("T")[0],
     };
 
-    // Lưu vào DynamoDB
     const paramsInsert = {
       TableName: TABLE_NAME,
       Item: newUser,
@@ -68,14 +136,73 @@ router.post("/register", async (req, res) => {
 
     await dynamoDB.put(paramsInsert).promise();
 
-    return res
-      .status(201)
-      .json({ message: "Đăng ký thành công!", user: newUser });
+    return res.status(200).json({
+      message: "Tài khoản đã được tạo thành công!",
+      success: true,
+    });
   } catch (error) {
-    console.error("Lỗi khi đăng ký:", error);
-    return res.status(500).json({ message: "Lỗi server", error });
+    console.error("Lỗi khi xác nhận tài khoản:", error.message);
+    return res.status(500).json({ message: "Lỗi server. Vui lòng thử lại sau!" });
   }
 });
+
+
+// router.post("/register", async (req, res) => {
+//   try {
+//     const { phoneNumber, password, fullName, email, gender, dob } = req.body;
+
+//     if (!phoneNumber || !password || !fullName) {
+//       return res
+//         .status(400)
+//         .json({ message: "Vui lòng nhập đầy đủ thông tin!" });
+//     }
+
+//     // Kiểm tra xem số điện thoại đã tồn tại chưa
+//     const paramsCheck = {
+//       TableName: TABLE_NAME,
+//       Key: { phoneNumber },
+//     };
+
+//     const { Item: existingUser } = await dynamoDB.get(paramsCheck).promise();
+//     if (existingUser) {
+//       return res
+//         .status(400)
+//         .json({ message: "Số điện thoại đã được đăng ký!" });
+//     }
+
+//     // Mã hóa mật khẩu
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     // Tạo user mới
+//     const newUser = {
+//       userID: uuidv4(),
+//       phoneNumber,
+//       password: hashedPassword,
+//       fullName,
+//       email: email || "unknown",
+//       gender: gender || "unknown",
+//       dob: dob || "unknown",
+//       avatar: avatar_Default,
+//       status: "active",
+//       createAt: new Date().toISOString().split("T")[0],
+//     };
+
+//     // Lưu vào DynamoDB
+//     const paramsInsert = {
+//       TableName: TABLE_NAME,
+//       Item: newUser,
+//     };
+
+//     await dynamoDB.put(paramsInsert).promise();
+
+//     return res
+//       .status(201)
+//       .json({ message: "Đăng ký thành công!", user: newUser });
+//   } catch (error) {
+//     console.error("Lỗi khi đăng ký:", error);
+//     return res.status(500).json({ message: "Lỗi server", error });
+//   }
+// });
 
 router.post("/login", async (req, res) => {
   try {
@@ -156,7 +283,11 @@ router.post("/send-reset-link", async (req, res) => {
     }
 
     // Generate a reset token (for simplicity, using userID)
-    const resetToken = jwt.sign({ userID: user.userID }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const resetToken = jwt.sign(
+      { userID: user.userID },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
 
     // Send email with reset link
     const transporter = nodemailer.createTransport({
@@ -178,7 +309,9 @@ router.post("/send-reset-link", async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
-    return res.status(200).json({ message: "Link đặt lại mật khẩu đã được gửi đến email của bạn" });
+    return res
+      .status(200)
+      .json({ message: "Link đặt lại mật khẩu đã được gửi đến email của bạn" });
   } catch (error) {
     console.error("Lỗi khi gửi link đặt lại mật khẩu:", error);
     return res.status(500).json({ message: "Lỗi server", error });
@@ -208,9 +341,7 @@ router.post("/reset-password", async (req, res) => {
     // console.log("DynamoDB query result:", user);
 
     if (!user) {
-      return res
-        .status(404)
-        .json({ message: "Người dùng không tồn tại" });
+      return res.status(404).json({ message: "Người dùng không tồn tại" });
     }
 
     // Mã hóa mật khẩu mới
@@ -231,9 +362,7 @@ router.post("/reset-password", async (req, res) => {
 
     await dynamoDB.update(paramsUpdate).promise();
 
-    return res
-      .status(200)
-      .json({ message: "Đặt lại mật khẩu thành công!" });
+    return res.status(200).json({ message: "Đặt lại mật khẩu thành công!" });
   } catch (error) {
     console.error("Lỗi khi đặt lại mật khẩu:", error);
     return res.status(500).json({ message: "Lỗi server", error });
