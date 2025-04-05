@@ -32,7 +32,7 @@ const upload = multer({
         }
     }),
     limits: {
-        fileSize: 10 * 1024 * 1024
+        fileSize: 10 * 1024 * 1024 // 10MB
     },
     fileFilter: (req, file, cb) => {
         const allowedTypes = /\.?(jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar|txt|mp3|mp4|m4a)$/;
@@ -121,7 +121,7 @@ module.exports = (io) => {
                 data: newMessage
             });
         } catch (error) {
-            console.error("Lỗi khi lưu tin nhắn file:", error);
+            console.error("❌ Lỗi khi lưu tin nhắn file:", error);
             res.status(500).json({
                 error: "Lỗi Server khi xử lý file!",
                 details: error.message
