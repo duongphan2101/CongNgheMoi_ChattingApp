@@ -332,12 +332,12 @@ function View({ setIsLoggedIn }) {
           >
             <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i>
           </button>
-          <button
+          {/* <button
             className="sidebar-bottom-btn btn"
             onClick={() => setCurrentView("cloud")}
           >
             <i className="sidebar-bottom_icon bi bi-cloud text-light"></i>
-          </button>
+          </button> */}
           <button
             className="sidebar-bottom-btn btn"
             onClick={() => setCurrentView("setting")}

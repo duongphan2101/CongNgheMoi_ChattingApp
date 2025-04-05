@@ -1,5 +1,6 @@
 body {
     background: linear-gradient(to right, #6a11cb, #2575fc);
+    /* background-color: #222; */
     color: white;
     font-family: Arial, sans-serif;
 }
@@ -43,6 +44,7 @@ body {
 .sidebar {
     width: 35%;
     background-color: rgba(44, 62, 80, 0.5);
+    /* background-color: rgba(255, 255, 255, 0.1); */
     border-radius: 10px;
     display: flex;
     flex-direction: column;
