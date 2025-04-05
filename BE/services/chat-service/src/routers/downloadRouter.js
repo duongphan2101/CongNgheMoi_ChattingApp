@@ -8,7 +8,7 @@ const s3 = new AWS.S3();
 const TABLE_NAME = "Message";
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "lab2s3aduong";
 
-// Hàm tiện ích để trích xuất key từ URL S3
+// Hàm để trích xuất key từ URL S3
 const extractKeyFromUrl = (url) => {
     const urlParts = url.split('/');
     let key = urlParts.slice(3).join('/');
@@ -19,7 +19,7 @@ const extractKeyFromUrl = (url) => {
     return key;
 };
 
-// Route xem file (chủ yếu dành cho hình ảnh)
+// Route xem file
 router.get("/view/:chatRoomId/:messageId", async (req, res) => {
     try {
     const { chatRoomId, messageId } = req.params;
@@ -48,7 +48,6 @@ router.get("/view/:chatRoomId/:messageId", async (req, res) => {
     const fileUrl = fileInfo.url;
     const key = extractKeyFromUrl(fileUrl);
     
-    // Stream file từ S3
     const s3Params = {
         Bucket: BUCKET_NAME,
         Key: key
@@ -56,10 +55,8 @@ router.get("/view/:chatRoomId/:messageId", async (req, res) => {
     
     const s3Stream = s3.getObject(s3Params).createReadStream();
     
-    // Set Content-Type để trình duyệt hiển thị đúng
     res.setHeader('Content-Type', fileInfo.type);
     
-    // Pipe stream từ S3 tới response
     s3Stream.pipe(res);
     
     } catch (error) {
@@ -68,12 +65,10 @@ router.get("/view/:chatRoomId/:messageId", async (req, res) => {
     }
 });
 
-// Route tải xuống file
 router.get("/download/:chatRoomId/:messageId", async (req, res) => {
     try {
     const { chatRoomId, messageId } = req.params;
     
-    // Lấy thông tin tin nhắn từ DynamoDB
     const params = {
         TableName: TABLE_NAME,
         Key: {
@@ -97,23 +92,19 @@ router.get("/download/:chatRoomId/:messageId", async (req, res) => {
     const fileUrl = fileInfo.url;
     const key = extractKeyFromUrl(fileUrl);
     
-    // Stream file từ S3
     const s3Params = {
         Bucket: BUCKET_NAME,
         Key: key
     };
     
-    // Lấy thông tin file từ S3
     const headParams = {
         Bucket: BUCKET_NAME,
         Key: key
     };
     
-    // Set headers cho việc tải xuống
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileInfo.name)}"`);
     res.setHeader('Content-Type', 'application/octet-stream');
     
-    // Stream file từ S3 tới response
     const s3Stream = s3.getObject(s3Params).createReadStream();
     s3Stream.pipe(res);
     
