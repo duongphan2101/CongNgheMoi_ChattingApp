@@ -9,7 +9,7 @@ require("dotenv").config({ path: "../.env" });
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-    cors: { origin: "*" } // Cho phép tất cả client kết nối
+    cors: { origin: "*" }
 });
 
 const PORT = 3618;
@@ -23,7 +23,6 @@ AWS.config.update({
 app.use(express.json());
 app.use(cors());
 
-// Import routes
 const conversationRoutes = require("./routers/conversationRouter");
 const chatRoomRoutes = require("./routers/ChatRoomRouter");
 const messageRoutes = require("./routers/messageRouter")(io);

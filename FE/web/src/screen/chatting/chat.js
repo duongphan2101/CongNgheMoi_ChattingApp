@@ -13,9 +13,21 @@ function Chat({ chatRoom, userChatting = [], user }) {
   const [messages, setMessages] = useState([]);
   const [currentUserPhone, setCurrentUserPhone] = useState();
   const [typing, setTyping] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [activeMessageId, setActiveMessageId] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  
+  // Trạng thái cho modal xem ảnh
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [currentImage, setCurrentImage] = useState({
+    src: "",
+    name: ""
+  });
+  
   const messagesEndRef = useRef(null);
   const emojiPickerRef = useRef(null);
-  const [showPicker, setShowPicker] = useState(false);
+  
   const otherUserPhone = chatRoom?.participants?.find(phone => phone !== currentUserPhone);
 
   const addEmoji = (emoji) => {
@@ -28,17 +40,30 @@ function Chat({ chatRoom, userChatting = [], user }) {
     setCurrentUserPhone(user.phoneNumber);
     fetch(`http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}`)
       .then((res) => res.json())
-      .then((data) => setMessages(data));
+      .then((data) => {
+        console.log("Loaded messages:", data);
+        setMessages(data);
+      })
+      .catch(err => console.error("Error fetching messages:", err));
 
     socket.emit("joinRoom", chatRoom.chatRoomId);
-    socket.on("receiveMessage", (newMessage) => setMessages((prev) => [...prev, newMessage]));
+    
+    socket.on("receiveMessage", (newMessage) => {
+      console.log("Received new message:", newMessage);
+      setMessages((prev) => [...prev, newMessage]);
+    });
+    
     socket.on("userTyping", () => setTyping(true));
     socket.on("userStopTyping", () => setTyping(false));
+    socket.on("messageDeleted", ({ messageId }) => {
+      setMessages((prev) => prev.filter(msg => msg.timestamp !== messageId));
+    });
 
     return () => {
       socket.off("receiveMessage");
       socket.off("userTyping");
       socket.off("userStopTyping");
+      socket.off("messageDeleted");
     };
   }, [chatRoom?.chatRoomId, user.phoneNumber]);
 
@@ -53,9 +78,25 @@ function Chat({ chatRoom, userChatting = [], user }) {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
         setShowPicker(false);
       }
+      // tắt menu khi click ra ngoài
+      if (!event.target.closest('.message-options') && !event.target.closest('.message-options-menu')) {
+        setActiveMessageId(null);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    
+    // Thêm xử lý khi nhấn ESC để đóng modal
+    const handleEsc = (event) => {
+      if (event.keyCode === 27) {
+        setShowImageModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener('keydown', handleEsc);
+    };
   }, []);
 
   const handleInputChange = (event) => {
@@ -72,6 +113,7 @@ function Chat({ chatRoom, userChatting = [], user }) {
       receiver: otherUserPhone,
       message,
       timestamp: Date.now(),
+      type: "text"
     };
     setMessage("");
     try {
@@ -86,79 +128,305 @@ function Chat({ chatRoom, userChatting = [], user }) {
     }
   };
 
+  const handleDeleteMessage = async (messageId) => {
+    try {
+      const response = await fetch("http://localhost:3618/deleteMessage", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatRoomId: chatRoom.chatRoomId,
+          messageId: messageId
+        }),
+      });
+      if (!response.ok) throw new Error("Xóa tin nhắn thất bại!");
+      setActiveMessageId(null);
+    } catch (error) {
+      console.error("Lỗi xóa tin nhắn:", error);
+    }
+  };
+
+  const toggleMessageOptions = (messageId) => {
+    if (activeMessageId === messageId) {
+      setActiveMessageId(null);
+    } else {
+      setActiveMessageId(messageId);
+    }
+  };
+
+  const handleFileButtonClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    console.log("Đang tải file lên:", file.name);
+    setUploading(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("chatRoomId", chatRoom.chatRoomId);
+      formData.append("sender", currentUserPhone);
+      formData.append("receiver", otherUserPhone);
+      
+      console.log("ChatRoomId:", chatRoom.chatRoomId);
+      console.log("Sender:", currentUserPhone);
+      console.log("Receiver:", otherUserPhone);
+      
+      const response = await fetch("http://localhost:3618/uploadFile", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Lỗi Server:", response.status, errorData);
+        throw new Error(`Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`}`);
+      }
+      
+      fileInputRef.current.value = null;
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      alert(error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+  
+  // Hàm mở modal xem ảnh
+  const openImageModal = (src, name) => {
+    setCurrentImage({ src, name });
+    setShowImageModal(true);
+  };
+
+  const renderFileMessage = (msg) => {
+    try {
+      const fileInfo = JSON.parse(msg.message);
+      const { name, url, size, type, messageId } = fileInfo;
+      const isImage = type.startsWith('image/');
+      
+      const formatFileSize = (bytes) => {
+        if (bytes < 1024)
+          return bytes + ' B';
+        else if (bytes < 1024 * 1024)
+          return (bytes / 1024).toFixed(1) + ' KB';
+        else
+          return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      };
+      
+      const downloadFile = (e) => {
+        e.preventDefault();
+        
+        const downloadUrl = `http://localhost:3618/download/${chatRoom.chatRoomId}/${msg.timestamp}`;
+        
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+      
+      return (
+        <div className="file-message">
+          {isImage ? (
+            <div className="file-preview">
+              <img 
+                src={`http://localhost:3618/view/${chatRoom.chatRoomId}/${msg.timestamp}`}
+                alt={name} 
+                className="img-preview" 
+                onClick={() => openImageModal(`http://localhost:3618/view/${chatRoom.chatRoomId}/${msg.timestamp}`, name)}
+              />
+              <div className="file-info">
+                <a href="#" onClick={downloadFile} className="file-name">
+                  {name}
+                </a>
+                <span className="file-size">{formatFileSize(size)}</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="file-icon">
+                <i className="bi bi-file-earmark"></i>
+              </div>
+              <div className="file-info">
+                <a href="#" onClick={downloadFile} className="file-name">
+                  {name}
+                </a>
+                <span className="file-size">{formatFileSize(size)}</span>
+              </div>
+            </>
+          )}
+        </div>
+      );
+    } catch (error) {
+      console.error("Lỗi khi xử lý nội dung file:", error);
+      return <p>Không thể hiển thị nội dung file này</p>;
+    }
+  };
+
   return (
-    <div className="chat-box container">
-      {!chatRoom || !userChatting.length ? (
-        <p className="text-center mt-3 centered-text">Chưa có cuộc trò chuyện nào</p>
-      ) : (
-        <>
-          <div className="chat-header row">
-            <div className="col-sm-12 d-flex align-items-center">
-              <img className="chat-header_avt" src={userChatting[0]?.avatar || a1} alt="" />
-              <p className="chat-header_name px-2 m-0">
-                {userChatting[0]?.fullName || "VChat!"}
-              </p>
+    <>
+      <div className="chat-box container">
+        {!chatRoom || !userChatting.length ? (
+          <p className="text-center mt-3 centered-text">Chưa có cuộc trò chuyện nào</p>
+        ) : (
+          <>
+            <div className="chat-header row">
+              <div className="col-sm-12 d-flex align-items-center">
+                <img className="chat-header_avt" src={userChatting[0]?.avatar || a1} alt="" />
+                <p className="chat-header_name px-2 m-0">
+                  {userChatting[0]?.fullName || "VChat!"}
+                </p>
+              </div>
+            </div>
+
+            <div className="chat-messages">
+              {messages.map((msg, index) => {
+                const isSentByCurrentUser = msg.sender === currentUserPhone;
+                return (
+                  <div 
+                    key={index} 
+                    className={`message ${isSentByCurrentUser ? "sent" : "received"}`}
+                  >
+                    {!isSentByCurrentUser && <img src={userChatting[0]?.avatar || a1} alt="User Avatar" className="user-avt" />}
+                    <div className="message-wrapper">
+                      <div className="message-info">
+                        <span>
+                          {new Date(parseInt(msg.timestamp)).toLocaleString("en-US", {
+                            timeZone: "Asia/Ho_Chi_Minh",
+                            hour: "numeric",
+                            minute: "numeric",
+                            hour12: true,
+                          })}
+                        </span>
+                        
+                        {msg.type === 'file' 
+                          ? renderFileMessage(msg)
+                          : <p>{msg.message}</p>
+                        }
+                      </div>
+                      
+                      {isSentByCurrentUser && (
+                        <div className="message-options-container">
+                          <button 
+                            className="message-options-btn"
+                            onClick={() => toggleMessageOptions(msg.timestamp)}
+                          >
+                            <i className="bi bi-three-dots-vertical"></i>
+                          </button>
+                          
+                          {activeMessageId === msg.timestamp && (
+                            <div className="message-options-menu">
+                              <button 
+                                className="message-option-item"
+                                onClick={() => handleDeleteMessage(msg.timestamp)}
+                              >
+                                <i className="bi bi-trash"></i> Xóa tin nhắn
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {isSentByCurrentUser && (
+                      <img src={user?.avatar || a1} alt="User Avatar" className="user-avt" />
+                    )}
+                  </div>
+                );
+              })}
+              {typing && <p className="typing-indicator">Đang nhập...</p>}
+              {uploading && <p className="typing-indicator">Đang tải file lên...</p>}
+              <div ref={messagesEndRef}></div>
+            </div>
+
+            <div className="chat-bottom row" style={{position: "relative"}}>
+              <form
+                className="chat-input"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
+              >
+                <div className="emoji-picker-container" ref={emojiPickerRef} style={{ position: "absolute", bottom: "50px", left: "10px" }} >
+                  {showPicker && <Picker data={data} onEmojiSelect={addEmoji} />}
+                </div>
+                
+                <button type="button" className="btn" onClick={() => setShowPicker((prev) => !prev)}>
+                  <i className="bi bi-emoji-smile text-light"></i>
+                </button>
+                
+                <input 
+                  type="file" 
+                  name="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  style={{ display: 'none' }} 
+                />
+                
+                <button 
+                  type="button" 
+                  className="btn" 
+                  onClick={handleFileButtonClick} 
+                  disabled={uploading}
+                >
+                  <i className="bi bi-file-earmark-arrow-up text-light"></i>
+                </button>
+                
+                <input
+                  type="text"
+                  placeholder="Nhập tin nhắn..."
+                  value={message}
+                  onChange={handleInputChange}
+                />
+                <button className="btn btn-link" type="submit">
+                  <i className="bi bi-send-fill"></i>
+                </button>
+              </form>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Modal xem ảnh */}
+      {showImageModal && (
+        <div className="image-modal-overlay" onClick={() => setShowImageModal(false)}>
+          <div className="image-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="image-modal-header">
+              <h5 className="image-modal-title">{currentImage.name}</h5>
+              <button 
+                className="image-modal-close" 
+                onClick={() => setShowImageModal(false)}
+              >
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="image-modal-body">
+              <img src={currentImage.src} alt={currentImage.name} className="image-modal-img" />
+            </div>
+            <div className="image-modal-footer">
+              <button 
+                className="image-modal-download" 
+                onClick={() => {
+                  const link = document.createElement('a');
+                  const chatRoomId = chatRoom.chatRoomId;
+                  const messageId = currentImage.src.split('/').pop();
+                  link.href = `http://localhost:3618/download/${chatRoomId}/${messageId}`;
+                  link.download = currentImage.name;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+              >
+                <i className="bi bi-download"></i> Tải xuống
+              </button>
             </div>
           </div>
-
-          <div className="chat-messages">
-            {messages.map((msg, index) => {
-              const isSentByCurrentUser = msg.sender === currentUserPhone;
-              return (
-                <div key={index} className={`message ${isSentByCurrentUser ? "sent" : "received"}`}>
-                  {!isSentByCurrentUser && <img src={userChatting[0]?.avatar} alt="User Avatar" className="user-avt" />}
-                  <div className="message-info">
-                    <span>
-                      {new Date(msg.timestamp).toLocaleString("en-US", {
-                        timeZone: "Asia/Ho_Chi_Minh",
-                        hour: "numeric",
-                        minute: "numeric",
-                        hour12: true,
-                      })}
-                    </span>
-                    <p>{msg.message}</p>
-                  </div>
-                  {isSentByCurrentUser && (
-                    <img src={user?.avatar || a1} alt="User Avatar" className="user-avt" />
-                  )}
-                </div>
-              );
-            })}
-            {typing && <p className="typing-indicator">Đang nhập...</p>}
-            <div ref={messagesEndRef}></div>
-          </div>
-
-          <div className="chat-bottom row" style={{position: "relative"}}>
-            <form
-              className="chat-input"
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendMessage();
-              }}
-            >
-              <div className="emoji-picker-container" ref={emojiPickerRef} style={{ position: "absolute", bottom: "50px", left: "10px" }} >
-                {showPicker && <Picker data={data} onEmojiSelect={addEmoji} />}
-              </div>
-              <button className="btn" onClick={() => setShowPicker((prev) => !prev)}>
-                <i className="bi bi-emoji-smile text-light"></i>
-              </button>
-              <button className="btn">
-                <i className="bi bi-file-earmark-arrow-up text-light"></i>
-              </button>
-              <input
-                type="text"
-                placeholder="Nhập tin nhắn..."
-                value={message}
-                onChange={handleInputChange}
-              />
-              <button className="btn btn-link" type="submit">
-                <i className="bi bi-send-fill"></i>
-              </button>
-            </form>
-          </div>
-        </>
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
