@@ -21,22 +21,87 @@ function Chat({ chatRoom, userChatting = [], user }) {
   );
 
   const [isRecording, setIsRecording] = useState(false);
-  const [recordTime, setRecordTime] = useState(0);
-  const recordIntervalRef = useRef(null);
+  const [audioBlob, setAudioBlob] = useState(null); 
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
-  const handleMicClick = () => {
+  const handleMicClick = async () => {
     if (!isRecording) {
-      setIsRecording(true);
-      setRecordTime(0);
-      recordIntervalRef.current = setInterval(() => {
-        setRecordTime((prev) => prev + 1);
-      }, 1000);
-    } else {
-      setIsRecording(false);
-      clearInterval(recordIntervalRef.current);
-      setRecordTime(0);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          setAudioBlob(blob); 
+          setIsRecording(false);
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Lỗi truy cập mic:", err);
+      }
     }
   };
+
+  const handleStopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    
+  };
+
+  const handleSendAudio = () => {
+    if (isRecording) {
+      // Nếu vẫn đang ghi âm, dừng lại và gửi sau khi đã xử lý xong
+      const mediaRecorder = mediaRecorderRef.current;
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          setAudioBlob(blob);
+          setIsRecording(false);
+  
+          // Tiến hành gửi ngay sau khi blob đã được tạo
+          sendAudioBlob(blob);
+        };
+        mediaRecorder.stop();
+      }
+    } else if (audioBlob) {
+      // Nếu đã có blob, gửi luôn
+      sendAudioBlob(audioBlob);
+    }
+  };
+  
+
+  const sendAudioBlob = async (blob) => {
+    const formData = new FormData();
+    formData.append("file", blob, "voice.webm");
+    formData.append("chatRoomId", chatRoom?.chatRoomId);
+    formData.append("sender", currentUserPhone);
+    formData.append("receiver", otherUserPhone);
+  
+    try {
+      const response = await fetch("http://localhost:3618/sendAudio", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Gửi ghi âm thất bại");
+      const audioMessage = await response.json();
+      console.log("Gửi ghi âm thành công:", audioMessage);
+      setMessages((prev) => [...prev, audioMessage.data]);
+      setAudioBlob(null);
+    } catch (err) {
+      console.error("Lỗi khi gửi ghi âm:", err);
+    }
+  };
+  
 
   const addEmoji = (emoji) => {
     setMessage((prev) => prev + emoji.native);
@@ -135,6 +200,8 @@ function Chat({ chatRoom, userChatting = [], user }) {
           <div className="chat-messages">
             {messages.map((msg, index) => {
               const isSentByCurrentUser = msg.sender === currentUserPhone;
+              const isAudio = msg.type === "audio";
+
               return (
                 <div
                   key={index}
@@ -158,7 +225,11 @@ function Chat({ chatRoom, userChatting = [], user }) {
                         hour12: true,
                       })}
                     </span>
-                    <p>{msg.message}</p>
+                    {isAudio ? (
+                      <audio controls src={msg.message} style={{ marginTop: 5 }} />
+                    ) : (
+                      <p>{msg.message}</p>
+                    )}
                   </div>
                   {isSentByCurrentUser && (
                     <img
@@ -177,8 +248,10 @@ function Chat({ chatRoom, userChatting = [], user }) {
           <div className="chat-bottom row" style={{ position: "relative" }}>
             {isRecording && (
               <div className="record-timer">
-                Đang ghi: {Math.floor(recordTime / 60)}:
-                {String(recordTime % 60).padStart(2, "0")}
+                <span>Đang ghi âm...</span>
+                <button className="stop-btn" onClick={handleStopRecording}>
+                  ⏹
+                </button>
               </div>
             )}
 
@@ -208,13 +281,14 @@ function Chat({ chatRoom, userChatting = [], user }) {
               <button className="btn" type="button" onClick={handleMicClick}>
                 <i className="bi bi-mic text-light"></i>
               </button>
+              
               <input
                 type="text"
                 placeholder="Nhập tin nhắn..."
                 value={message}
                 onChange={handleInputChange}
               />
-              <button className="btn btn-link" type="submit">
+              <button className="btn btn-link" type="button" onClick={handleSendAudio}>
                 <i className="bi bi-send-fill"></i>
               </button>
             </form>

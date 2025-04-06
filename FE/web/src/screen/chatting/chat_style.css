@@ -275,13 +275,14 @@
   
 .record-timer {
     position: absolute;
-    bottom: 60px;
+    width: 80%;
+    bottom: 70px;
     left: 50%;
     transform: translateX(-50%);
-    background-color: #343a40;
+    background-color: #3542d3;
     color: #fff;
-    padding: 6px 16px;
-    border-radius: 20px;
+    padding: 6px 25px;
+    border-radius: 8px;
     font-weight: bold;
     font-size: 14px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -297,9 +298,15 @@
     color: red;
   }
   
-  @keyframes pulse-dot {
-    0% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.6; transform: scale(1.2); }
-    100% { opacity: 1; transform: scale(1); }
+  .stop-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
   }
-  
+  .stop-btn:hover {
+    transform: scale(1.2);
+    color: red;
+  }
