@@ -30,9 +30,21 @@ function View({ setIsLoggedIn }) {
   const renderView = () => {
     switch (currentView) {
       case "chat":
-        return <Chat setCurrentView={setCurrentView} chatRoom={chatRoom || {}} userChatting={userChatting || []} user={userInfo || {}} />;
+        return (
+          <Chat
+            setCurrentView={setCurrentView}
+            chatRoom={chatRoom || {}}
+            userChatting={userChatting || []}
+            user={userInfo || {}}
+          />
+        );
       case "setting":
-        return <Setting setCurrentView={setCurrentView} setIsLoggedIn={setIsLoggedIn} />;
+        return (
+          <Setting
+            setCurrentView={setCurrentView}
+            setIsLoggedIn={setIsLoggedIn}
+          />
+        );
       case "cloud":
         return <Cloud setCurrentView={setCurrentView} />;
       case "contacts":
@@ -44,22 +56,25 @@ function View({ setIsLoggedIn }) {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const data = await getUser();
-      if (data) {
-        setUserInfo(data);
-        const editData = { ...data };
-        if (data.dob) {
-          const [year, month, day] = data.dob.split("-");
-          editData.year = year;
-          editData.month = parseInt(month, 10);
-          editData.day = parseInt(day, 10);
+      try {
+        const data = await getUser();
+        if (data) {
+          setUserInfo(data);
+          const editData = { ...data };
+          if (data.dob) {
+            const [year, month, day] = data.dob.split("-");
+            editData.year = year;
+            editData.month = parseInt(month, 10);
+            editData.day = parseInt(day, 10);
+          }
+          setEditInfo(editData);
         }
-        setEditInfo(editData);
+      } catch (error) {
+        console.error("Error fetching user info:", error);
       }
     };
 
     fetchUser();
-
   }, []);
 
   const handleEdit = () => {
@@ -84,7 +99,9 @@ function View({ setIsLoggedIn }) {
   const handleSaveChanges = async () => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
-      toast.error("Không có token, vui lòng đăng nhập lại!", { position: "top-right" });
+      toast.error("Không có token, vui lòng đăng nhập lại!", {
+        position: "top-right",
+      });
       return;
     }
 
@@ -105,7 +122,7 @@ function View({ setIsLoggedIn }) {
       const response = await fetch("http://localhost:3824/user/update", {
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -121,7 +138,9 @@ function View({ setIsLoggedIn }) {
       setUserInfo(updatedUser.user);
       setShowEditModal(false);
       setShowModal(true);
-      toast.success("Cập nhật thông tin thành công!", { position: "top-right" });
+      toast.success("Cập nhật thông tin thành công!", {
+        position: "top-right",
+      });
       // setNotification({ show: true, message: "Cập nhật thông tin thành công!", type: "success" });
       // setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
     } catch (error) {
@@ -148,7 +167,7 @@ function View({ setIsLoggedIn }) {
       const response = await fetch("http://localhost:3824/user/update-avatar", {
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           // Không set header "Content-Type" khi gửi FormData
         },
         body: formData,
@@ -191,7 +210,6 @@ function View({ setIsLoggedIn }) {
       if (!result || result.length === 0) {
         toast.warning("Không tìm thấy user!");
         setUserSearch([]);
-
       } else {
         setUserSearch(result);
       }
@@ -203,29 +221,37 @@ function View({ setIsLoggedIn }) {
   const [userChatList, setUserChatList] = useState([]);
 
   useEffect(() => {
-    let isMounted = true;
+  if (!userInfo?.phoneNumber) return; // Ensure userInfo is not null or undefined
 
-    (async () => {
-      const data = await getConversations();
-      if (!isMounted || !data?.length) return;
+  let isMounted = true;
 
-      const myPhone = data[0].participants[0];
-      const userData = await Promise.all(
-        data.map(async (convo) => {
-          const partnerPhone = convo.participants.find(p => p !== myPhone);
-          const userArray = await getUserbySearch(partnerPhone, "");
+  (async () => {
+    const data = await getConversations();
+    if (!isMounted || !data?.length) return;
 
-          const user = Array.isArray(userArray) ? userArray[0] : userArray;
+    const myPhone = userInfo.phoneNumber;
 
-          return user ? { ...user, lastMessage: convo.lastMessage } : null;
-        })
-      );
+    const userData = await Promise.all(
+      data.map(async (convo) => {
+        const partnerPhone = convo.participants.find((p) => p !== myPhone);
 
-      setUserChatList(userData.filter(user => user !== null));
-    })();
+        if (!partnerPhone) return null;
 
-    return () => { isMounted = false; };
-  }, []);
+        const userArray = await getUserbySearch(partnerPhone, "");
+        const user = Array.isArray(userArray) ? userArray[0] : userArray;
+
+        return user ? { ...user, lastMessage: convo.lastMessage } : null;
+      })
+    );
+
+    setUserChatList(userData.filter((user) => user !== null));
+  })();
+
+  return () => {
+    isMounted = false;
+  };
+}, [userInfo?.phoneNumber]); // Use optional chaining to avoid errors
+
 
   const check = async (phone1, phone2) => {
     const chatting = await getUserbySearch(phone2, phone2);
@@ -234,18 +260,17 @@ function View({ setIsLoggedIn }) {
     const chatRoomId = await checkChatRoom(phone1, phone2);
     const chatRoomInfo = await getChatRoom(chatRoomId);
     setChatRoom(chatRoomInfo);
-
   };
 
   return (
     <div className="wrapper">
       {/* Sidebar */}
       <div className="sidebar">
-        <div className="sidebar-header" style={{ position: 'relative' }}>
-          <form className="sidebar-header_search"
-            onSubmit={handleGetUserbyKey} >
-
-            <input type="search" placeholder="Search..."
+        <div className="sidebar-header" style={{ position: "relative" }}>
+          <form className="sidebar-header_search" onSubmit={handleGetUserbyKey}>
+            <input
+              type="search"
+              placeholder="Search..."
               style={{ flex: 1 }}
               value={keyWord}
               onFocus={() => setIsFocused(true)}
@@ -255,7 +280,6 @@ function View({ setIsLoggedIn }) {
             <button className="btn" type="submit">
               <i className="bi bi-search text-light"></i>
             </button>
-
           </form>
 
           {isFocused && userSearch.length > 0 && (
@@ -264,54 +288,71 @@ function View({ setIsLoggedIn }) {
                 {userSearch.map((user) => (
                   <li
                     style={{
-                      listStyleType: 'none',
-                      width: '100%',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      transition: 'background 0.2s ease-in-out'
+                      listStyleType: "none",
+                      width: "100%",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      transition: "background 0.2s ease-in-out",
                     }}
                     key={user.id}
-                    onClick={() => check(userInfo.phoneNumber, user.phoneNumber)}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#222'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    onClick={() =>
+                      check(userInfo.phoneNumber, user.phoneNumber)
+                    }
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "#222")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
                   >
-                    <img className="user-avt" src={user?.avatar} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-                    <span className="mx-4" style={{ fontSize: '16px', fontWeight: '500' }}>{user.fullName}</span>
+                    <img
+                      className="user-avt"
+                      src={user?.avatar}
+                      alt="Avatar"
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "50%",
+                      }}
+                    />
+                    <span
+                      className="mx-4"
+                      style={{ fontSize: "16px", fontWeight: "500" }}
+                    >
+                      {user.fullName}
+                    </span>
                   </li>
-
                 ))}
               </ul>
             </div>
           )}
-
-
         </div>
 
         {/* User List */}
         <div className="user-list">
           {userChatList.length > 0 ? (
             userChatList.map((user, index) => (
-              <div className="user" key={index} onClick={() => check(userInfo.phoneNumber, user.phoneNumber)}>
-                <img
-                  className="user-avt"
-                  src={user.avatar}
-                  alt="User"
-                />
+              <div
+                className="user"
+                key={index}
+                onClick={() => check(userInfo.phoneNumber, user.phoneNumber)}
+              >
+                <img className="user-avt" src={user.avatar} alt="User" />
                 <div>
                   <strong>{user.fullName || "Chưa Cập Nhật"}</strong>
                   <br />
-                  <small>{user.lastMessage || "Chưa Có"}</small>
+                  <small>{user.lastMessage || "Chưa Có"}</small>{" "}
+                  {/* Hiển thị lastMessage */}
                 </div>
               </div>
             ))
           ) : (
-            <p></p>
+            <p>Không có cuộc trò chuyện nào</p>
           )}
         </div>
-
 
         <div className="sidebar-bottom d-flex justify-content-around align-items-center">
           <button
@@ -348,9 +389,7 @@ function View({ setIsLoggedIn }) {
       </div>
 
       {/* Main */}
-      <div className="content">
-        {renderView()}
-      </div>
+      <div className="content">{renderView()}</div>
 
       {/* Modal */}
       {showModal && (
@@ -405,14 +444,16 @@ function View({ setIsLoggedIn }) {
                       className="btn btn-sm btn-secondary"
                       onClick={() => {
                         setAvatarPreview(null);
-                        setEditInfo(prev => ({ ...prev, avatar: null }));
+                        setEditInfo((prev) => ({ ...prev, avatar: null }));
                       }}
                     >
                       Hủy
                     </button>
                   </div>
                 )}
-                <h5 className="fw-bold mt-3 mb-4">{userInfo ? userInfo.fullName : "Chưa có tên"}</h5>
+                <h5 className="fw-bold mt-3 mb-4">
+                  {userInfo ? userInfo.fullName : "Chưa có tên"}
+                </h5>
                 <div className="text-start px-3">
                   <h6 className="text-center">
                     <strong>Thông tin cá nhân</strong>
@@ -431,10 +472,24 @@ function View({ setIsLoggedIn }) {
                     Email: <strong>{userInfo?.email || "Chưa cập nhật"}</strong>
                   </p>
 
-                  <p>Giới tính: <strong>{userInfo?.gender === "Male" ? "Nam" : userInfo?.gender === "Female" ? "Nữ" : "Chưa cập nhật"}</strong></p>
-                  <p>Ngày sinh: <strong>{userInfo?.dob || "Chưa cập nhật"}</strong></p>
-                  <p>Điện thoại: <strong>{userInfo?.phoneNumber || "Chưa cập nhật"}</strong></p>
-
+                  <p>
+                    Giới tính:{" "}
+                    <strong>
+                      {userInfo?.gender === "Male"
+                        ? "Nam"
+                        : userInfo?.gender === "Female"
+                        ? "Nữ"
+                        : "Chưa cập nhật"}
+                    </strong>
+                  </p>
+                  <p>
+                    Ngày sinh:{" "}
+                    <strong>{userInfo?.dob || "Chưa cập nhật"}</strong>
+                  </p>
+                  <p>
+                    Điện thoại:{" "}
+                    <strong>{userInfo?.phoneNumber || "Chưa cập nhật"}</strong>
+                  </p>
                 </div>
               </div>
               <div className="modal-footer bg-dark">
@@ -443,7 +498,7 @@ function View({ setIsLoggedIn }) {
                   className="btn w-100 py-3 custom-button"
                   onClick={() => {
                     setShowModal(false);
-                    handleEdit()
+                    handleEdit();
                   }}
                 >
                   <i className="bi bi-pencil me-2"></i> Cập nhật
@@ -478,10 +533,8 @@ function View({ setIsLoggedIn }) {
                     <input
                       type="text"
                       className="form-control"
-
                       name="fullName"
                       value={editInfo.fullName || ""}
-
                       onChange={handleEditChange}
                     />
                   </div>
@@ -495,10 +548,15 @@ function View({ setIsLoggedIn }) {
                           name="gender"
                           id="genderMale"
                           value="Male"
-                          checked={editInfo?.gender === "Male" || "Chưa cập nhật"}
+                          checked={
+                            editInfo?.gender === "Male" || "Chưa cập nhật"
+                          }
                           onChange={handleEditChange}
                         />
-                        <label className="form-check-label" htmlFor="genderMale">
+                        <label
+                          className="form-check-label"
+                          htmlFor="genderMale"
+                        >
                           Nam
                         </label>
                       </div>
@@ -509,10 +567,15 @@ function View({ setIsLoggedIn }) {
                           name="gender"
                           id="genderFemale"
                           value="Female"
-                          checked={editInfo?.gender === "Female" || "Chưa cập nhật"}
+                          checked={
+                            editInfo?.gender === "Female" || "Chưa cập nhật"
+                          }
                           onChange={handleEditChange}
                         />
-                        <label className="form-check-label" htmlFor="genderFemale">
+                        <label
+                          className="form-check-label"
+                          htmlFor="genderFemale"
+                        >
                           Nữ
                         </label>
                       </div>
@@ -521,14 +584,12 @@ function View({ setIsLoggedIn }) {
                   <div className="mb-3">
                     <label className="form-label">Ngày sinh</label>
                     <div className="d-flex">
-
                       <select
                         className="form-select me-2"
                         name="day"
                         value={editInfo.day || ""}
                         onChange={handleEditChange}
                       >
-
                         <option value="" disabled>
                           Ngày
                         </option>
@@ -609,7 +670,6 @@ function View({ setIsLoggedIn }) {
           </div>
         </div>
       )}
-
     </div>
   );
 }
