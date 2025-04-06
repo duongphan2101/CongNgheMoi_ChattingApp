@@ -6,7 +6,8 @@ const multerS3 = require("multer-s3");
 const router = express.Router();
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const s3 = new AWS.S3();
-const TABLE_NAME = "Message";
+const TABLE_MESSAGE_NAME = "Message";
+const TABLE_CONVERSATION_NAME = "Conversations";
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "lab2s3aduong";
 const upload = multer({
   storage: multerS3({
@@ -20,33 +21,57 @@ const upload = multer({
   }),
 });
 module.exports = (io) => {
-router.post("/sendMessage", async (req, res) => {
-    try {
-        const { chatRoomId, sender, receiver, message} = req.body;
+    router.post("/sendMessage", async (req, res) => {
+        try {
+            const { chatRoomId, sender, receiver, message } = req.body;
+    
+            if (!chatRoomId || !sender || !receiver || !message) {
+                console.error("❌ Thiếu dữ liệu từ client:", req.body);
+                return res.status(400).json({ error: "Thiếu trường bắt buộc!" });
+            }
 
-        if (!chatRoomId || !sender || !receiver || !message) {
-            console.error("❌ Thiếu dữ liệu từ client:", req.body);
-            return res.status(400).json({ error: "Thiếu trường bắt buộc!" });
+            const chatId = [sender, receiver].sort().join("_");
+    
+            // Tạo tin nhắn mới
+            const newMessage = new Message(chatRoomId, sender, receiver, message, "text");
+            // Lưu tin nhắn vào bảng Message
+            const params = {
+                TableName: TABLE_MESSAGE_NAME,
+                Item: newMessage,
+            };
+    
+            await dynamoDB.put(params).promise();
+            console.log("✅ Tin nhắn đã lưu vào DB:", newMessage); 
+    
+            // Cập nhật lastMessage trong bảng Conversations
+            const updateParams = {
+                TableName: TABLE_CONVERSATION_NAME, // Tên bảng lưu thông tin cuộc trò chuyện
+                Key: { chatId }, // Khóa chính là chatRoomId
+                UpdateExpression: "set lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
+                ExpressionAttributeValues: {
+                    ":lastMessage": message,
+                    ":lastMessageAt": new Date(newMessage.timestamp).toLocaleDateString("vi-VN", {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                    }),
+                },
+                ReturnValues: "UPDATED_NEW",
+            };
+    
+            await dynamoDB.update(updateParams).promise();
+    
+            // Gửi tin nhắn đến các client trong phòng
+            io.to(chatRoomId).emit("receiveMessage", newMessage);
+    
+        } catch (error) {
+            console.error("❌ Lỗi khi lưu tin nhắn:", error);
+            res.status(500).json({ error: "Lỗi server!" });
         }
-
-        const newMessage = new Message(chatRoomId, sender, receiver, message, "text");
-        
-        const params = {
-            TableName: TABLE_NAME,
-            Item: newMessage,
-        };
-
-        await dynamoDB.put(params).promise();
-        console.log("✅ Tin nhắn đã lưu vào DB:", newMessage);
-
-        io.to(chatRoomId).emit("receiveMessage", newMessage);
-
-        res.status(201).json({ message: "Gửi thành công!", data: newMessage });
-    } catch (error) {
-        console.error("❌ Lỗi khi lưu tin nhắn:", error);
-        res.status(500).json({ error: "Lỗi server!" });
-    }
-});
+    });
 
 router.delete("/deleteMessage", async (req, res) => {
     try {

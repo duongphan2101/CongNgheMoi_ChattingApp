@@ -4,7 +4,7 @@ const verifyToken = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
-const TABLE_NAME = "Conversattions";
+const TABLE_NAME = "Conversations";
 const CHATROOM_TABLE = "ChatRooms";
 const MESSAGE_TABLE = "Message";
 
