@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { io } from "socket.io-client";
 import Chat from "../chatting/chat";
 import Setting from "../setting/setting";
 import Cloud from "../cloud/cloud";
@@ -222,53 +223,64 @@ function View({ setIsLoggedIn }) {
   const [userChatList, setUserChatList] = useState([]);
 
   useEffect(() => {
-  if (!userInfo?.phoneNumber) return; // Ensure userInfo is not null or undefined
+    if (!userInfo?.phoneNumber) return; // Ensure userInfo is not null or undefined
 
-  let isMounted = true;
+    let isMounted = true;
 
-  (async () => {
-    const data = await getConversations();
-    if (!isMounted || !data?.length) return;
+    (async () => {
+      const data = await getConversations();
+      if (!isMounted || !data?.length) return;
 
-    const myPhone = userInfo.phoneNumber;
+      const myPhone = userInfo.phoneNumber;
 
-    const userData = await Promise.all(
-      data.map(async (convo) => {
-        const partnerPhone = convo.participants.find((p) => p !== myPhone);
+      const userData = await Promise.all(
+        data.map(async (convo) => {
+          const partnerPhone = convo.participants.find((p) => p !== myPhone);
 
-        if (!partnerPhone) return null;
+          if (!partnerPhone) return null;
 
-        const userArray = await getUserbySearch(partnerPhone, "");
-        const user = Array.isArray(userArray) ? userArray[0] : userArray;
+          const userArray = await getUserbySearch(partnerPhone, "");
+          const user = Array.isArray(userArray) ? userArray[0] : userArray;
 
-        return user ? { ...user, lastMessage: convo.lastMessage } : null;
-      })
-    );
+          return user
+            ? {
+                ...user,
+                lastMessage: convo.lastMessage,
+                isUnread: convo.isUnread, // Include isUnread from the backend
+              }
+            : null;
+        })
+      );
 
-    setUserChatList(userData.filter((user) => user !== null));
-  })();
+      setUserChatList(userData.filter((user) => user !== null));
+    })();
 
-  return () => {
-    isMounted = false;
-  };
-}, [userInfo?.phoneNumber]); // Use optional chaining to avoid errors
-
+    return () => {
+      isMounted = false;
+    };
+  }, [userInfo?.phoneNumber]); // Use optional chaining to avoid errors
 
   const check = async (phone1, phone2) => {
     const chatting = await getUserbySearch(phone2, phone2);
     setUserChatting(chatting);
 
+    const chatId = [phone1, phone2].sort().join("_");
     const chatRoomId = await checkChatRoom(phone1, phone2);
     const chatRoomInfo = await getChatRoom(chatRoomId);
     setChatRoom(chatRoomInfo);
+
+    // Mark the conversation as read
+    await markAsRead(chatId);
   };
 
   const updateLastMessage = (senderPhone, receiverPhone, lastMessage) => {
     setUserChatList((prevList) =>
       prevList.map((conversation) => {
         if (
-          (conversation.phoneNumber === receiverPhone && userInfo.phoneNumber === senderPhone) ||
-          (conversation.phoneNumber === senderPhone && userInfo.phoneNumber === receiverPhone)
+          (conversation.phoneNumber === receiverPhone &&
+            userInfo.phoneNumber === senderPhone) ||
+          (conversation.phoneNumber === senderPhone &&
+            userInfo.phoneNumber === receiverPhone)
         ) {
           return { ...conversation, lastMessage };
         }
@@ -276,6 +288,31 @@ function View({ setIsLoggedIn }) {
       })
     );
   };
+
+  const markAsRead = async (chatId) => {
+    try {
+      await fetch("http://localhost:3618/markAsRead", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ chatId }),
+      });
+
+      // Cập nhật trạng thái isUnread trong userChatList
+      setUserChatList((prevList) =>
+        prevList.map((conversation) =>
+          conversation.chatId === chatId
+            ? { ...conversation, isUnread: false }
+            : conversation
+        )
+      );
+    } catch (error) {
+      console.error("Error marking conversation as read:", error);
+    }
+  };
+
+  const unreadCount = userChatList.filter((user) => user.isUnread).length;
 
   return (
     <div className="wrapper">
@@ -359,8 +396,13 @@ function View({ setIsLoggedIn }) {
                 <div>
                   <strong>{user.fullName || "Chưa Cập Nhật"}</strong>
                   <br />
-                  <small>{user.lastMessage || "Chưa Có"}</small>{" "}
-                  {/* Hiển thị lastMessage */}
+                  <small
+                    style={{
+                      fontWeight: user.isUnread ? "bold" : "normal", // Kiểm tra isUnread để in đậm
+                    }}
+                  >
+                    {user.lastMessage || "Chưa Có"}
+                  </small>
                 </div>
               </div>
             ))
@@ -376,12 +418,28 @@ function View({ setIsLoggedIn }) {
           >
             <i className="sidebar-bottom_icon bi bi-person-circle text-light"></i>
           </button>
-          <button
+          <div
             className="sidebar-bottom-btn btn active"
             onClick={() => setCurrentView("chat")}
           >
             <i className="sidebar-bottom_icon bi bi-chat-dots text-light"></i>
-          </button>
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-5px",
+                  right: "-5px",
+                  backgroundColor: "red",
+                  color: "white",
+                  borderRadius: "50%",
+                  padding: "2px 6px",
+                  fontSize: "12px",
+                }}
+              >
+                {unreadCount}
+              </span>
+            )}
+          </div>
           <button
             className="sidebar-bottom-btn btn"
             onClick={() => setCurrentView("contacts")}
