@@ -36,6 +36,7 @@ function View({ setIsLoggedIn }) {
             chatRoom={chatRoom || {}}
             userChatting={userChatting || []}
             user={userInfo || {}}
+            updateLastMessage={updateLastMessage} // Truyền hàm updateLastMessage
           />
         );
       case "setting":
@@ -260,6 +261,20 @@ function View({ setIsLoggedIn }) {
     const chatRoomId = await checkChatRoom(phone1, phone2);
     const chatRoomInfo = await getChatRoom(chatRoomId);
     setChatRoom(chatRoomInfo);
+  };
+
+  const updateLastMessage = (senderPhone, receiverPhone, lastMessage) => {
+    setUserChatList((prevList) =>
+      prevList.map((conversation) => {
+        if (
+          (conversation.phoneNumber === receiverPhone && userInfo.phoneNumber === senderPhone) ||
+          (conversation.phoneNumber === senderPhone && userInfo.phoneNumber === receiverPhone)
+        ) {
+          return { ...conversation, lastMessage };
+        }
+        return conversation;
+      })
+    );
   };
 
   return (

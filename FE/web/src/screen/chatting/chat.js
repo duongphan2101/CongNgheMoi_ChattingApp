@@ -8,7 +8,7 @@ import data from "@emoji-mart/data";
 
 const socket = io("http://localhost:3618");
 
-function Chat({ chatRoom, userChatting = [], user }) {
+function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [currentUserPhone, setCurrentUserPhone] = useState();
@@ -134,6 +134,9 @@ function Chat({ chatRoom, userChatting = [], user }) {
     socket.on("receiveMessage", (newMessage) => {
       console.log("Received new message:", newMessage);
       setMessages((prev) => [...prev, newMessage]);
+
+      // Cập nhật lastMessage
+      updateLastMessage(newMessage.sender, newMessage.receiver, newMessage.message);
     });
 
     socket.on("userTyping", () => setTyping(true));
@@ -206,6 +209,9 @@ function Chat({ chatRoom, userChatting = [], user }) {
         body: JSON.stringify(newMsg),
       });
       if (!response.ok) throw new Error("Gửi tin nhắn thất bại!");
+  
+      // Cập nhật lastMessage trong danh sách userChatList
+      updateLastMessage(currentUserPhone, otherUserPhone, newMsg.message);
     } catch (error) {
       console.error("Lỗi gửi tin nhắn:", error);
     }
