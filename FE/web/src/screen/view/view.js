@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { io } from "socket.io-client";
 import Chat from "../chatting/chat";
 import Setting from "../setting/setting";
 import Cloud from "../cloud/cloud";
@@ -291,24 +290,40 @@ function View({ setIsLoggedIn }) {
 
   const markAsRead = async (chatId) => {
     try {
-      await fetch("http://localhost:3618/markAsRead", {
+      const res = await fetch("http://localhost:3618/markAsRead", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatId }),
       });
 
-      // Cập nhật trạng thái isUnread trong userChatList
-      setUserChatList((prevList) =>
-        prevList.map((conversation) =>
-          conversation.chatId === chatId
-            ? { ...conversation, isUnread: false }
-            : conversation
-        )
+      if (!res.ok) throw new Error("Update failed");
+
+      // Gọi lại API getConversations để cập nhật trạng thái từ DB
+      const updatedConversations = await getConversations();
+      const myPhone = userInfo.phoneNumber;
+
+      const updatedUserData = await Promise.all(
+        updatedConversations.map(async (convo) => {
+          const partnerPhone = convo.participants.find((p) => p !== myPhone);
+
+          if (!partnerPhone) return null;
+
+          const userArray = await getUserbySearch(partnerPhone, "");
+          const user = Array.isArray(userArray) ? userArray[0] : userArray;
+
+          return user
+            ? {
+                ...user,
+                lastMessage: convo.lastMessage,
+                isUnread: convo.isUnread, // Lấy trạng thái isUnread từ DB
+              }
+            : null;
+        })
       );
+
+      setUserChatList(updatedUserData.filter((user) => user !== null));
     } catch (error) {
-      console.error("Error marking conversation as read:", error);
+      console.error("❌ Lỗi khi cập nhật trạng thái đọc:", error);
     }
   };
 
@@ -386,21 +401,20 @@ function View({ setIsLoggedIn }) {
         {/* User List */}
         <div className="user-list">
           {userChatList.length > 0 ? (
-            userChatList.map((user, index) => (
+            userChatList.map((user,index) => (
               <div
                 className="user"
-                key={index}
-                onClick={() => check(userInfo.phoneNumber, user.phoneNumber)}
+                key={index} // Đảm bảo key là duy nhất cho mỗi người
+                onClick={async () => {
+                  await markAsRead(user.chatId); // Gọi hàm update
+                  check(userInfo.phoneNumber, user.phoneNumber); // Gọi hàm chọn người chat
+                }}
               >
                 <img className="user-avt" src={user.avatar} alt="User" />
                 <div>
                   <strong>{user.fullName || "Chưa Cập Nhật"}</strong>
                   <br />
-                  <small
-                    style={{
-                      fontWeight: user.isUnread ? "bold" : "normal", // Kiểm tra isUnread để in đậm
-                    }}
-                  >
+                  <small className={user.isUnread ? "bold-message" : ""}>
                     {user.lastMessage || "Chưa Có"}
                   </small>
                 </div>

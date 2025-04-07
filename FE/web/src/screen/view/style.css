@@ -119,7 +119,10 @@ body {
     overflow: auto;
 }
 
-
+.bold-message {
+    font-weight: bold;
+}
+  
 /* 🖥 Responsive Tablet */
 @media screen and (max-width: 1024px) {
     .wrapper {
