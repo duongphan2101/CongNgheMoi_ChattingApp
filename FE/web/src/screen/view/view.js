@@ -15,6 +15,7 @@ import getConversations from "../../API/api_getConversation";
 import checkChatRoom from "../../API/api_checkChatRoom";
 import getChatRoom from "../../API/api_getChatRoombyChatRoomId";
 import "./style.css";
+import { v4 as uuidv4 } from "uuid"; // Import thư viện để tạo ID ngẫu nhiên
 
 function View({ setIsLoggedIn }) {
   const [currentView, setCurrentView] = useState("chat");
@@ -329,6 +330,58 @@ function View({ setIsLoggedIn }) {
 
   const unreadCount = userChatList.filter((user) => user.isUnread).length;
 
+  const createChatRoomAndConversation = async (currentUserPhone, targetUserPhone) => {
+    try {
+      // Tạo chatRoomId ngẫu nhiên bắt đầu bằng chữ 'c' và 3-5 số ngẫu nhiên
+      const chatRoomId = `c${Math.floor(100 + Math.random() * 90000)}`;
+
+      const chatRoomData = {
+        chatRoomId,
+        isGroup: false,
+        participants: [currentUserPhone, targetUserPhone]
+      };
+
+      console.log(chatRoomData)
+
+      // Gửi dữ liệu lên bảng ChatRooms
+      await fetch("http://localhost:3618/createChatRoom", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(chatRoomData),
+      });
+
+      const sortedPhones = [currentUserPhone, targetUserPhone].sort();
+
+      // Dữ liệu cho bảng Conservations
+      const conversationData = {
+        chatId: `${sortedPhones[0]}_${sortedPhones[1]}`,
+        chatRoomId,
+        participants: sortedPhones,
+      };
+
+      // Gửi dữ liệu lên bảng Conservations
+      await fetch("http://localhost:3618/createConversation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(conversationData),
+      });
+
+      console.log("ChatRoom và Conversation đã được tạo thành công!");
+    } catch (error) {
+      console.error("Lỗi khi tạo ChatRoom và Conversation:", error);
+    }
+  };
+
+  // Chỉnh sửa sự kiện onClick trong danh sách tìm kiếm
+  const handleUserClick = async (currentUserPhone, targetUserPhone) => {
+    await createChatRoomAndConversation(currentUserPhone, targetUserPhone);
+    check(currentUserPhone, targetUserPhone); // Gọi hàm check để cập nhật giao diện
+  };
+
   return (
     <div className="wrapper">
       {/* Sidebar */}
@@ -352,8 +405,9 @@ function View({ setIsLoggedIn }) {
           {isFocused && userSearch.length > 0 && (
             <div className="search_theme">
               <ul className="m-0 p-0" style={{ flex: 1 }}>
-                {userSearch.map((user) => (
+                {userSearch.map((user , index) => (
                   <li
+                    key={user.id || user.phoneNumber || index}
                     style={{
                       listStyleType: "none",
                       width: "100%",
@@ -364,9 +418,8 @@ function View({ setIsLoggedIn }) {
                       borderRadius: "8px",
                       transition: "background 0.2s ease-in-out",
                     }}
-                    key={user.id}
                     onClick={() =>
-                      check(userInfo.phoneNumber, user.phoneNumber)
+                      handleUserClick(userInfo.phoneNumber, user.phoneNumber)
                     }
                     onMouseEnter={(e) =>
                       (e.currentTarget.style.background = "#222")

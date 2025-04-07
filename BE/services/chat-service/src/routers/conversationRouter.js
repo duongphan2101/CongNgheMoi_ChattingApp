@@ -139,5 +139,38 @@ router.get("/messages", async (req, res) => {
     }
 });
 
+router.post("/createConversation", async (req, res) => {
+    try {
+        const { chatId , chatRoomId , participants } = req.body;
+
+        // Dữ liệu cho bảng Conversations
+        const conversationData = {
+            chatId,
+            chatRoomId,
+            isGroup: false,
+            participants,
+            isUnread: false,
+            lastMessage: "",
+            lastMessageAt: null,
+        };
+
+        // Lưu vào bảng Conversations
+        const conversationParams = {
+            TableName: TABLE_NAME,
+            Item: conversationData,
+        };
+        await dynamoDB.put(conversationParams).promise();
+
+        // Phản hồi thành công
+        res.status(201).json({
+            message: "Conversation và ChatRoom đã được tạo thành công!",
+            chatRoomId,
+        });
+    } catch (error) {
+        console.error("Lỗi khi tạo Conversation và ChatRoom:", error);
+        res.status(500).json({ message: "Lỗi server!" });
+    }
+});
+
 module.exports = router;
 
