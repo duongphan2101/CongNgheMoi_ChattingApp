@@ -53,4 +53,42 @@ router.get("/messages", async (req, res) => {
     }
 });
 
+// Tạo ChatRoom mới
+router.post("/createChatRoom", async (req, res) => {
+    try {
+      const { chatRoomId, isGroup, participants } = req.body;
+  
+      // Kiểm tra participants là mảng và có đúng 2 số điện thoại
+      if (
+        !Array.isArray(participants) ||
+        participants.length !== 2 ||
+        participants.some((p) => typeof p !== "string" || !p.trim())
+      ) {
+        return res.status(400).json({ message: "participants phải là mảng gồm 2 số điện thoại hợp lệ!" });
+      }
+  
+      const chatRoomData = {
+        chatRoomId,
+        isGroup,
+        participants,
+      };
+  
+      const params = {
+        TableName: CHATROOM_TABLE,
+        Item: chatRoomData,
+      };
+  
+      await dynamoDB.put(params).promise();
+  
+      res.status(201).json({
+        message: "ChatRoom đã được tạo thành công!",
+        chatRoomId,
+      });
+    } catch (error) {
+      console.error("Lỗi khi tạo ChatRoom:", error);
+      res.status(500).json({ message: "Lỗi server!" });
+    }
+  });
+  
+
 module.exports = router;

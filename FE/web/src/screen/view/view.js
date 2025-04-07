@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Chat from "../chatting/chat";
 import Setting from "../setting/setting";
 import Cloud from "../cloud/cloud";
@@ -26,13 +26,29 @@ function View({ setIsLoggedIn }) {
   const [editInfo, setEditInfo] = useState({});
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [chatRoom, setChatRoom] = useState({});
+  const [userSearch, setUserSearch] = useState([]);
+  const [isSearchVisible, setIsSearchVisible] = useState(false); // Trạng thái hiển thị danh sách
+  const searchRef = useRef(null); // Tham chiếu đến phần tử danh sách tìm kiếm
 
   const renderView = () => {
     switch (currentView) {
       case "chat":
-        return <Chat setCurrentView={setCurrentView} chatRoom={chatRoom || {}} userChatting={userChatting || []} user={userInfo || {}} />;
+        return (
+          <Chat
+            setCurrentView={setCurrentView}
+            chatRoom={chatRoom || {}}
+            userChatting={userChatting || []}
+            user={userInfo || {}}
+            updateLastMessage={updateLastMessage} // Truyền hàm updateLastMessage
+          />
+        );
       case "setting":
-        return <Setting setCurrentView={setCurrentView} setIsLoggedIn={setIsLoggedIn} />;
+        return (
+          <Setting
+            setCurrentView={setCurrentView}
+            setIsLoggedIn={setIsLoggedIn}
+          />
+        );
       case "cloud":
         return <Cloud setCurrentView={setCurrentView} />;
       case "contacts":
@@ -44,22 +60,25 @@ function View({ setIsLoggedIn }) {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const data = await getUser();
-      if (data) {
-        setUserInfo(data);
-        const editData = { ...data };
-        if (data.dob) {
-          const [year, month, day] = data.dob.split("-");
-          editData.year = year;
-          editData.month = parseInt(month, 10);
-          editData.day = parseInt(day, 10);
+      try {
+        const data = await getUser();
+        if (data) {
+          setUserInfo(data);
+          const editData = { ...data };
+          if (data.dob) {
+            const [year, month, day] = data.dob.split("-");
+            editData.year = year;
+            editData.month = parseInt(month, 10);
+            editData.day = parseInt(day, 10);
+          }
+          setEditInfo(editData);
         }
-        setEditInfo(editData);
+      } catch (error) {
+        console.error("Error fetching user info:", error);
       }
     };
 
     fetchUser();
-
   }, []);
 
   const handleEdit = () => {
@@ -84,7 +103,9 @@ function View({ setIsLoggedIn }) {
   const handleSaveChanges = async () => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
-      toast.error("Không có token, vui lòng đăng nhập lại!", { position: "top-right" });
+      toast.error("Không có token, vui lòng đăng nhập lại!", {
+        position: "top-right",
+      });
       return;
     }
 
@@ -105,7 +126,7 @@ function View({ setIsLoggedIn }) {
       const response = await fetch("http://localhost:3824/user/update", {
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -121,7 +142,9 @@ function View({ setIsLoggedIn }) {
       setUserInfo(updatedUser.user);
       setShowEditModal(false);
       setShowModal(true);
-      toast.success("Cập nhật thông tin thành công!", { position: "top-right" });
+      toast.success("Cập nhật thông tin thành công!", {
+        position: "top-right",
+      });
       // setNotification({ show: true, message: "Cập nhật thông tin thành công!", type: "success" });
       // setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
     } catch (error) {
@@ -148,7 +171,7 @@ function View({ setIsLoggedIn }) {
       const response = await fetch("http://localhost:3824/user/update-avatar", {
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           // Không set header "Content-Type" khi gửi FormData
         },
         body: formData,
@@ -173,9 +196,6 @@ function View({ setIsLoggedIn }) {
     }
   };
 
-  const [userSearch, setUserSearch] = useState([]);
-  const [isFocused, setIsFocused] = useState(false);
-
   const handleGetUserbyKey = async (e) => {
     e.preventDefault();
 
@@ -191,9 +211,9 @@ function View({ setIsLoggedIn }) {
       if (!result || result.length === 0) {
         toast.warning("Không tìm thấy user!");
         setUserSearch([]);
-
       } else {
         setUserSearch(result);
+        setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
       }
     } catch (error) {
       toast.warning("Lỗi khi gọi API:", error);
@@ -203,115 +223,316 @@ function View({ setIsLoggedIn }) {
   const [userChatList, setUserChatList] = useState([]);
 
   useEffect(() => {
+    if (!userInfo?.phoneNumber) return;
+
     let isMounted = true;
 
     (async () => {
       const data = await getConversations();
       if (!isMounted || !data?.length) return;
 
-      const myPhone = data[0].participants[0];
+      const myPhone = userInfo.phoneNumber;
+
       const userData = await Promise.all(
         data.map(async (convo) => {
-          const partnerPhone = convo.participants.find(p => p !== myPhone);
-          const userArray = await getUserbySearch(partnerPhone, "");
+          const partnerPhone = convo.participants.find((p) => p !== myPhone);
 
+          if (!partnerPhone) return null;
+
+          const userArray = await getUserbySearch(partnerPhone, "");
           const user = Array.isArray(userArray) ? userArray[0] : userArray;
 
-          return user ? { ...user, lastMessage: convo.lastMessage } : null;
+          return user
+            ? {
+              ...user,
+              lastMessage: convo.lastMessage,
+              isUnread: convo.isUnread,
+            }
+            : null;
         })
       );
 
-      setUserChatList(userData.filter(user => user !== null));
+      setUserChatList(userData.filter((user) => user !== null));
     })();
 
-    return () => { isMounted = false; };
-  }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, [userInfo?.phoneNumber]); // Use optional chaining to avoid errors
 
   const check = async (phone1, phone2) => {
     const chatting = await getUserbySearch(phone2, phone2);
     setUserChatting(chatting);
 
+    const chatId = [phone1, phone2].sort().join("_");
     const chatRoomId = await checkChatRoom(phone1, phone2);
     const chatRoomInfo = await getChatRoom(chatRoomId);
     setChatRoom(chatRoomInfo);
 
+    // Mark the conversation as read
+    await markAsRead(chatId);
   };
+
+  const updateLastMessage = (senderPhone, receiverPhone, lastMessage) => {
+    setUserChatList((prevList) =>
+      prevList.map((conversation) => {
+        if (
+          (conversation.phoneNumber === receiverPhone &&
+            userInfo.phoneNumber === senderPhone) ||
+          (conversation.phoneNumber === senderPhone &&
+            userInfo.phoneNumber === receiverPhone)
+        ) {
+          return { ...conversation, lastMessage };
+        }
+        return conversation;
+      })
+    );
+  };
+
+  const renderLastMessage = (lastMessage) => {
+    if (!lastMessage) return "Chưa Có";
+
+    try {
+      const parsed = JSON.parse(lastMessage);
+      if (parsed.name && parsed.url && parsed.size && parsed.type) {
+        return "Vừa gửi một file";
+      }
+    } catch (e) {
+
+    }
+
+    if (lastMessage.endsWith(".webm")) {
+      return "Tin nhắn thoại";
+    }
+
+    return lastMessage;
+  };
+
+
+  const markAsRead = async (chatId) => {
+    try {
+      const res = await fetch("http://localhost:3618/markAsRead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId }),
+      });
+
+      if (!res.ok) throw new Error("Update failed");
+
+      // Gọi lại API getConversations để cập nhật trạng thái từ DB
+      const updatedConversations = await getConversations();
+      const myPhone = userInfo.phoneNumber;
+
+
+      const updatedUserData = await Promise.all(
+        updatedConversations.map(async (convo) => {
+          const partnerPhone = convo.participants.find((p) => p !== myPhone);
+
+          if (!partnerPhone) return null;
+
+          const userArray = await getUserbySearch(partnerPhone, "");
+          const user = Array.isArray(userArray) ? userArray[0] : userArray;
+
+          return user
+            ? {
+              ...user,
+              lastMessage: convo.lastMessage,
+              isUnread: convo.isUnread,
+            }
+            : null;
+        })
+      );
+
+      setUserChatList(updatedUserData.filter((user) => user !== null));
+    } catch (error) {
+      console.error("❌ Lỗi khi cập nhật trạng thái đọc:", error);
+    }
+  };
+
+  const unreadCount = userChatList.filter((user) => user.isUnread).length;
+
+  const createChatRoomAndConversation = async (currentUserPhone, targetUserPhone) => {
+    try {
+      // Tạo chatRoomId ngẫu nhiên bắt đầu bằng chữ 'c' và 3-5 số ngẫu nhiên
+      const sortedPhones = [currentUserPhone, targetUserPhone].sort();
+      const chatId = `${sortedPhones[0]}_${sortedPhones[1]}`;
+
+      const checkRes = await fetch(
+        "http://localhost:3618/checkConversationExist",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ chatId }),
+        }
+      );
+
+      const checkData = await checkRes.json();
+
+      if (checkData.exists) {
+        console.log(
+          "Conversation đã tồn tại với chatId:",
+          checkData.chatId
+        );
+        return; // không tạo lại nữa
+      }
+
+      const chatRoomId = `c${Math.floor(100 + Math.random() * 90000)}`;
+
+      const chatRoomData = {
+        chatRoomId,
+        isGroup: false,
+        participants: [currentUserPhone, targetUserPhone],
+      };
+
+      console.log(chatRoomData);
+
+      // Gửi dữ liệu lên bảng ChatRooms
+      await fetch("http://localhost:3618/createChatRoom", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(chatRoomData),
+      });
+
+      // Dữ liệu cho bảng Conservations
+      const conversationData = {
+        chatId,
+        chatRoomId,
+        participants: sortedPhones,
+      };
+
+      // Gửi dữ liệu lên bảng Conservations
+      await fetch("http://localhost:3618/createConversation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(conversationData),
+      });
+
+      console.log("ChatRoom và Conversation đã được tạo thành công!");
+    } catch (error) {
+      console.error("Lỗi khi tạo ChatRoom và Conversation:", error);
+    }
+  };
+
+  // Chỉnh sửa sự kiện onClick trong danh sách tìm kiếm
+  const handleUserClick = async (currentUserPhone, targetUserPhone) => {
+    await createChatRoomAndConversation(currentUserPhone, targetUserPhone);
+    check(currentUserPhone, targetUserPhone); // Gọi hàm check để cập nhật giao diện
+  };
+
+  // Ẩn danh sách khi nhấn ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchVisible(false); // Ẩn danh sách khi nhấn ra ngoài
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="wrapper">
       {/* Sidebar */}
       <div className="sidebar">
-        <div className="sidebar-header" style={{ position: 'relative' }}>
-          <form className="sidebar-header_search"
-            onSubmit={handleGetUserbyKey} >
-
-            <input type="search" placeholder="Search..."
+        <div className="sidebar-header" style={{ position: "relative" }}>
+          <form className="sidebar-header_search" onSubmit={handleGetUserbyKey}>
+            <input
+              type="search"
+              placeholder="Search..."
               style={{ flex: 1 }}
               value={keyWord}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setTimeout(() => setIsFocused(false), 100)}
               onChange={(e) => setKeyWord(e.target.value)}
             />
             <button className="btn" type="submit">
               <i className="bi bi-search text-light"></i>
             </button>
-
           </form>
 
-          {isFocused && userSearch.length > 0 && (
-            <div className="search_theme">
+          {isSearchVisible && userSearch.length > 0 && (
+            <div className="search_theme" ref={searchRef}>
               <ul className="m-0 p-0" style={{ flex: 1 }}>
-                {userSearch.map((user) => (
+                {userSearch.map((user, index) => (
                   <li
+                    key={user.id || user.phoneNumber || index}
                     style={{
-                      listStyleType: 'none',
-                      width: '100%',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      transition: 'background 0.2s ease-in-out'
+                      listStyleType: "none",
+                      width: "100%",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      transition: "background 0.2s ease-in-out",
                     }}
-                    key={user.id}
-                    onClick={() => check(userInfo.phoneNumber, user.phoneNumber)}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#222'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    onClick={() =>
+                      handleUserClick(userInfo.phoneNumber, user.phoneNumber)
+                    }
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "#222")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
                   >
-                    <img className="user-avt" src={user?.avatar} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-                    <span className="mx-4" style={{ fontSize: '16px', fontWeight: '500' }}>{user.fullName}</span>
+                    <img
+                      className="user-avt"
+                      src={user?.avatar}
+                      alt="Avatar"
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "50%",
+                      }}
+                    />
+                    <span
+                      className="mx-4"
+                      style={{ fontSize: "16px", fontWeight: "500" }}
+                    >
+                      {user.fullName}
+                    </span>
                   </li>
-
                 ))}
               </ul>
             </div>
           )}
-
-
         </div>
 
         {/* User List */}
         <div className="user-list">
           {userChatList.length > 0 ? (
             userChatList.map((user, index) => (
-              <div className="user" key={index} onClick={() => check(userInfo.phoneNumber, user.phoneNumber)}>
-                <img
-                  className="user-avt"
-                  src={user.avatar}
-                  alt="User"
-                />
+              <div
+                className="user"
+                key={index} // Đảm bảo key là duy nhất cho mỗi người
+                onClick={async () => {
+                  await markAsRead(user.chatId); // Gọi hàm update
+                  check(userInfo.phoneNumber, user.phoneNumber); // Gọi hàm chọn người chat
+                }}
+              >
+                <img className="user-avt" src={user.avatar} alt="User" />
                 <div>
                   <strong>{user.fullName || "Chưa Cập Nhật"}</strong>
                   <br />
-                  <small>{user.lastMessage || "Chưa Có"}</small>
+                  <small className={user.isUnread ? "bold-message" : ""}>
+                    {renderLastMessage(user.lastMessage)}
+                  </small>
+
                 </div>
               </div>
             ))
           ) : (
-            <p></p>
+            <p>Không có cuộc trò chuyện nào</p>
           )}
         </div>
-
 
         <div className="sidebar-bottom d-flex justify-content-around align-items-center">
           <button
@@ -320,12 +541,29 @@ function View({ setIsLoggedIn }) {
           >
             <i className="sidebar-bottom_icon bi bi-person-circle text-light"></i>
           </button>
-          <button
+          <div
             className="sidebar-bottom-btn btn active"
             onClick={() => setCurrentView("chat")}
+            style={{position: "relative"}}
           >
             <i className="sidebar-bottom_icon bi bi-chat-dots text-light"></i>
-          </button>
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "5px",
+                  right: "5px",
+                  backgroundColor: "red",
+                  color: "white",
+                  borderRadius: "50%",
+                  padding: "2px 6px",
+                  fontSize: "12px",
+                }}
+              >
+                {unreadCount}
+              </span>
+            )}
+          </div>
           <button
             className="sidebar-bottom-btn btn"
             onClick={() => setCurrentView("contacts")}
@@ -348,9 +586,7 @@ function View({ setIsLoggedIn }) {
       </div>
 
       {/* Main */}
-      <div className="content">
-        {renderView()}
-      </div>
+      <div className="content">{renderView()}</div>
 
       {/* Modal */}
       {showModal && (
@@ -405,14 +641,16 @@ function View({ setIsLoggedIn }) {
                       className="btn btn-sm btn-secondary"
                       onClick={() => {
                         setAvatarPreview(null);
-                        setEditInfo(prev => ({ ...prev, avatar: null }));
+                        setEditInfo((prev) => ({ ...prev, avatar: null }));
                       }}
                     >
                       Hủy
                     </button>
                   </div>
                 )}
-                <h5 className="fw-bold mt-3 mb-4">{userInfo ? userInfo.fullName : "Chưa có tên"}</h5>
+                <h5 className="fw-bold mt-3 mb-4">
+                  {userInfo ? userInfo.fullName : "Chưa có tên"}
+                </h5>
                 <div className="text-start px-3">
                   <h6 className="text-center">
                     <strong>Thông tin cá nhân</strong>
@@ -431,10 +669,24 @@ function View({ setIsLoggedIn }) {
                     Email: <strong>{userInfo?.email || "Chưa cập nhật"}</strong>
                   </p>
 
-                  <p>Giới tính: <strong>{userInfo?.gender === "Male" ? "Nam" : userInfo?.gender === "Female" ? "Nữ" : "Chưa cập nhật"}</strong></p>
-                  <p>Ngày sinh: <strong>{userInfo?.dob || "Chưa cập nhật"}</strong></p>
-                  <p>Điện thoại: <strong>{userInfo?.phoneNumber || "Chưa cập nhật"}</strong></p>
-
+                  <p>
+                    Giới tính:{" "}
+                    <strong>
+                      {userInfo?.gender === "Male"
+                        ? "Nam"
+                        : userInfo?.gender === "Female"
+                          ? "Nữ"
+                          : "Chưa cập nhật"}
+                    </strong>
+                  </p>
+                  <p>
+                    Ngày sinh:{" "}
+                    <strong>{userInfo?.dob || "Chưa cập nhật"}</strong>
+                  </p>
+                  <p>
+                    Điện thoại:{" "}
+                    <strong>{userInfo?.phoneNumber || "Chưa cập nhật"}</strong>
+                  </p>
                 </div>
               </div>
               <div className="modal-footer bg-dark">
@@ -443,7 +695,7 @@ function View({ setIsLoggedIn }) {
                   className="btn w-100 py-3 custom-button"
                   onClick={() => {
                     setShowModal(false);
-                    handleEdit()
+                    handleEdit();
                   }}
                 >
                   <i className="bi bi-pencil me-2"></i> Cập nhật
@@ -478,10 +730,8 @@ function View({ setIsLoggedIn }) {
                     <input
                       type="text"
                       className="form-control"
-
                       name="fullName"
                       value={editInfo.fullName || ""}
-
                       onChange={handleEditChange}
                     />
                   </div>
@@ -495,10 +745,15 @@ function View({ setIsLoggedIn }) {
                           name="gender"
                           id="genderMale"
                           value="Male"
-                          checked={editInfo?.gender === "Male" || "Chưa cập nhật"}
+                          checked={
+                            editInfo?.gender === "Male" || "Chưa cập nhật"
+                          }
                           onChange={handleEditChange}
                         />
-                        <label className="form-check-label" htmlFor="genderMale">
+                        <label
+                          className="form-check-label"
+                          htmlFor="genderMale"
+                        >
                           Nam
                         </label>
                       </div>
@@ -509,10 +764,15 @@ function View({ setIsLoggedIn }) {
                           name="gender"
                           id="genderFemale"
                           value="Female"
-                          checked={editInfo?.gender === "Female" || "Chưa cập nhật"}
+                          checked={
+                            editInfo?.gender === "Female" || "Chưa cập nhật"
+                          }
                           onChange={handleEditChange}
                         />
-                        <label className="form-check-label" htmlFor="genderFemale">
+                        <label
+                          className="form-check-label"
+                          htmlFor="genderFemale"
+                        >
                           Nữ
                         </label>
                       </div>
@@ -521,14 +781,12 @@ function View({ setIsLoggedIn }) {
                   <div className="mb-3">
                     <label className="form-label">Ngày sinh</label>
                     <div className="d-flex">
-
                       <select
                         className="form-select me-2"
                         name="day"
                         value={editInfo.day || ""}
                         onChange={handleEditChange}
                       >
-
                         <option value="" disabled>
                           Ngày
                         </option>
@@ -609,7 +867,6 @@ function View({ setIsLoggedIn }) {
           </div>
         </div>
       )}
-
     </div>
   );
 }

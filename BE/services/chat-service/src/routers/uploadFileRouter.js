@@ -7,6 +7,7 @@ const Message = require("../models/message");
 
 const router = express.Router();
 const TABLE_NAME = "Message";
+const TABLE_CONVERSATION_NAME = "Conversations";
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "lab2s3aduong";
 
 const s3 = new AWS.S3();
@@ -51,15 +52,15 @@ module.exports = (io) => {
     const handleMulterError = (err, req, res, next) => {
         if (err) {
             console.error("Lỗi multer:", err);
-            
+
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     error: "Kích thước file vượt quá giới hạn 10MB. Vui lòng chọn file nhỏ hơn.",
                     code: "FILE_TOO_LARGE"
                 });
             }
-            
-            return res.status(400).json({ 
+
+            return res.status(400).json({
                 error: err.message || "Tải file lên thất bại",
                 code: "UPLOAD_ERROR"
             });
@@ -67,21 +68,26 @@ module.exports = (io) => {
         next();
     };
 
+    const isUserOnline = (userId) => {
+        // Thay thế bằng logic kiểm tra trạng thái đăng nhập thực tế
+        return io.sockets.adapter.rooms.has(userId);
+    };
+
     // Route upload file
     router.post("/uploadFile", upload.single("file"), handleMulterError, async (req, res) => {
         try {
             console.log("Nhận yêu cầu tải file lên");
-                
+
             if (!req.file) {
                 return res.status(400).json({ error: "Không có file nào được tải lên!" });
             }
 
             const { chatRoomId, sender, receiver } = req.body;
-                
+
             if (!chatRoomId || !sender || !receiver) {
-                return res.status(400).json({ 
-                    error: "Thiếu thông tin bắt buộc!", 
-                    fields: { chatRoomId, sender, receiver } 
+                return res.status(400).json({
+                    error: "Thiếu thông tin bắt buộc!",
+                    fields: { chatRoomId, sender, receiver }
                 });
             }
 
@@ -99,10 +105,10 @@ module.exports = (io) => {
             };
 
             const newMessage = new Message(
-                chatRoomId, 
-                sender, 
-                receiver, 
-                JSON.stringify(fileInfo), 
+                chatRoomId,
+                sender,
+                receiver,
+                JSON.stringify(fileInfo),
                 "file"
             );
 
@@ -112,8 +118,33 @@ module.exports = (io) => {
             };
 
             await dynamoDB.put(params).promise();
-            console.log("✅ Lưu tin nhắn file vào DB:", newMessage);
+            const chatId = [sender, receiver].sort().join("_");
+            const isUnread = !isUserOnline(receiver);
+            const updateParams = {
+                TableName: TABLE_CONVERSATION_NAME, // Tên bảng lưu thông tin cuộc trò chuyện
+                Key: { chatId }, // Khóa chính là chatId
+                UpdateExpression:
+                    "set lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnread = :isUnread",
+                ExpressionAttributeValues: {
+                    ":lastMessage": "Vừa nhận được file",
+                    ":lastMessageAt": new Date(newMessage.timestamp).toLocaleDateString(
+                        "vi-VN",
+                        {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                        }
+                    ),
+                    ":isUnread": isUnread,
+                },
+                ReturnValues: "UPDATED_NEW",
+            };
 
+            await dynamoDB.update(updateParams).promise();
+            console.log("✅ Lưu tin nhắn file vào DB:", newMessage);
             io.to(chatRoomId).emit("receiveMessage", newMessage);
 
             res.status(201).json({
