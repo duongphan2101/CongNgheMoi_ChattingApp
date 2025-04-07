@@ -172,5 +172,31 @@ router.post("/createConversation", async (req, res) => {
     }
 });
 
+router.post("/checkConversationExist", async (req, res) => {
+    const { chatId } = req.body;
+  
+    if (!chatId) {
+      return res.status(400).json({ message: "Thiếu chatId!" });
+    }
+  
+    const params = {
+      TableName: TABLE_NAME,
+      Key: { chatId },
+    };
+  
+    try {
+      const result = await dynamoDB.get(params).promise();
+      if (result.Item) {
+        return res.status(200).json({ exists: true, chatRoomId: result.Item.chatRoomId });
+      } else {
+        return res.status(200).json({ exists: false });
+      }
+    } catch (error) {
+      console.error("Lỗi khi kiểm tra conversation:", error);
+      res.status(500).json({ message: "Lỗi server!" });
+    }
+  });
+  
+
 module.exports = router;
 

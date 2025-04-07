@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Chat from "../chatting/chat";
 import Setting from "../setting/setting";
 import Cloud from "../cloud/cloud";
@@ -27,6 +27,9 @@ function View({ setIsLoggedIn }) {
   const [editInfo, setEditInfo] = useState({});
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [chatRoom, setChatRoom] = useState({});
+  const [userSearch, setUserSearch] = useState([]);
+  const [isSearchVisible, setIsSearchVisible] = useState(false); // Trạng thái hiển thị danh sách
+  const searchRef = useRef(null); // Tham chiếu đến phần tử danh sách tìm kiếm
 
   const renderView = () => {
     switch (currentView) {
@@ -194,7 +197,6 @@ function View({ setIsLoggedIn }) {
     }
   };
 
-  const [userSearch, setUserSearch] = useState([]);
   const [isFocused, setIsFocused] = useState(false);
 
   const handleGetUserbyKey = async (e) => {
@@ -214,6 +216,7 @@ function View({ setIsLoggedIn }) {
         setUserSearch([]);
       } else {
         setUserSearch(result);
+        setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
       }
     } catch (error) {
       toast.warning("Lỗi khi gọi API:", error);
@@ -330,18 +333,42 @@ function View({ setIsLoggedIn }) {
 
   const unreadCount = userChatList.filter((user) => user.isUnread).length;
 
-  const createChatRoomAndConversation = async (currentUserPhone, targetUserPhone) => {
+  const createChatRoomAndConversation = async (currentUserPhone,targetUserPhone) => {
     try {
       // Tạo chatRoomId ngẫu nhiên bắt đầu bằng chữ 'c' và 3-5 số ngẫu nhiên
+      const sortedPhones = [currentUserPhone, targetUserPhone].sort();
+      const chatId = `${sortedPhones[0]}_${sortedPhones[1]}`;
+
+      const checkRes = await fetch(
+        "http://localhost:3618/checkConversationExist",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ chatId }),
+        }
+      );
+
+      const checkData = await checkRes.json();
+
+      if (checkData.exists) {
+        console.log(
+          "Conversation đã tồn tại với chatId:",
+          checkData.chatId
+        );
+        return; // không tạo lại nữa
+      }
+
       const chatRoomId = `c${Math.floor(100 + Math.random() * 90000)}`;
 
       const chatRoomData = {
         chatRoomId,
         isGroup: false,
-        participants: [currentUserPhone, targetUserPhone]
+        participants: [currentUserPhone, targetUserPhone],
       };
 
-      console.log(chatRoomData)
+      console.log(chatRoomData);
 
       // Gửi dữ liệu lên bảng ChatRooms
       await fetch("http://localhost:3618/createChatRoom", {
@@ -352,11 +379,9 @@ function View({ setIsLoggedIn }) {
         body: JSON.stringify(chatRoomData),
       });
 
-      const sortedPhones = [currentUserPhone, targetUserPhone].sort();
-
       // Dữ liệu cho bảng Conservations
       const conversationData = {
-        chatId: `${sortedPhones[0]}_${sortedPhones[1]}`,
+        chatId,
         chatRoomId,
         participants: sortedPhones,
       };
@@ -382,6 +407,20 @@ function View({ setIsLoggedIn }) {
     check(currentUserPhone, targetUserPhone); // Gọi hàm check để cập nhật giao diện
   };
 
+  // Ẩn danh sách khi nhấn ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchVisible(false); // Ẩn danh sách khi nhấn ra ngoài
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
     <div className="wrapper">
       {/* Sidebar */}
@@ -393,8 +432,6 @@ function View({ setIsLoggedIn }) {
               placeholder="Search..."
               style={{ flex: 1 }}
               value={keyWord}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setTimeout(() => setIsFocused(false), 100)}
               onChange={(e) => setKeyWord(e.target.value)}
             />
             <button className="btn" type="submit">
@@ -402,10 +439,10 @@ function View({ setIsLoggedIn }) {
             </button>
           </form>
 
-          {isFocused && userSearch.length > 0 && (
-            <div className="search_theme">
+          {isSearchVisible && userSearch.length > 0 && (
+            <div className="search_theme" ref={searchRef}>
               <ul className="m-0 p-0" style={{ flex: 1 }}>
-                {userSearch.map((user , index) => (
+                {userSearch.map((user, index) => (
                   <li
                     key={user.id || user.phoneNumber || index}
                     style={{
@@ -454,7 +491,7 @@ function View({ setIsLoggedIn }) {
         {/* User List */}
         <div className="user-list">
           {userChatList.length > 0 ? (
-            userChatList.map((user,index) => (
+            userChatList.map((user, index) => (
               <div
                 className="user"
                 key={index} // Đảm bảo key là duy nhất cho mỗi người
