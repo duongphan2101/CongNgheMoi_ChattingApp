@@ -12,6 +12,6 @@ app.use("/auth", authRoutes);
 
 // Khởi động server
 const PORT = process.env.PORT || 3721;
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`Auth service đang chạy trên cổng ${PORT}`);
 });

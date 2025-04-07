@@ -4,7 +4,7 @@ const verifyToken = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
-const TABLE_NAME = "Conversattions";
+const TABLE_NAME = "Conversations";
 const CHATROOM_TABLE = "ChatRooms";
 const MESSAGE_TABLE = "Message";
 
@@ -138,6 +138,65 @@ router.get("/messages", async (req, res) => {
         res.status(500).json({ message: "Lỗi server!" });
     }
 });
+
+router.post("/createConversation", async (req, res) => {
+    try {
+        const { chatId , chatRoomId , participants } = req.body;
+
+        // Dữ liệu cho bảng Conversations
+        const conversationData = {
+            chatId,
+            chatRoomId,
+            isGroup: false,
+            participants,
+            isUnread: false,
+            lastMessage: "",
+            lastMessageAt: null,
+        };
+
+        // Lưu vào bảng Conversations
+        const conversationParams = {
+            TableName: TABLE_NAME,
+            Item: conversationData,
+        };
+        await dynamoDB.put(conversationParams).promise();
+
+        // Phản hồi thành công
+        res.status(201).json({
+            message: "Conversation và ChatRoom đã được tạo thành công!",
+            chatRoomId,
+        });
+    } catch (error) {
+        console.error("Lỗi khi tạo Conversation và ChatRoom:", error);
+        res.status(500).json({ message: "Lỗi server!" });
+    }
+});
+
+router.post("/checkConversationExist", async (req, res) => {
+    const { chatId } = req.body;
+  
+    if (!chatId) {
+      return res.status(400).json({ message: "Thiếu chatId!" });
+    }
+  
+    const params = {
+      TableName: TABLE_NAME,
+      Key: { chatId },
+    };
+  
+    try {
+      const result = await dynamoDB.get(params).promise();
+      if (result.Item) {
+        return res.status(200).json({ exists: true, chatRoomId: result.Item.chatRoomId });
+      } else {
+        return res.status(200).json({ exists: false });
+      }
+    } catch (error) {
+      console.error("Lỗi khi kiểm tra conversation:", error);
+      res.status(500).json({ message: "Lỗi server!" });
+    }
+  });
+  
 
 module.exports = router;
 

@@ -4,13 +4,13 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { ToastContainer} from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import Login from "./component/login/login";
-import Register from "./component/register/register";
-import View from "./component/view/view";
-import Setting from "./component/setting/setting";
-import ForgotPassword from "./component/forgotpass/forgotpass";
-import SendLinkReset from "./component/sendLink/sendLinkReset";
-import ConfirmEmail from "./component/register/ConfirmEmail"; // Import the ConfirmEmail component
+import Login from "./screen/login/login";
+import Register from "./screen/register/register";
+import View from "./screen/view/view";
+import Setting from "./screen/setting/setting";
+import ForgotPassword from "./screen/forgotpass/forgotpass";
+import SendLinkReset from "./screen/sendLink/sendLinkReset";
+import ConfirmEmail from "./screen/register/ConfirmEmail";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
