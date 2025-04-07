@@ -9,7 +9,7 @@ require("dotenv").config({ path: "../.env" });
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-    cors: { origin: "*" } // Cho phép tất cả client kết nối
+    cors: { origin: "*" }
 });
 
 const PORT = 3618;
@@ -23,18 +23,20 @@ AWS.config.update({
 app.use(express.json());
 app.use(cors());
 
-// Import routes
 const conversationRoutes = require("./routers/conversationRouter");
 const chatRoomRoutes = require("./routers/ChatRoomRouter");
 const messageRoutes = require("./routers/messageRouter")(io);
+const uploadFileRouter = require("./routers/uploadFileRouter")(io);
+const downloadRouter = require("./routers/downloadRouter");
 
 app.use("/", conversationRoutes);
 app.use("/", chatRoomRoutes);
 app.use("/", messageRoutes);
+app.use("/", uploadFileRouter);
+app.use("/", downloadRouter);
 
 // Xử lý socket.io
 io.on("connection", (socket) => {
-
     socket.on("joinRoom", (chatRoomId) => {
         socket.join(chatRoomId);
     });
@@ -48,4 +50,3 @@ io.on("connection", (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
-

@@ -1,11 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const SERVER_IP = "192.168.1.143";
-const SERVER_PORT = "3721";
-const BASE_URL = `http://${SERVER_IP}:${SERVER_PORT}`;
+import getIp from "../utils/getIp.js";
 
 const login = async (phoneNumber, password) => {
   try {
+    const BASE_URL = getIp();
+
+    if (!BASE_URL) throw new Error("Không thể xác định BASE_URL");
+
     const response = await fetch(`${BASE_URL}/auth/login`, {
       method: "POST",
       headers: {
@@ -14,11 +15,12 @@ const login = async (phoneNumber, password) => {
       body: JSON.stringify({ phoneNumber, password }),
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
-      throw new Error(data.message || "Đăng nhập thất bại!");
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Đăng nhập thất bại!");
     }
+
+    const data = await response.json();
 
     if (data.token) {
       await AsyncStorage.setItem("accessToken", data.token);
@@ -26,10 +28,11 @@ const login = async (phoneNumber, password) => {
 
     return data;
   } catch (error) {
-    console.error("Lỗi đăng nhập:", error);
+    console.error("Lỗi đăng nhập:", error.message || error);
     return null;
   }
 };
+
 
 export default login;
 

@@ -10,7 +10,7 @@ import View from "./screen/view/view";
 import Setting from "./screen/setting/setting";
 import ForgotPassword from "./screen/forgotpass/forgotpass";
 import SendLinkReset from "./screen/sendLink/sendLinkReset";
-import ConfirmEmail from "./screen/register/ConfirmEmail"; // Import the ConfirmEmail component
+import ConfirmEmail from "./screen/register/ConfirmEmail";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);

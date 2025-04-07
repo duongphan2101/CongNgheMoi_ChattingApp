@@ -43,7 +43,7 @@ export default function App({ navigation }) {
         <AntDesign name="back" size={24} color="gray" />
       </TouchableOpacity>
 
-      <Image style={{ height: '50%', width: '100%', resizeMode: 'contains' }} source={require('../assets/slice2.png')} />
+      <Image style={{ height: '55%', width: '100%', resizeMode: 'contains' }} source={require('../assets/slice2.png')} />
       <View style={[styles.container,
       { padding: 20, width: '100%', backgroundColor: themeColors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20 }]}>
 
