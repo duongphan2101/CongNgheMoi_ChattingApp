@@ -244,10 +244,12 @@ function View({ setIsLoggedIn }) {
 
           return user
             ? {
-              ...user,
-              lastMessage: convo.lastMessage,
-              isUnread: convo.isUnread,
-            }
+                ...user,
+                lastMessage: convo.lastMessage,
+                isUnreadBy:
+                  Array.isArray(convo.isUnreadBy) &&
+                  convo.isUnreadBy.includes(myPhone),
+              }
             : null;
         })
       );
@@ -258,7 +260,7 @@ function View({ setIsLoggedIn }) {
     return () => {
       isMounted = false;
     };
-  }, [userInfo?.phoneNumber]); // Use optional chaining to avoid errors
+  }, [userInfo?.phoneNumber]);
 
   const check = async (phone1, phone2) => {
     const chatting = await getUserbySearch(phone2, phone2);
@@ -297,9 +299,7 @@ function View({ setIsLoggedIn }) {
       if (parsed.name && parsed.url && parsed.size && parsed.type) {
         return "Vừa gửi một file";
       }
-    } catch (e) {
-
-    }
+    } catch (e) {}
 
     if (lastMessage.endsWith(".webm")) {
       return "Tin nhắn thoại";
@@ -308,21 +308,21 @@ function View({ setIsLoggedIn }) {
     return lastMessage;
   };
 
-
   const markAsRead = async (chatId) => {
     try {
       const res = await fetch("http://localhost:3618/markAsRead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatId }),
+        body: JSON.stringify({
+          chatId,
+          phoneNumber: userInfo.phoneNumber, // Thêm phoneNumber
+        }),
       });
 
       if (!res.ok) throw new Error("Update failed");
 
-      // Gọi lại API getConversations để cập nhật trạng thái từ DB
       const updatedConversations = await getConversations();
       const myPhone = userInfo.phoneNumber;
-
 
       const updatedUserData = await Promise.all(
         updatedConversations.map(async (convo) => {
@@ -335,10 +335,12 @@ function View({ setIsLoggedIn }) {
 
           return user
             ? {
-              ...user,
-              lastMessage: convo.lastMessage,
-              isUnread: convo.isUnread,
-            }
+                ...user,
+                lastMessage: convo.lastMessage,
+                isUnreadBy:
+                  Array.isArray(convo.isUnreadBy) &&
+                  convo.isUnreadBy.includes(myPhone),
+              }
             : null;
         })
       );
@@ -349,9 +351,12 @@ function View({ setIsLoggedIn }) {
     }
   };
 
-  const unreadCount = userChatList.filter((user) => user.isUnread).length;
+  const unreadCount = userChatList.filter((user) => user.isUnreadBy).length;
 
-  const createChatRoomAndConversation = async (currentUserPhone, targetUserPhone) => {
+  const createChatRoomAndConversation = async (
+    currentUserPhone,
+    targetUserPhone
+  ) => {
     try {
       // Tạo chatRoomId ngẫu nhiên bắt đầu bằng chữ 'c' và 3-5 số ngẫu nhiên
       const sortedPhones = [currentUserPhone, targetUserPhone].sort();
@@ -371,10 +376,7 @@ function View({ setIsLoggedIn }) {
       const checkData = await checkRes.json();
 
       if (checkData.exists) {
-        console.log(
-          "Conversation đã tồn tại với chatId:",
-          checkData.chatId
-        );
+        console.log("Conversation đã tồn tại với chatId:", checkData.chatId);
         return; // không tạo lại nữa
       }
 
@@ -522,10 +524,9 @@ function View({ setIsLoggedIn }) {
                 <div>
                   <strong>{user.fullName || "Chưa Cập Nhật"}</strong>
                   <br />
-                  <small className={user.isUnread ? "bold-message" : ""}>
+                  <small className={user.isUnreadBy ? "bold-message" : ""}>
                     {renderLastMessage(user.lastMessage)}
                   </small>
-
                 </div>
               </div>
             ))
@@ -544,7 +545,7 @@ function View({ setIsLoggedIn }) {
           <div
             className="sidebar-bottom-btn btn active"
             onClick={() => setCurrentView("chat")}
-            style={{position: "relative"}}
+            style={{ position: "relative" }}
           >
             <i className="sidebar-bottom_icon bi bi-chat-dots text-light"></i>
             {unreadCount > 0 && (
@@ -675,8 +676,8 @@ function View({ setIsLoggedIn }) {
                       {userInfo?.gender === "Male"
                         ? "Nam"
                         : userInfo?.gender === "Female"
-                          ? "Nữ"
-                          : "Chưa cập nhật"}
+                        ? "Nữ"
+                        : "Chưa cập nhật"}
                     </strong>
                   </p>
                   <p>

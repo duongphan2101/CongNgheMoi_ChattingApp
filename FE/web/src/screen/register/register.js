@@ -5,15 +5,16 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import sendConfirmationEmail from "../../API/api_register/api_sendConfirmationEmail";
+import { useNavigate } from "react-router-dom";
 
-function Register({ setIsRegistering }) {
+function Register() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState(""); // State for email error message
-
+  const navigate = useNavigate();
   const validateInputs = () => {
 
     if (!/^\d{10}$/.test(phoneNumber)) {
@@ -59,7 +60,7 @@ function Register({ setIsRegistering }) {
   
     if (response.success) {
       toast.success(response.message);
-      setIsRegistering(false);
+      navigate("/login");
     } else {
       setEmailError(response.message || "Đã xảy ra lỗi. Vui lòng thử lại.");
 
@@ -116,7 +117,7 @@ function Register({ setIsRegistering }) {
         <p className="text-center mt-4">
           Đã có tài khoản?{" "}
           <span
-            onClick={() => setIsRegistering(false)}
+            onClick={() => navigate("/login")}
             className="link"
             style={{ cursor: "pointer", color: "blue" }}
           >

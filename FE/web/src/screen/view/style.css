@@ -238,13 +238,13 @@ body {
     animation: slideIn 0.5s ease-in-out, fadeOut 0.5s ease-in-out 2.5s;
 } */
 
-.notification.success {
+/* .notification.success {
     background-color: #28a745;
 }
 
 .notification.error {
     background-color: #dc3545;
-}
+} */
 
 @keyframes slideIn {
     from {

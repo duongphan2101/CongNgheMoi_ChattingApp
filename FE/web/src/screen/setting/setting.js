@@ -23,8 +23,9 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
     if (!setIsLoggedIn) {
       return;
     }
-    setIsLoggedIn(false); // Quay về màn hình Login
-    setCurrentView("login"); // Điều hướng về login
+    setIsLoggedIn(false);
+    setCurrentView("login");
+    localStorage.removeItem("accessToken");
   };
 
   const handleChangePassword = () => {
@@ -39,7 +40,7 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
       return;
     }
 
-    const token = localStorage.getItem("accessToken"); // Lấy token từ localStorage
+    const token = localStorage.getItem("accessToken");
     if (!token) {
       toast.error("Bạn cần đăng nhập để thay đổi mật khẩu!", { position: "top-right" });
       return;
@@ -92,7 +93,6 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
             value={mode}
             onChange={(e) => setMode(e.target.value)}
           >
-            <option value="Mặc định">Mặc định</option>
             <option value="Dark Mode">Dark Mode</option>
             <option value="Light Mode">Light Mode</option>
           </select>
