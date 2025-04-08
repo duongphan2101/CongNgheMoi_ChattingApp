@@ -119,12 +119,35 @@ module.exports = (io) => {
 
             await dynamoDB.put(params).promise();
             const chatId = [sender, receiver].sort().join("_");
-            const isUnread = !isUserOnline(receiver);
+
+            // Lấy thông tin participants từ bảng Conversations
+            const getConversationParams = {
+                TableName: TABLE_CONVERSATION_NAME,
+                Key: { chatId },
+            };
+
+            const conversationData = await dynamoDB.get(getConversationParams).promise();
+
+            if (!conversationData.Item || !conversationData.Item.participants) {
+                return res
+                    .status(404)
+                    .json({ error: "Không tìm thấy cuộc trò chuyện!" });
+            }
+
+            const participants = conversationData.Item.participants;
+            const unreadFor = participants.filter((p) => p !== sender); // Loại sender ra khỏi danh sách unread
+
+            // Lấy danh sách hiện tại từ conversation
+            const currentUnreadList = conversationData.Item.isUnreadBy || [];
+
+            // Thêm các phần tử mới vào danh sách, đảm bảo không trùng lặp
+            const updatedUnreadList = Array.from(new Set([...currentUnreadList, ...unreadFor]));
+
+            // Cập nhật bảng Conversation
             const updateParams = {
-                TableName: TABLE_CONVERSATION_NAME, // Tên bảng lưu thông tin cuộc trò chuyện
-                Key: { chatId }, // Khóa chính là chatId
-                UpdateExpression:
-                    "set lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnread = :isUnread",
+                TableName: TABLE_CONVERSATION_NAME,
+                Key: { chatId },
+                UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnreadBy = :updatedUnreadList",
                 ExpressionAttributeValues: {
                     ":lastMessage": "Vừa nhận được file",
                     ":lastMessageAt": new Date(newMessage.timestamp).toLocaleDateString(
@@ -138,7 +161,7 @@ module.exports = (io) => {
                             second: "2-digit",
                         }
                     ),
-                    ":isUnread": isUnread,
+                    ":updatedUnreadList": updatedUnreadList,
                 },
                 ReturnValues: "UPDATED_NEW",
             };

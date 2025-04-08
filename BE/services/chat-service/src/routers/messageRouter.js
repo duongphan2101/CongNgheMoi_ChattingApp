@@ -21,7 +21,6 @@ const upload = multer({
   }),
 });
 module.exports = (io) => {
-
   const isUserOnline = (userId) => {
     // Thay thế bằng logic kiểm tra trạng thái đăng nhập thực tế
     return io.sockets.adapter.rooms.has(userId);
@@ -30,14 +29,14 @@ module.exports = (io) => {
   router.post("/sendMessage", async (req, res) => {
     try {
       const { chatRoomId, sender, receiver, message } = req.body;
-
+  
       if (!chatRoomId || !sender || !receiver || !message) {
         console.error("❌ Thiếu dữ liệu từ client:", req.body);
         return res.status(400).json({ error: "Thiếu trường bắt buộc!" });
       }
-
+  
       const chatId = [sender, receiver].sort().join("_");
-
+  
       // Tạo tin nhắn mới
       const newMessage = new Message(
         chatRoomId,
@@ -46,23 +45,46 @@ module.exports = (io) => {
         message,
         "text"
       );
-
+  
       // Lưu tin nhắn vào bảng Message
       const params = {
         TableName: TABLE_MESSAGE_NAME,
         Item: newMessage,
       };
-
+  
       await dynamoDB.put(params).promise();
       console.log("✅ Tin nhắn đã lưu vào DB:", newMessage);
-
-      const isUnread = !isUserOnline(receiver);
-
-      const updateParams = {
-        TableName: TABLE_CONVERSATION_NAME, 
+  
+      // Lấy thông tin participants từ bảng Conversations
+      const getConversationParams = {
+        TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
-        UpdateExpression:
-          "set lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnread = :isUnread",
+      };
+
+      console.log(chatId)
+  
+      const conversationData = await dynamoDB.get(getConversationParams).promise();
+  
+      if (!conversationData.Item || !conversationData.Item.participants) {
+        return res
+          .status(404)
+          .json({ error: "Không tìm thấy cuộc trò chuyện!" });
+      }
+  
+      const participants = conversationData.Item.participants;
+      const unreadFor = participants.filter((p) => p !== sender); // Loại sender ra khỏi danh sách unread
+  
+      // Lấy danh sách hiện tại từ conversation
+      const currentUnreadList = conversationData.Item.isUnreadBy || [];
+  
+      // Thêm các phần tử mới vào danh sách, đảm bảo không trùng lặp
+      const updatedUnreadList = Array.from(new Set([...currentUnreadList, ...unreadFor]));
+  
+      // Cập nhật bảng Conversation
+      const updateParams = {
+        TableName: TABLE_CONVERSATION_NAME,
+        Key: { chatId },
+        UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnreadBy = :updatedUnreadList",
         ExpressionAttributeValues: {
           ":lastMessage": message,
           ":lastMessageAt": new Date(newMessage.timestamp).toLocaleDateString(
@@ -76,18 +98,26 @@ module.exports = (io) => {
               second: "2-digit",
             }
           ),
-          ":isUnread": isUnread, // Giá trị của isUnread
+          ":updatedUnreadList": updatedUnreadList,
         },
         ReturnValues: "UPDATED_NEW",
       };
-
+  
       await dynamoDB.update(updateParams).promise();
-
+  
       // Gửi tin nhắn đến các client trong phòng
       io.to(chatRoomId).emit("receiveMessage", newMessage);
       res.status(200).json({ message: "Gửi tin nhắn thành công!" });
     } catch (error) {
-      console.error("Lỗi khi lưu tin nhắn:", error);
+      console.error("❌ Lỗi khi lưu tin nhắn:", error);
+  
+      // Xử lý lỗi rõ ràng hơn
+      if (error.name === "ValidationException") {
+        return res.status(400).json({
+          error: "Lỗi dữ liệu khi cập nhật. Đảm bảo isUnreadBy là kiểu Set.",
+        });
+      }
+  
       res.status(500).json({ error: "Lỗi server!" });
     }
   });
@@ -152,12 +182,10 @@ module.exports = (io) => {
       await dynamoDB.delete(deleteParams).promise();
       console.log("Đã xóa tin nhắn:", messageId);
 
-
       io.to(chatRoomId).emit("messageDeleted", { messageId });
 
       res.status(200).json({ message: "Xóa tin nhắn thành công!" });
     } catch (error) {
-
       console.error("Lỗi khi xóa tin nhắn:", error);
       res.status(500).json({ error: "Lỗi server!" });
     }
@@ -165,28 +193,69 @@ module.exports = (io) => {
 
   router.post("/markAsRead", async (req, res) => {
     try {
-      const { chatId } = req.body;
-
-      if (!chatId) {
-        return res.status(400).json({ error: "Thiếu chatId!" });
+      const { chatId, phoneNumber } = req.body;
+  
+      if (!chatId || !phoneNumber) {
+        return res
+          .status(400)
+          .json({ error: "Thiếu chatId hoặc phoneNumber!" });
       }
-
+  
+      // Trước tiên, kiểm tra conversation có tồn tại không
+      const getParams = {
+        TableName: TABLE_CONVERSATION_NAME,
+        Key: { chatId },
+      };
+  
+      const conversationData = await dynamoDB.get(getParams).promise();
+  
+      if (!conversationData.Item) {
+        return res
+          .status(404)
+          .json({ error: "Không tìm thấy cuộc trò chuyện!" });
+      }
+  
+      const currentUnreadList = conversationData.Item.isUnreadBy || [];
+  
+      // Nếu không tồn tại hoặc không chứa số cần xóa thì bỏ qua
+      if (!currentUnreadList.includes(phoneNumber)) {
+        console.log(
+          `ℹ️ Số ${phoneNumber} không có trong isUnreadBy => không cần xóa.`
+        );
+        return res
+          .status(200)
+          .json({ message: "Đã đọc hoặc không có gì để cập nhật!" });
+      }
+  
+      // Loại bỏ phoneNumber khỏi danh sách
+      const updatedUnreadList = currentUnreadList.filter(
+        (user) => user !== phoneNumber
+      );
+  
+      // Cập nhật lại danh sách isUnreadBy
       const updateParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
-        UpdateExpression: "SET isUnread = :isUnread",
+        UpdateExpression: "SET isUnreadBy = :updatedUnreadList",
         ExpressionAttributeValues: {
-          ":isUnread": false,
+          ":updatedUnreadList": updatedUnreadList,
         },
         ReturnValues: "UPDATED_NEW",
       };
-
+  
       const result = await dynamoDB.update(updateParams).promise();
-      console.log("✅ Đã cập nhật isUnread thành false cho chatId:", chatId);
-
-      res.status(200).json({ message: "Đã đánh dấu là đã đọc!", updatedAttributes: result.Attributes });
+      console.log(
+        `✅ Đã xóa ${phoneNumber} khỏi isUnreadBy cho chatId:`,
+        chatId
+      );
+  
+      res.status(200).json({
+        message: "Đã đánh dấu là đã đọc!",
+        updatedAttributes: result.Attributes,
+      });
     } catch (error) {
-      console.error("❌ Lỗi khi cập nhật isUnread:", error);
+      console.error("❌ Lỗi khi cập nhật isUnreadBy:", error);
+  
       res.status(500).json({ error: "Lỗi server!" });
     }
   });
@@ -200,18 +269,56 @@ module.exports = (io) => {
       }
 
       const audioUrl = req.file.location;
-      const audioMessage = new Message(chatRoomId, sender, receiver, audioUrl, "audio");
-      await dynamoDB.put({
-        TableName: TABLE_MESSAGE_NAME,
-        Item: audioMessage,
-      }).promise();
+
+      // Tạo tin nhắn ghi âm mới
+      const audioMessage = new Message(
+        chatRoomId,
+        sender,
+        receiver,
+        audioUrl,
+        "audio"
+      );
+
+      // Lưu tin nhắn vào bảng Message
+      await dynamoDB
+        .put({
+          TableName: TABLE_MESSAGE_NAME,
+          Item: audioMessage,
+        })
+        .promise();
+
+      console.log("✅ Tin nhắn ghi âm đã lưu vào DB:", audioMessage);
+
       const chatId = [sender, receiver].sort().join("_");
-      const isUnread = !isUserOnline(receiver);
+
+      // Lấy thông tin participants từ bảng Conversations
+      const getConversationParams = {
+        TableName: TABLE_CONVERSATION_NAME,
+        Key: { chatId },
+      };
+
+      const conversationData = await dynamoDB.get(getConversationParams).promise();
+
+      if (!conversationData.Item || !conversationData.Item.participants) {
+        return res
+          .status(404)
+          .json({ error: "Không tìm thấy cuộc trò chuyện!" });
+      }
+
+      const participants = conversationData.Item.participants;
+      const unreadFor = participants.filter((p) => p !== sender); // Loại sender ra khỏi danh sách unread
+
+      // Lấy danh sách hiện tại từ conversation
+      const currentUnreadList = conversationData.Item.isUnreadBy || [];
+
+      // Thêm các phần tử mới vào danh sách, đảm bảo không trùng lặp
+      const updatedUnreadList = Array.from(new Set([...currentUnreadList, ...unreadFor]));
+
+      // Cập nhật bảng Conversation
       const updateParams = {
-        TableName: TABLE_CONVERSATION_NAME, // Tên bảng lưu thông tin cuộc trò chuyện
-        Key: { chatId }, // Khóa chính là chatId
-        UpdateExpression:
-          "set lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnread = :isUnread",
+        TableName: TABLE_CONVERSATION_NAME,
+        Key: { chatId },
+        UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnreadBy = :updatedUnreadList",
         ExpressionAttributeValues: {
           ":lastMessage": "Tin Nhắn Thoại",
           ":lastMessageAt": new Date(audioMessage.timestamp).toLocaleDateString(
@@ -225,16 +332,21 @@ module.exports = (io) => {
               second: "2-digit",
             }
           ),
-          ":isUnread": isUnread,
+          ":updatedUnreadList": updatedUnreadList,
         },
         ReturnValues: "UPDATED_NEW",
       };
+
       await dynamoDB.update(updateParams).promise();
-      console.log("Tin nhắn ghi âm đã lưu:", audioMessage);
+
+      console.log("✅ Đã cập nhật thông tin cuộc trò chuyện:", chatId);
+
+      // Gửi tin nhắn đến các client trong phòng
       io.to(chatRoomId).emit("receiveMessage", audioMessage);
+
       res.status(201).json({ success: true, data: audioMessage });
     } catch (err) {
-      console.error("Lỗi khi gửi ghi âm:", err);
+      console.error("❌ Lỗi khi gửi ghi âm:", err);
       res.status(500).json({ error: "Lỗi server!" });
     }
   });
