@@ -2,13 +2,13 @@ import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import sendLinkReset from "../../API/api_sendLinkReset"; // Import the sendLinkReset function
-
-function SendLinkReset({ setIsForgotPassword }) {
+// import { useNavigate } from "react-router-dom";
+function SendLinkReset() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const location = useLocation();
-
+  // const navigate = useNavigate();
   const validatePhoneNumber = () => {
     const phoneRegex = /^0[0-9]{9}$/;
     if (!phoneRegex.test(phoneNumber)) {

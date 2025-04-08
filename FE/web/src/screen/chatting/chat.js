@@ -95,24 +95,6 @@ function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
     }
   };
 
-  const renderLastMessage = (lastMessage) => {
-  if (!lastMessage) return "Chưa Có";
-
-  try {
-    const parsed = JSON.parse(lastMessage);
-    if (parsed.name && parsed.url && parsed.size && parsed.type) {
-      return "Vừa gửi một file";
-    }
-  } catch (e) {
-    // Not JSON, continue to check other conditions
-  }
-
-  if (lastMessage.endsWith(".webm")) {
-    return "Tin nhắn thoại";
-  }
-
-  return lastMessage;
-};
 
 
 

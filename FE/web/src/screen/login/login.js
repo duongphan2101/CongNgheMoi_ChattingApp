@@ -1,15 +1,15 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./login_style.css";
 import login from "../../API/api_login";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-
-function Login({ setIsLoggedIn, setIsRegistering, setIsForgotPassword }) {
+function Login({ setIsLoggedIn}) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
-
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,6 +17,7 @@ function Login({ setIsLoggedIn, setIsRegistering, setIsForgotPassword }) {
     if (data) {
       setIsLoggedIn(true);
       toast.success("Đăng nhập thành công!", { position: "top-right" });
+      navigate("/");
     } else {
       toast.error("Đăng nhập thất bại, Vui lòng thử lại!", { position: "top-right" });
     }
@@ -43,7 +44,7 @@ function Login({ setIsLoggedIn, setIsRegistering, setIsForgotPassword }) {
         <p
           className="text-end mt-2"
           style={{ cursor: "pointer", color: "blue" }}
-          onClick={() => setIsForgotPassword(true)} // Chuyển sang màn hình quên mật khẩu
+          onClick={() => navigate("/send-reset-link")} 
         >
           Forgot Password?
         </p>
@@ -53,7 +54,7 @@ function Login({ setIsLoggedIn, setIsRegistering, setIsForgotPassword }) {
         <p className="text-center mt-4">
           Don't have an account?{" "}
           <span
-            onClick={() => setIsRegistering(true)}
+            onClick={() => navigate("/register")}
             className="link"
             style={{ cursor: "pointer", color: "blue" }}
           >
