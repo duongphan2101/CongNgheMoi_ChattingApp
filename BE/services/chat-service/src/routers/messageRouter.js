@@ -6,10 +6,7 @@ const multerS3 = require("multer-s3");
 const router = express.Router();
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const s3 = new AWS.S3();
-<<<<<<< HEAD
-=======
 const TABLE_NAME = "Message";
->>>>>>> 2d5b81b9 (up)
 const TABLE_MESSAGE_NAME = "Message";
 const TABLE_CONVERSATION_NAME = "Conversations";
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "lab2s3aduong";
@@ -195,8 +192,6 @@ module.exports = (io) => {
     }
   });
 
-<<<<<<< HEAD
-=======
   router.post("/sendAudio", upload.single("file"), async (req, res) => {
     try {
         const { chatRoomId, sender, receiver } = req.body;
@@ -219,7 +214,7 @@ module.exports = (io) => {
         res.status(500).json({ error: "Lỗi server!" });
     }
   });
->>>>>>> 2d5b81b9 (up)
+  
   router.post("/markAsRead", async (req, res) => {
     try {
       const { chatId, phoneNumber } = req.body;
