@@ -100,15 +100,18 @@ router.get("/confirm-email", async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
-      return res.status(400).json({ message: "Token không hợp lệ." });
+      return res.status(400).send("Token không hợp lệ.");
     }
 
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (err) {
-      const errorMessage = err.name === "TokenExpiredError" ? "Token đã hết hạn." : "Token không hợp lệ.";
-      return res.status(400).json({ message: errorMessage });
+      const errorMessage =
+        err.name === "TokenExpiredError"
+          ? "Token đã hết hạn."
+          : "Token không hợp lệ.";
+          return res.redirect(`http://localhost:3000/confirm-email?status=error&message=Token không hợp lệ hoặc đã hết hạn`);
     }
 
     const { email, phoneNumber, password, fullName, gender, dob } = decoded;
@@ -136,16 +139,13 @@ router.get("/confirm-email", async (req, res) => {
 
     await dynamoDB.put(paramsInsert).promise();
 
-    return res.status(200).json({
-      message: "Tài khoản đã được tạo thành công!",
-      success: true,
-    });
+    // Chuyển hướng đến frontend với token
+    return res.redirect(`http://localhost:3000/confirm-email?status=success`);
   } catch (error) {
     console.error("Lỗi khi xác nhận tài khoản:", error.message);
-    return res.status(500).json({ message: "Lỗi server. Vui lòng thử lại sau!" });
+    return res.status(500).send("Lỗi server. Vui lòng thử lại sau!");
   }
 });
-
 
 // router.post("/register", async (req, res) => {
 //   try {

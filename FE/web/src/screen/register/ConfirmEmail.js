@@ -10,43 +10,25 @@ function ConfirmEmail() {
   // Lấy địa chỉ IP của máy chủ
   const SERVER_IP = window.location.hostname;
   const SERVER_PORT = 3721;
-  const BASE_URL = `https://${SERVER_IP}:${SERVER_PORT}`;
+  const BASE_URL = `http://${SERVER_IP}:${SERVER_PORT}`;
   console.log("BASE ", BASE_URL);
 
   useEffect(() => {
-    const confirmEmail = async () => {
-      const token = searchParams.get("token");
-      console.log("Token từ URL:", token);
-      if (!token) {
-        setMessage("Token không hợp lệ.");
-        setSuccess(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${BASE_URL}/auth/confirm-email?token=${token}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          setMessage(`${data.message}`);
-          setSuccess(true);
-        } else {
-          setMessage(`${data.message || "Xác nhận tài khoản thất bại."}`);
-          setSuccess(false);
-        }
-      } catch (error) {
-        console.error("Lỗi khi xác nhận tài khoản:", error);
-        setMessage("Đã xảy ra lỗi. Vui lòng thử lại sau.");
-        setSuccess(false);
-      }
-    };
-
-    confirmEmail();
-  }, [searchParams,  BASE_URL]);
+    const status = searchParams.get("status");
+    const messageParam = searchParams.get("message");
+  
+    if (status === "success") {
+      setSuccess(true);
+      setMessage("Xác nhận thành công!");
+    } else if (status === "error") {
+      setSuccess(false);
+      setMessage(decodeURIComponent(messageParam || "Xác nhận thất bại."));
+    } else {
+      setSuccess(false);
+      setMessage("Liên kết không hợp lệ hoặc đã hết hạn.");
+    }
+  }, [searchParams]);
+  
 
   return (
     <div className="container text-center my-4">
