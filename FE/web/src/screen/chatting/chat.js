@@ -94,10 +94,7 @@ function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
       sendAudioBlob(audioBlob);
     }
   };
-
-
-
-
+  
   const sendAudioBlob = async (blob) => {
     const formData = new FormData();
     formData.append("file", blob, "voice.webm");
