@@ -514,10 +514,10 @@ function View({ setIsLoggedIn }) {
             userChatList.map((user, index) => (
               <div
                 className="user"
-                key={index} // Đảm bảo key là duy nhất cho mỗi người
+                key={index}
                 onClick={async () => {
-                  await markAsRead(user.chatId); // Gọi hàm update
-                  check(userInfo.phoneNumber, user.phoneNumber); // Gọi hàm chọn người chat
+                  await markAsRead(user.chatId);
+                  check(userInfo.phoneNumber, user.phoneNumber);
                 }}
               >
                 <img className="user-avt" src={user.avatar} alt="User" />
@@ -531,7 +531,10 @@ function View({ setIsLoggedIn }) {
               </div>
             ))
           ) : (
-            <p>Không có cuộc trò chuyện nào</p>
+            <p style={{
+              padding: "0 50px",
+            }}>
+              Hãy tìm bạn bè bằng số điện thoại và trò chuyện với họ ngay nào!</p>
           )}
         </div>
 

@@ -20,7 +20,8 @@ const upload = multer({
     },
   }),
 });
-module.exports = (io) => {
+
+module.exports = (io, redisPublisher) => {
   const isUserOnline = (userId) => {
     // Thay thế bằng logic kiểm tra trạng thái đăng nhập thực tế
     return io.sockets.adapter.rooms.has(userId);
@@ -29,14 +30,14 @@ module.exports = (io) => {
   router.post("/sendMessage", async (req, res) => {
     try {
       const { chatRoomId, sender, receiver, message } = req.body;
-  
+
       if (!chatRoomId || !sender || !receiver || !message) {
         console.error("❌ Thiếu dữ liệu từ client:", req.body);
         return res.status(400).json({ error: "Thiếu trường bắt buộc!" });
       }
-  
+
       const chatId = [sender, receiver].sort().join("_");
-  
+
       // Tạo tin nhắn mới
       const newMessage = new Message(
         chatRoomId,
@@ -45,16 +46,16 @@ module.exports = (io) => {
         message,
         "text"
       );
-  
+
       // Lưu tin nhắn vào bảng Message
       const params = {
         TableName: TABLE_MESSAGE_NAME,
         Item: newMessage,
       };
-  
+
       await dynamoDB.put(params).promise();
       console.log("✅ Tin nhắn đã lưu vào DB:", newMessage);
-  
+
       // Lấy thông tin participants từ bảng Conversations
       const getConversationParams = {
         TableName: TABLE_CONVERSATION_NAME,
@@ -62,24 +63,24 @@ module.exports = (io) => {
       };
 
       console.log(chatId)
-  
+
       const conversationData = await dynamoDB.get(getConversationParams).promise();
-  
+
       if (!conversationData.Item || !conversationData.Item.participants) {
         return res
           .status(404)
           .json({ error: "Không tìm thấy cuộc trò chuyện!" });
       }
-  
+
       const participants = conversationData.Item.participants;
       const unreadFor = participants.filter((p) => p !== sender); // Loại sender ra khỏi danh sách unread
-  
+
       // Lấy danh sách hiện tại từ conversation
       const currentUnreadList = conversationData.Item.isUnreadBy || [];
-  
+
       // Thêm các phần tử mới vào danh sách, đảm bảo không trùng lặp
       const updatedUnreadList = Array.from(new Set([...currentUnreadList, ...unreadFor]));
-  
+
       // Cập nhật bảng Conversation
       const updateParams = {
         TableName: TABLE_CONVERSATION_NAME,
@@ -102,22 +103,35 @@ module.exports = (io) => {
         },
         ReturnValues: "UPDATED_NEW",
       };
-  
+
       await dynamoDB.update(updateParams).promise();
-  
+
       // Gửi tin nhắn đến các client trong phòng
       io.to(chatRoomId).emit("receiveMessage", newMessage);
+
+      // Publish notify to Redis (đẩy qua channel 'notifications')
+      const notifyPayload = JSON.stringify({
+        type: "new_message",
+        to: receiver,
+        from: sender,
+        message,
+        timestamp: newMessage.timestamp,
+      });
+
+      redisPublisher.publish("notifications", notifyPayload);
+      console.log("Đã publish thông báo:", notifyPayload);
+
       res.status(200).json({ message: "Gửi tin nhắn thành công!" });
     } catch (error) {
       console.error("❌ Lỗi khi lưu tin nhắn:", error);
-  
+
       // Xử lý lỗi rõ ràng hơn
       if (error.name === "ValidationException") {
         return res.status(400).json({
           error: "Lỗi dữ liệu khi cập nhật. Đảm bảo isUnreadBy là kiểu Set.",
         });
       }
-  
+
       res.status(500).json({ error: "Lỗi server!" });
     }
   });
@@ -194,29 +208,29 @@ module.exports = (io) => {
   router.post("/markAsRead", async (req, res) => {
     try {
       const { chatId, phoneNumber } = req.body;
-  
+
       if (!chatId || !phoneNumber) {
         return res
           .status(400)
           .json({ error: "Thiếu chatId hoặc phoneNumber!" });
       }
-  
+
       // Trước tiên, kiểm tra conversation có tồn tại không
       const getParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
       };
-  
+
       const conversationData = await dynamoDB.get(getParams).promise();
-  
+
       if (!conversationData.Item) {
         return res
           .status(404)
           .json({ error: "Không tìm thấy cuộc trò chuyện!" });
       }
-  
+
       const currentUnreadList = conversationData.Item.isUnreadBy || [];
-  
+
       // Nếu không tồn tại hoặc không chứa số cần xóa thì bỏ qua
       if (!currentUnreadList.includes(phoneNumber)) {
         console.log(
@@ -226,12 +240,12 @@ module.exports = (io) => {
           .status(200)
           .json({ message: "Đã đọc hoặc không có gì để cập nhật!" });
       }
-  
+
       // Loại bỏ phoneNumber khỏi danh sách
       const updatedUnreadList = currentUnreadList.filter(
         (user) => user !== phoneNumber
       );
-  
+
       // Cập nhật lại danh sách isUnreadBy
       const updateParams = {
         TableName: TABLE_CONVERSATION_NAME,
@@ -242,20 +256,20 @@ module.exports = (io) => {
         },
         ReturnValues: "UPDATED_NEW",
       };
-  
+
       const result = await dynamoDB.update(updateParams).promise();
       console.log(
         `✅ Đã xóa ${phoneNumber} khỏi isUnreadBy cho chatId:`,
         chatId
       );
-  
+
       res.status(200).json({
         message: "Đã đánh dấu là đã đọc!",
         updatedAttributes: result.Attributes,
       });
     } catch (error) {
       console.error("❌ Lỗi khi cập nhật isUnreadBy:", error);
-  
+
       res.status(500).json({ error: "Lỗi server!" });
     }
   });
@@ -343,6 +357,18 @@ module.exports = (io) => {
 
       // Gửi tin nhắn đến các client trong phòng
       io.to(chatRoomId).emit("receiveMessage", audioMessage);
+
+      // Publish notify to Redis (đẩy qua channel 'notifications')
+      const notifyPayload = JSON.stringify({
+        type: "audio",
+        to: receiver,
+        from: sender,
+        audioMessage,
+        timestamp: audioMessage.timestamp,
+      });
+
+      redisPublisher.publish("notifications", notifyPayload);
+      console.log("Đã publish thông báo:", notifyPayload);
 
       res.status(201).json({ success: true, data: audioMessage });
     } catch (err) {
