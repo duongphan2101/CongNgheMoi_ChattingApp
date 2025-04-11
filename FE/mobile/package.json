@@ -36,7 +36,8 @@
     "react-native-localize": "^3.4.1",
     "react-native-modal": "^14.0.0-rc.1",
     "react-native-network-info": "^5.2.1",
-    "react-native-web": "~0.19.13"
+    "react-native-web": "~0.19.13",
+    "expo-image-picker": "~16.0.6"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
