@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 
-const getIp = () => {
+const getIp = (service = 'auth') => {
   let debugHost = null;
 
   if (Constants?.expoConfig?.hostUri) {
@@ -9,16 +9,18 @@ const getIp = () => {
     debugHost = Constants.manifest.debuggerHost.split(':')[0];
   }
 
-  if (debugHost) {
-    return `http://${debugHost}:3721`;
+  // Nếu không thể lấy được địa chỉ IP
+  if (!debugHost) {
+    console.log("Không thể lấy IP từ Expo, sử dụng IP mặc định");
+    debugHost = "192.168.1.x";
   }
 
-  return null;
+  const PORT = {
+    auth: 3721,  // Port auth-service
+    user: 3824,  // Port user-service
+  };
+
+  return `http://${debugHost}:${PORT[service] || PORT.auth}`;
 };
 
 export default getIp;
-
-// Gọi hàm và log IP
-const ipAddress = getIp();
-console.log("Địa chỉ IP máy chủ:", ipAddress);
-
