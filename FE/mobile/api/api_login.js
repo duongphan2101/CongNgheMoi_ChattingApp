@@ -3,7 +3,7 @@ import getIp from "../utils/getIp.js";
 
 const login = async (phoneNumber, password) => {
   try {
-    const BASE_URL = getIp();
+    const BASE_URL = getIp('auth');
 
     if (!BASE_URL) throw new Error("Không thể xác định BASE_URL");
 
