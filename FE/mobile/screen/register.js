@@ -118,7 +118,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     justifyContent: 'center',
   }, back: {
     position: 'absolute',
-    top: 30,
+    top: 35,
     left: 20,
     zIndex: 100,
   }, input: {

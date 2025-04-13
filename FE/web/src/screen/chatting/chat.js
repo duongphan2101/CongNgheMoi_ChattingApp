@@ -5,10 +5,14 @@ import io from "socket.io-client";
 import a1 from "../../assets/imgs/9306614.jpg";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
+import { playNotificationSound } from '../../utils/sound.js';
+import { toast } from "react-toastify";
+import getUserbySearch from "../../API/api_searchUSer";
 
 const socket = io("http://localhost:3618");
+const notificationSocket = io("http://localhost:3515");
 
-function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
+function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [currentUserPhone, setCurrentUserPhone] = useState();
@@ -68,8 +72,6 @@ function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
     }
   };
 
-
-
   const handleStopRecording = () => {
     mediaRecorderRef.current?.stop();
   };
@@ -95,9 +97,6 @@ function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
     }
   };
 
-
-
-
   const sendAudioBlob = async (blob) => {
     const formData = new FormData();
     formData.append("file", blob, "voice.webm");
@@ -113,7 +112,7 @@ function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
       if (!response.ok) throw new Error("Gửi ghi âm thất bại");
       const audioMessage = await response.json();
       console.log("Gửi ghi âm thành công:", audioMessage);
-     
+
       setAudioBlob(null);
     } catch (err) {
       console.error("Lỗi khi gửi ghi âm:", err);
@@ -121,12 +120,50 @@ function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
   };
 
   useEffect(() => {
+    if (!user?.phoneNumber) return;
+
+    notificationSocket.emit("join", user.phoneNumber);
+
+    notificationSocket.on("notification", async (data) => {
+      try {
+        let senderName;
+
+          const senderInfo = (await getUserbySearch(data.from, data.from))[0];
+          senderName = senderInfo?.fullName || data.from;
+        
+        playNotificationSound();
+        if(data.type === "new_message") {
+          toast.info(`Tin nhắn từ ${senderName}: ${data.message}`, {
+          position: "bottom-right",
+          autoClose: 5000,
+        });
+        }else if(data.type === "file") {
+          toast.info(`Nhận được một file từ ${senderName}`, {
+            position: "bottom-right",
+            autoClose: 5000,
+          });
+        }else if(data.type === "audio") {
+          toast.info(`Nhận được một tin nhắn thoại từ ${senderName}`, {
+            position: "bottom-right",
+            autoClose: 5000,
+          });
+        }
+      } catch (err) {
+        console.error("Lỗi khi xử lý notification:", err);
+      }
+    });
+
+    return () => {
+      notificationSocket.off("notification");
+    };
+  }, [user?.phoneNumber]);
+
+  useEffect(() => {
     if (!chatRoom?.chatRoomId) return;
     setCurrentUserPhone(user.phoneNumber);
     fetch(`http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}`)
       .then((res) => res.json())
       .then((data) => {
-        console.log("Loaded messages:", data);
         setMessages(data);
       })
       .catch(err => console.error("Error fetching messages:", err));
@@ -134,7 +171,6 @@ function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
     socket.emit("joinRoom", chatRoom.chatRoomId);
 
     socket.on("receiveMessage", (newMessage) => {
-      console.log("Received new message:", newMessage);
       setMessages((prev) => [...prev, newMessage]);
 
       // Cập nhật lastMessage
@@ -211,7 +247,7 @@ function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
         body: JSON.stringify(newMsg),
       });
       if (!response.ok) throw new Error("Gửi tin nhắn thất bại!");
-  
+
       // Cập nhật lastMessage trong danh sách userChatList
       updateLastMessage(currentUserPhone, otherUserPhone, newMsg.message);
     } catch (error) {
@@ -295,7 +331,7 @@ function Chat({ chatRoom, userChatting = [], user ,updateLastMessage}) {
   const renderFileMessage = (msg) => {
     try {
       const fileInfo = JSON.parse(msg.message);
-      const { name, size, type} = fileInfo;
+      const { name, size, type } = fileInfo;
       const isImage = type.startsWith('image/');
 
       const formatFileSize = (bytes) => {

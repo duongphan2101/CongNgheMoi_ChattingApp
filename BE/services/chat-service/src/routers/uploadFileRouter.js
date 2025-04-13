@@ -47,7 +47,7 @@ const upload = multer({
     }
 });
 
-module.exports = (io) => {
+module.exports = (io, redisPublisher) => {
     // Middleware xử lý lỗi multer
     const handleMulterError = (err, req, res, next) => {
         if (err) {
@@ -169,6 +169,18 @@ module.exports = (io) => {
             await dynamoDB.update(updateParams).promise();
             console.log("✅ Lưu tin nhắn file vào DB:", newMessage);
             io.to(chatRoomId).emit("receiveMessage", newMessage);
+
+            // Publish notify to Redis (đẩy qua channel 'notifications')
+            const notifyPayload = JSON.stringify({
+                type: "file",
+                to: receiver,
+                from: sender,
+                newMessage,
+                timestamp: newMessage.timestamp,
+            });
+
+            redisPublisher.publish("notifications", notifyPayload);
+            console.log("Đã publish thông báo:", notifyPayload);
 
             res.status(201).json({
                 message: "Tải file lên thành công!",
