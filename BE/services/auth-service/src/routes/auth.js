@@ -39,9 +39,7 @@ function getLocalIPAddress() {
 
 const SERVER_IP = getLocalIPAddress();
 const SERVER_PORT = 3721;
-const EXPO_PORT = 8081;
 const BASE_URL = `http://${SERVER_IP}:${SERVER_PORT}`;
-const EXPO_URL = `exp://${SERVER_IP}:${EXPO_PORT}`;
 
 router.post("/send-confirmation-email", async (req, res) => {
   try {
@@ -118,7 +116,7 @@ router.get("/confirm-email", async (req, res) => {
           ? "Token đã hết hạn."
           : "Token không hợp lệ.";
       return res.redirect(
-        `http://localhost:3000/confirm-email?status=error&message=Token không hợp lệ hoặc đã hết hạn`
+        `${BASE_URL}/auth/confirm-email?status=error&message=Token không hợp lệ hoặc đã hết hạn`
       );
     }
 
@@ -147,8 +145,44 @@ router.get("/confirm-email", async (req, res) => {
 
     await dynamoDB.put(paramsInsert).promise();
 
-    // Chuyển hướng đến frontend với token
-    return res.redirect(`http://localhost:3000/confirm-email?status=success`);
+    return res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Đăng ký thành công</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+            background-color: #f4f4f4;
+          }
+          .container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+          }
+          h1 {
+            color: #4CAF50;
+          }
+          p {
+            font-size: 18px;
+            color: #333;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Đăng ký thành công!</h1>
+          <p>Cảm ơn bạn đã đăng ký. Bạn có thể đăng nhập vào ứng dụng ngay bây giờ.</p>
+        </div>
+      </body>
+      </html>
+    `);
   } catch (error) {
     console.error("Lỗi khi xác nhận tài khoản:", error.message);
     return res.status(500).send("Lỗi server. Vui lòng thử lại sau!");
@@ -381,9 +415,6 @@ router.get("/reset-password-on-phone", async (req, res) => {
   try {
     const { token, phoneNumber } = req.query;
 
-    console.log("Token:", token);
-    console.log("PhoneNumber:", phoneNumber);
-
     if (!token || !phoneNumber) {
       return res.status(400).send("Token và số điện thoại là bắt buộc.");
     }
@@ -451,19 +482,77 @@ router.get("/reset-password-on-phone", async (req, res) => {
           button:hover {
             background-color: #0056b3;
           }
+          .error {
+            color: red;
+            font-size: 14px;
+            margin-top: -10px;
+            margin-bottom: 10px;
+          }
+          .success {
+            color: green;
+            font-size: 14px;
+            margin-top: -10px;
+            margin-bottom: 10px;
+          }
         </style>
       </head>
       <body>
         <div class="container">
           <h2>Đổi mật khẩu</h2>
-          <form action="/auth/reset-password-on-phone?token=${token}&phoneNumber=${phoneNumber}" method="POST">
+          <form id="resetPasswordForm" action="/auth/reset-password-on-phone?token=${token}&phoneNumber=${phoneNumber}" method="POST">
             <label for="newPassword">Mật khẩu mới:</label>
             <input type="password" id="newPassword" name="newPassword" required />
             <label for="confirmPassword">Xác nhận mật khẩu:</label>
             <input type="password" id="confirmPassword" name="confirmPassword" required />
+            <p id="message" class=""></p>
             <button type="submit">Đổi mật khẩu</button>
           </form>
         </div>
+        <script>
+          const form = document.getElementById('resetPasswordForm');
+          const messageElement = document.getElementById('message');
+
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const newPassword = formData.get('newPassword');
+            const confirmPassword = formData.get('confirmPassword');
+
+            if (newPassword !== confirmPassword) {
+              messageElement.textContent = "Mật khẩu xác nhận không khớp.";
+              messageElement.className = "error";
+              return;
+            }
+
+            try {
+              const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  newPassword,
+                  confirmPassword,
+                }),
+              });
+
+              const result = await response.text();
+
+              if (response.ok) {
+                messageElement.textContent = result;
+                messageElement.className = "success";
+                form.reset();
+              } else {
+                messageElement.textContent = result;
+                messageElement.className = "error";
+              }
+            } catch (error) {
+              messageElement.textContent = "Có lỗi xảy ra. Vui lòng thử lại.";
+              messageElement.className = "error";
+            }
+          });
+        </script>
       </body>
       </html>
     `);
