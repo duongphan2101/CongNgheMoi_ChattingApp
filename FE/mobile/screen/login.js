@@ -81,7 +81,9 @@ export default function App({ navigation }) {
         </View>
 
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20 }}>
-          <TouchableOpacity><Text style={{ fontWeight: 'bold', color: themeColors.text }}>Forget Password?</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('forgetpassword')}>
+            <Text style={{ fontWeight: 'bold', color: themeColors.text }}>Forget Password?</Text>
+          </TouchableOpacity>
         </View>
 
       </View>
