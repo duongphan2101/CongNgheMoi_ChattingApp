@@ -6,7 +6,6 @@ const multerS3 = require("multer-s3");
 const router = express.Router();
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const s3 = new AWS.S3();
-const TABLE_NAME = "Message";
 const TABLE_MESSAGE_NAME = "Message";
 const TABLE_CONVERSATION_NAME = "Conversations";
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "lab2s3aduong";
@@ -206,29 +205,6 @@ module.exports = (io, redisPublisher) => {
     }
   });
 
-  router.post("/sendAudio", upload.single("file"), async (req, res) => {
-    try {
-        const { chatRoomId, sender, receiver } = req.body;
-  
-        if (!req.file || !chatRoomId || !sender || !receiver) {
-            return res.status(400).json({ error: "Thiếu dữ liệu!" });
-        }
-        const audioUrl = req.file.location;
-        const audioMessage = new Message(chatRoomId, sender, receiver, audioUrl, "audio");
-        await dynamoDB.put({
-            TableName: TABLE_NAME,
-            Item: audioMessage,
-        }).promise();
-  
-        console.log("Tin nhắn ghi âm đã lưu:", audioMessage);
-        io.to(chatRoomId).emit("receiveMessage", audioMessage);
-        res.status(201).json({ success: true, data: audioMessage });
-    } catch (err) {
-        console.error("Lỗi khi gửi ghi âm:", err);
-        res.status(500).json({ error: "Lỗi server!" });
-    }
-  });
-  
   router.post("/markAsRead", async (req, res) => {
     try {
       const { chatId, phoneNumber } = req.body;
