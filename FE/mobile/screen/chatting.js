@@ -51,11 +51,11 @@ export default function App({navigation, route}) {
 
         <View style={styles.bottomtab}>
            <TouchableOpacity style={styles.touch}>
-              <Ionicons name="image" size={40} color={themeColors.primary} />
+              <Ionicons name="image" size={40} color={themeColors.text} />
             </TouchableOpacity>
             <TextInput style={styles.textInput} placeholder='Nhập nội dung ...' placeholderTextColor={'#ccc'} />
             <TouchableOpacity style={styles.touch}>
-              <Ionicons name="send" size={40} color={themeColors.primary} />
+              <Ionicons name="send" size={40} color={themeColors.text} />
             </TouchableOpacity>
         </View>
 
@@ -96,7 +96,7 @@ const getStyles = (themeColors) => StyleSheet.create({
   },
   bottomtab: {
     height: 90,
-    backgroundColor: themeColors.background,
+    backgroundColor: themeColors.primary,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',

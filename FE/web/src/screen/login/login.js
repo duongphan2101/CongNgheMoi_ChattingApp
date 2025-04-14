@@ -26,18 +26,18 @@ function Login({ setIsLoggedIn}) {
   return (
     <div className="container chat-container blox">
       <form className="container-fluid chat-form" onSubmit={handleSubmit}>
-        <h1 className="text-center my-4 title">Login</h1>
+        <h1 className="text-center my-4 title">Đăng nhập</h1>
         <input
           className="form-control inp"
           type="tel"
-          placeholder="Phone Number"
+          placeholder="Số điện thoại (10 chữ số)"
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value)}
         />
         <input
           className="form-control inp mt-4"
           type="password"
-          placeholder="Password"
+          placeholder="Mật khẩu"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
@@ -46,19 +46,19 @@ function Login({ setIsLoggedIn}) {
           style={{ cursor: "pointer", color: "blue" }}
           onClick={() => navigate("/send-reset-link")} 
         >
-          Forgot Password?
+          Quên mật khẩu?
         </p>
         <button type="submit" className="btn btn-login btn-primary mt-2 form-control">
-          Login
+          Đăng nhập
         </button>
         <p className="text-center mt-4">
-          Don't have an account?{" "}
+          Không có tài khoản?{" "}
           <span
             onClick={() => navigate("/register")}
             className="link"
             style={{ cursor: "pointer", color: "blue" }}
           >
-            Sign Up
+            Đăng ký
           </span>
         </p>
       </form>
