@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   StyleSheet,
   Text,
@@ -11,6 +12,8 @@ import {
 import { useTheme } from "../contexts/themeContext";
 import colors from "../themeColors";
 import { useTranslation } from "react-i18next";
+import { TextInput } from "react-native";
+import changePassword from "../api/api_changePassSetting";
 
 const App = ({ navigation }) => {
   const { theme, toggleTheme } = useTheme();
@@ -26,6 +29,11 @@ const App = ({ navigation }) => {
 
   const toggleSwitch = () => setIsEnabled((previousState) => !previousState);
 
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const handleLogout = () => {
     Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
       { text: "Hủy", style: "cancel" },
@@ -33,7 +41,9 @@ const App = ({ navigation }) => {
     ]);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await AsyncStorage.removeItem("accessToken");
+    await AsyncStorage.removeItem("user");
     console.log("Đăng xuất thành công");
     navigation.navigate("started");
   };
@@ -74,26 +84,26 @@ const App = ({ navigation }) => {
         {/* Modal chọn Theme */}
         <Modal visible={themeModalVisible} transparent animationType="fade">
           <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              onPress={() => selectTheme("light")}
-              style={styles.modalItem}
-            >
-              <Text style={styles.modalText}>Light</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => selectTheme("dark")}
-              style={styles.modalItem}
-            >
-              <Text style={styles.modalText}>Dark</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setThemeModalVisible(false)}
-              style={styles.modalCancel}
-            >
-              <Text style={styles.modalCancelText}>Hủy</Text>
-            </TouchableOpacity>
-          </View>
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                onPress={() => selectTheme("light")}
+                style={styles.modalItem}
+              >
+                <Text style={styles.modalText}>Light</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => selectTheme("dark")}
+                style={styles.modalItem}
+              >
+                <Text style={styles.modalText}>Dark</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setThemeModalVisible(false)}
+                style={styles.modalCancel}
+              >
+                <Text style={styles.modalCancelText}>Hủy</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Modal>
 
@@ -146,9 +156,96 @@ const App = ({ navigation }) => {
             value={isEnabled}
           />
         </View>
-        <TouchableOpacity style={styles.changePassButton}>
+
+        <TouchableOpacity
+          style={styles.changePassButton}
+          onPress={() => setPasswordModalVisible(true)}
+        >
           <Text style={styles.changePassText}>Đổi mật khẩu</Text>
         </TouchableOpacity>
+
+        {/* Modal đổi mật khẩu */}
+        <Modal visible={passwordModalVisible} transparent animationType="fade">
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text
+                style={[styles.modalText, { fontSize: 20, marginBottom: 20 }]}
+              >
+                Đổi mật khẩu
+              </Text>
+              <Text style={styles.modalTextinput}>Mật khẩu hiện tại</Text>
+              <TextInput
+                placeholder="Mật khẩu hiện tại"
+                placeholderTextColor="#999"
+                secureTextEntry
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                style={styles.input}
+              />
+              <Text style={styles.modalTextinput}>Mật khẩu mới</Text>
+              <TextInput
+                placeholder="Mật khẩu mới"
+                placeholderTextColor="#999"
+                secureTextEntry
+                value={newPassword}
+                onChangeText={setNewPassword}
+                style={styles.input}
+              />
+              <Text style={styles.modalTextinput}>Xác nhận mật khẩu</Text>
+              <TextInput
+                placeholder="Xác nhận mật khẩu mới"
+                placeholderTextColor="#999"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                style={styles.input}
+              />
+
+              <TouchableOpacity
+                onPress={async () => {
+                  if (!currentPassword || !newPassword || !confirmPassword) {
+                    Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin!");
+                    return;
+                  }
+
+                  if (newPassword !== confirmPassword) {
+                    Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp.");
+                    return;
+                  }
+
+                  try {
+                    const res = await changePassword(
+                      currentPassword,
+                      newPassword,
+                      confirmPassword
+                    );
+                    Alert.alert("Thành công", "Đổi mật khẩu thành công!");
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                    setPasswordModalVisible(false);
+                  } catch (error) {
+                    Alert.alert(
+                      "Lỗi",
+                      error.message || "Đổi mật khẩu thất bại!"
+                    );
+                  }
+                }}
+                style={[styles.modalItem, { backgroundColor: "#4CAF50" }]}
+              >
+                <Text style={styles.modalText}>Lưu</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setPasswordModalVisible(false)}
+                style={styles.modalCancel}
+              >
+                <Text style={styles.modalCancelText}>Hủy</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* Đăng xuất */}
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
           <Text style={styles.logoutText}>Đăng xuất</Text>
@@ -183,15 +280,15 @@ const getStyles = (themeColors) =>
       color: themeColors.text,
     },
     pickerButton: {
-      backgroundColor: '#4f9ef8',
+      backgroundColor: "#4f9ef8",
       paddingVertical: 10,
       paddingHorizontal: 18,
       borderRadius: 7,
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: '37%',         
-      alignSelf: 'stretch',  
-      shadowColor: '#000',
+      alignItems: "center",
+      justifyContent: "center",
+      width: "37%",
+      alignSelf: "stretch",
+      shadowColor: "#000",
       shadowOffset: { width: 0, height: 3 },
       shadowOpacity: 0.25,
       shadowRadius: 4,
@@ -205,25 +302,25 @@ const getStyles = (themeColors) =>
       backgroundColor: "rgba(0, 0, 0, 0.4)",
     },
     modalContent: {
-      backgroundColor: '#fff',
+      backgroundColor: "#fff",
       paddingVertical: 20,
-      paddingHorizontal: 25,
+      paddingHorizontal: 20,
       borderRadius: 16,
-      width: 280,  
-      alignItems: 'center',
-      shadowColor: '#000',
+      width: 280,
+      alignItems: "center",
+      shadowColor: "#000",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.25,
       shadowRadius: 8,
       elevation: 10,
     },
     modalItem: {
-      width: '100%',
+      width: "100%",
       paddingVertical: 14,
-      backgroundColor: '#f1f1f1',
+      backgroundColor: "#f1f1f1",
       borderRadius: 10,
-      marginBottom: 12,
-      alignItems: 'center',
+      marginBottom: 10,
+      alignItems: "center",
     },
     modalText: {
       fontSize: 16,
@@ -271,6 +368,24 @@ const getStyles = (themeColors) =>
       fontWeight: "bold",
       color: themeColors.text,
     },
+    input: {
+      width: "100%",
+      height: 50,
+      borderWidth: 1,
+      borderColor: "#ccc",
+      borderRadius: 10,
+      paddingHorizontal: 15,
+      marginTop: 10,
+      marginBottom: 12,
+      fontSize: 16,
+      backgroundColor: "#f9f9f9",
+      color: "#333",
+    },
+    modalTextinput: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: "#333",
+      alignSelf: "flex-start",
+    },
   });
-
 export default App;

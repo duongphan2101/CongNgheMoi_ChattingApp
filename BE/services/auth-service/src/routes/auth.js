@@ -40,7 +40,6 @@ function getLocalIPAddress() {
 const SERVER_IP = getLocalIPAddress();
 const SERVER_PORT = 3721;
 const BASE_URL = `http://${SERVER_IP}:${SERVER_PORT}`;
-console.log("BASE URL: ", BASE_URL);
 
 router.post("/send-confirmation-email", async (req, res) => {
   try {

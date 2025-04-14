@@ -47,7 +47,6 @@ export default function App({ navigation }) {
   };
 
   return (
-
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -58,7 +57,6 @@ export default function App({ navigation }) {
           onPress={() => navigation.goBack()}
         >
           <AntDesign name="back" size={24} color="gray" />
-
         </TouchableOpacity>
 
         <Image
@@ -152,7 +150,6 @@ export default function App({ navigation }) {
   );
 }
 
-
 const getStyles = (themeColors) =>
   StyleSheet.create({
     container: {
@@ -188,3 +185,4 @@ const getStyles = (themeColors) =>
       width: "100%",
     },
   });
+
