@@ -5,7 +5,6 @@ const sendResetLink = async (phoneNumber) => {
     const BASE_URL = getIp();
 
     if (!BASE_URL) throw new Error("Không thể xác định BASE_URL");
-
     const response = await fetch(`${BASE_URL}/auth/send-reset-link-on-phone`, {
       method: "POST",
       headers: {

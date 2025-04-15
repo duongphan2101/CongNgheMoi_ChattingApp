@@ -131,6 +131,13 @@ function View({ setIsLoggedIn }) {
           // Nếu tháng lớn hơn tháng hiện tại, đặt lại thành tháng hiện tại
           if (newInfo.month > currentDate.month) {
             newInfo.month = currentDate.month;
+            if (newInfo.day > currentDate.day) {
+              newInfo.day = currentDate.day;
+            }
+          } else if(newInfo.month === currentDate.month && newInfo.day > currentDate.day) {
+            if (newInfo.day > currentDate.day) {
+              newInfo.day = currentDate.day;
+            }
           }
         }
         

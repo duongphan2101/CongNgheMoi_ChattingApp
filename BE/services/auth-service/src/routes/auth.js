@@ -24,18 +24,21 @@ const avatar_Default =
   "https://lab2s3aduong.s3.ap-southeast-1.amazonaws.com/man+avatar.png";
 
 // Hàm lấy IP LAN của máy chủ
+
 function getLocalIPAddress() {
   const interfaces = os.networkInterfaces();
-  const targetInterface = interfaces["Wi-Fi"]; // Thay "Wi-Fi" bằng tên giao diện mạng của bạn
-  if (targetInterface) {
-    for (const config of targetInterface) {
-      if (config.family === "IPv4" && !config.internal) {
-        return config.address;
+
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        return iface.address;
       }
     }
   }
-  return "localhost"; // Trả về localhost nếu không tìm thấy IP phù hợp
+
+  return "localhost";
 }
+
 
 const SERVER_IP = getLocalIPAddress();
 const SERVER_PORT = 3721;
@@ -383,7 +386,7 @@ router.post("/send-reset-link-on-phone", async (req, res) => {
 
     // Tạo link đổi mật khẩu
     const resetLink = `${BASE_URL}/auth/reset-password-on-phone?token=${resetToken}&phoneNumber=${phoneNumber}`;
-
+    console.log("Base url ", BASE_URL);
     // Gửi email với link đổi mật khẩu
     const transporter = nodemailer.createTransport({
       service: "gmail",
