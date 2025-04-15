@@ -267,6 +267,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     width: 55,
     height: 55,
     marginLeft: 10,
+    borderRadius: 50
   },
   name: {
     fontSize: 24,
