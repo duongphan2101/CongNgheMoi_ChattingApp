@@ -16,7 +16,8 @@ const getIp = (service = 'auth') => {
   }
 
   const PORT = {
-    auth: 3721,  // Port auth-service
+    auth: 3721,
+    user: 3824
   };
 
   return `http://${debugHost}:${PORT[service] || PORT.auth}`;
