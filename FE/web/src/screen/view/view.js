@@ -69,16 +69,6 @@ function View({ setIsLoggedIn }) {
     }
 };
 
-  const [currentDate] = useState({
-    year: new Date().getFullYear(),
-    month: new Date().getMonth() + 1,
-    day: new Date().getDate()
-  });
-
-  const getDaysInMonth = (year, month) => {
-    return new Date(year, month, 0).getDate();
-  };
-
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -182,68 +172,13 @@ useEffect(() => {
 }, [fetchFriends]);
 
   const handleEdit = () => {
-    const editData = { ...userInfo };
-    // Xử lý ngày sinh
-    if (userInfo?.dob) {
-      const [year, month, day] = userInfo.dob.split('-');
-      editData.year = parseInt(year, 10);
-      editData.month = parseInt(month, 10);
-      editData.day = parseInt(day, 10);
-    } else {
-
-      const defaultDate = new Date();
-      defaultDate.setMonth(defaultDate.getMonth() - 1);
-      editData.year = defaultDate.getFullYear();
-      editData.month = defaultDate.getMonth() + 1;
-      editData.day = defaultDate.getDate();
-    }
-    
-    setEditInfo(editData);
+    setEditInfo(userInfo);
     setShowEditModal(true);
   };
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
-    
-    setEditInfo((prev) => {
-      const newInfo = { ...prev };
-      
-      if (name === "year" || name === "month" || name === "day") {
-        newInfo[name] = parseInt(value, 10);
-      } else {
-        newInfo[name] = value;
-      }
-      
-      // Kiểm tra ngày tháng để ngăn ngày tương lai
-      if (name === "year" || name === "month") {
-        // Nếu năm là năm hiện tại, kiểm tra tháng
-        if (newInfo.year === currentDate.year) {
-          // Nếu tháng lớn hơn tháng hiện tại, đặt lại thành tháng hiện tại
-          if (newInfo.month > currentDate.month) {
-            newInfo.month = currentDate.month;
-          }
-        }
-        
-        //kiểm tra xem ngày hiện tại có hợp lệ cho tháng,năm mới kh
-        if (newInfo.year && newInfo.month && newInfo.day) {
-          const daysInMonth = getDaysInMonth(newInfo.year, newInfo.month);
-          if (newInfo.day > daysInMonth) {
-            newInfo.day = daysInMonth;
-          }
-        }
-      }
-      
-      if (name === "day") {
-        if (newInfo.year === currentDate.year && newInfo.month === currentDate.month) {
-          //nếu ngày lớn hơn ngày hiện tại, đặt lại thành ngày hiện tại
-          if (newInfo.day > currentDate.day) {
-            newInfo.day = currentDate.day;
-          }
-        }
-      }
-      
-      return newInfo;
-    });
+    setEditInfo((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleAvatarChange = (e) => {
@@ -1022,34 +957,44 @@ const handleRejectFriendRequest = async (requestId) => {
                   <div className="mb-3">
                     <label className="form-label">Giới tính</label>
                     <div>
-                    <div className="form-check form-check-inline">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        name="gender"
-                        id="genderMale"
-                        value="Male"
-                        checked={editInfo?.gender === "Male"}
-                        onChange={handleEditChange}
-                      />
-                      <label className="form-check-label" htmlFor="genderMale">
-                        Nam
-                      </label>
-                    </div>
-                    <div className="form-check form-check-inline">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        name="gender"
-                        id="genderFemale"
-                        value="Female"
-                        checked={editInfo?.gender === "Female"}
-                        onChange={handleEditChange}
-                      />
-                      <label className="form-check-label" htmlFor="genderFemale">
-                        Nữ
-                      </label>
-                    </div>
+                      <div className="form-check form-check-inline">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="gender"
+                          id="genderMale"
+                          value="Male"
+                          checked={
+                            editInfo?.gender === "Male" || "Chưa cập nhật"
+                          }
+                          onChange={handleEditChange}
+                        />
+                        <label
+                          className="form-check-label"
+                          htmlFor="genderMale"
+                        >
+                          Nam
+                        </label>
+                      </div>
+                      <div className="form-check form-check-inline">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="gender"
+                          id="genderFemale"
+                          value="Female"
+                          checked={
+                            editInfo?.gender === "Female" || "Chưa cập nhật"
+                          }
+                          onChange={handleEditChange}
+                        />
+                        <label
+                          className="form-check-label"
+                          htmlFor="genderFemale"
+                        >
+                          Nữ
+                        </label>
+                      </div>
                     </div>
                   </div>
                   <div className="mb-3">
@@ -1061,33 +1006,14 @@ const handleRejectFriendRequest = async (requestId) => {
                         value={editInfo.day || ""}
                         onChange={handleEditChange}
                       >
-                        <option value="" disabled>Ngày</option>
-                        {editInfo.year && editInfo.month ? 
-                          Array.from({ length: getDaysInMonth(editInfo.year, editInfo.month) }, (_, i) => {
-                            const day = i + 1;
-                            const isDisabled = editInfo.year === currentDate.year && 
-                                              editInfo.month === currentDate.month && 
-                                              day > currentDate.day;
-                            return (
-                              <option key={day} value={day} disabled={isDisabled}>
-                                {day}
-                              </option>
-                            );
-                          })
-                          :
-                          // Mặc định hiển thị 31 ngày nếu chưa chọn tháng hoặc năm
-                          Array.from({ length: 31 }, (_, i) => {
-                            const day = i + 1;
-                            const isDisabled = editInfo.year === currentDate.year && 
-                                              editInfo.month === currentDate.month && 
-                                              day > currentDate.day;
-                            return (
-                              <option key={day} value={day} disabled={isDisabled}>
-                                {day}
-                              </option>
-                            );
-                          })
-                        }
+                        <option value="" disabled>
+                          Ngày
+                        </option>
+                        {Array.from({ length: 31 }, (_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            {i + 1}
+                          </option>
+                        ))}
                       </select>
                       <select
                         className="form-select me-2"
@@ -1095,16 +1021,14 @@ const handleRejectFriendRequest = async (requestId) => {
                         value={editInfo.month || ""}
                         onChange={handleEditChange}
                       >
-                        <option value="" disabled>Tháng</option>
-                        {Array.from({ length: 12 }, (_, i) => {
-                          const month = i + 1;
-                          const isDisabled = editInfo.year === currentDate.year && month > currentDate.month;
-                          return (
-                            <option key={month} value={month} disabled={isDisabled}>
-                              Tháng {month}
-                            </option>
-                          );
-                        })}
+                        <option value="" disabled>
+                          Tháng
+                        </option>
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            Tháng {i + 1}
+                          </option>
+                        ))}
                       </select>
                       <select
                         className="form-select"
@@ -1112,7 +1036,9 @@ const handleRejectFriendRequest = async (requestId) => {
                         value={editInfo.year || ""}
                         onChange={handleEditChange}
                       >
-                        <option value="" disabled>Năm</option>
+                        <option value="" disabled>
+                          Năm
+                        </option>
                         {Array.from({ length: 100 }, (_, i) => {
                           const year = new Date().getFullYear() - i;
                           return (
