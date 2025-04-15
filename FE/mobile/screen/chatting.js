@@ -17,7 +17,7 @@ const socket = io(`http://${BASE_URL}:3618`);
 const notificationSocket = io(`http://${BASE_URL}:3515`);
 
 export default function App({ navigation, route }) {
-  const { theme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const themeColors = colors[theme];
   const { hideSearch } = useSearch();
 
@@ -156,6 +156,17 @@ export default function App({ navigation, route }) {
   };
 
   const styles = getStyles(themeColors);
+
+  const [isRecording, setIsRecording] = React.useState(false);
+
+  const handleMicPress = () => {
+    setIsRecording(true);
+  };
+
+  const handleStopRecording = () => {
+    setIsRecording(false);
+  };
+
   return (
     <TouchableWithoutFeedback onPress={handleScreenPress}>
       <KeyboardAvoidingView
@@ -315,4 +326,5 @@ const getStyles = (themeColors) => StyleSheet.create({
   touch: {
     marginHorizontal: 5
   }
-});
+})
+
