@@ -22,7 +22,7 @@ const sendResetLink = async (phoneNumber) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error("Lỗi gửi link reset:", error.message || error);
+    console.error("Lỗi gửi link reset:", error?.message ?? error);
     return null;
   }
 };

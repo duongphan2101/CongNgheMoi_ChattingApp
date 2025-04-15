@@ -79,7 +79,7 @@ export default function App({ navigation }) {
         </TouchableOpacity>
 
         <Image
-          style={{ height: "40%", width: "100%", resizeMode: "contains" }}
+          style={{ height: "50%", width: "100%", resizeMode: "contains" }}
           source={require("../assets/slice2.png")}
         />
         <View
@@ -221,3 +221,4 @@ const getStyles = (themeColors) =>
       width: "100%",
     },
   });
+

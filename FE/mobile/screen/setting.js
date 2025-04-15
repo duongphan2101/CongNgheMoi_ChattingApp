@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   StyleSheet,
   Text,
@@ -40,7 +41,9 @@ const App = ({ navigation }) => {
     ]);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await AsyncStorage.removeItem("accessToken");
+    await AsyncStorage.removeItem("user");
     console.log("Đăng xuất thành công");
     navigation.navigate("started");
   };
