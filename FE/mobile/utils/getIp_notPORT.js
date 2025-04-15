@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 
-const getIp = (service = 'auth') => {
+const getIp = () => {
   let debugHost = null;
 
   if (Constants?.expoConfig?.hostUri) {
@@ -15,11 +15,7 @@ const getIp = (service = 'auth') => {
     debugHost = "192.168.1.144";
   }
 
-  const PORT = {
-    auth: 3721,  // Port auth-service
-  };
-
-  return `http://${debugHost}:${PORT[service] || PORT.auth}`;
+  return debugHost;
 };
 
 export default getIp;

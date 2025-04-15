@@ -1,5 +1,5 @@
 // App.js
-import React from "react";
+import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ThemeProvider } from "./contexts/themeContext";
@@ -12,8 +12,12 @@ import resetpassword from "./screen/ForgetPassword/resetPassword";
 
 const Stack = createNativeStackNavigator();
 import TabNavigator from "./screen/footer";
+import { setupNotifications } from "./utils/notifications";
 
 export default function App() {
+    useEffect(() => {
+    setupNotifications();
+  }, []);
   return (
     <ThemeProvider>
       <NavigationContainer>

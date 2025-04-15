@@ -126,23 +126,24 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
     notificationSocket.on("notification", async (data) => {
       try {
+        if (data.from === user.phoneNumber) return;
         let senderName;
 
-          const senderInfo = (await getUserbySearch(data.from, data.from))[0];
-          senderName = senderInfo?.fullName || data.from;
-        
+        const senderInfo = (await getUserbySearch(data.from, data.from))[0];
+        senderName = senderInfo?.fullName || data.from;
+
         playNotificationSound();
-        if(data.type === "new_message") {
+        if (data.type === "new_message") {
           toast.info(`Tin nhắn từ ${senderName}: ${data.message}`, {
-          position: "bottom-right",
-          autoClose: 5000,
-        });
-        }else if(data.type === "file") {
+            position: "bottom-right",
+            autoClose: 5000,
+          });
+        } else if (data.type === "file") {
           toast.info(`Nhận được một file từ ${senderName}`, {
             position: "bottom-right",
             autoClose: 5000,
           });
-        }else if(data.type === "audio") {
+        } else if (data.type === "audio") {
           toast.info(`Nhận được một tin nhắn thoại từ ${senderName}`, {
             position: "bottom-right",
             autoClose: 5000,
