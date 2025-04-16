@@ -1,23 +1,22 @@
 import React, { useState } from "react";
 import "./contacts_style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
-import a1 from "../../assets/imgs/9306614.jpg";
-import a2 from "../../assets/imgs/9334176.jpg";
-import a3 from "../../assets/imgs/1.jpg";
 
-function Contacts() {
+function Contacts({
+  friendRequests,
+  friends,
+  handleAcceptFriendRequest,
+  handleRejectFriendRequest,
+}) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const contacts = [
-    { id: 1, name: "J97", online: true, avatar: a1 },
-    { id: 2, name: "Trịnh Trần Phương Tuấn", online: false, avatar: a2 },
-    { id: 3, name: "Jack", online: true, avatar: a3 },
-    { id: 4, name: "Tinh Tú", online: true, avatar: a1 },
-  ];
+  const contacts = [];
 
   const filteredContacts = contacts.filter((contact) =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  console.log("Friends in Contacts:", friends);
 
   return (
     <div className="chat-box container">
@@ -40,9 +39,68 @@ function Contacts() {
         <div className="col-sm-3"></div>
       </div>
 
-      <div className="contacts-list">
-        {filteredContacts.map((contact) => (
-          <div key={contact.id} className="contact-item">
+      {/* Hiển thị danh sách lời mời kết bạn */}
+      <div className="friend-requests mt-4">
+        <h5 className="text-light">Lời mời kết bạn</h5>
+        {friendRequests && friendRequests.length > 0 ? (
+          <ul className="list-group">
+            {friendRequests.map((request) => (
+              <li
+                key={request.RequestId} // Đảm bảo RequestId là duy nhất
+                className="list-group-item d-flex justify-content-between align-items-center"
+              >
+                <span>{request.senderPhone}</span>
+                <div>
+                  <button
+                    className="btn btn-success btn-sm me-2"
+                    onClick={() => handleAcceptFriendRequest(request.RequestId)}
+                  >
+                    Chấp nhận
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => handleRejectFriendRequest(request.RequestId)}
+                  >
+                    Từ chối
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-light">Không có lời mời kết bạn nào.</p>
+        )}
+      </div>
+
+      {/* Hiển thị danh sách bạn bè */}
+      <div className="friends-list mt-4">
+        <h5 className="text-light">Danh sách bạn bè</h5>
+        {friends.length > 0 ? (
+          friends.map((friend) => (
+            <div key={friend.id} className="contact-item"> {/* Đảm bảo friend.id là duy nhất */}
+              <div className="d-flex align-items-center">
+                <div className="contact-avatar">
+                  <img
+                    src={friend.avatar || "default-avatar.png"} // Hiển thị avatar mặc định nếu không có
+                    alt={friend.fullName || "Unknown"} // Hiển thị tên mặc định nếu không có
+                    className="user-avt"
+                  />
+                </div>
+                <div className="contact-info">
+                  <h5 className="mb-0">{friend.fullName || "Không rõ"}</h5>
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-light">Không có bạn bè nào.</p>
+        )}
+      </div>
+
+      {/* Hiển thị danh sách liên hệ */}
+      <div className="contacts-list mt-4">
+        {filteredContacts.map((contact, index) => (
+          <div key={index} className="contact-item"> {/* Sử dụng index làm key */}
             <div className="d-flex align-items-center">
               <div className="contact-avatar">
                 <img
