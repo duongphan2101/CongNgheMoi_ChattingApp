@@ -221,8 +221,8 @@ export default function App({ navigation, route }) {
     const formData = new FormData();
     formData.append("file", {
       uri,
-      name: `voice-${Date.now()}.m4a`,
-      type: "audio/m4a",
+      name: `voice-${Date.now()}.mp3`,
+      type: "audio/mp3",
     });
     formData.append("chatRoomId", chatRoomId);
     formData.append("sender", currentUserPhone);
@@ -540,15 +540,15 @@ const getStyles = (themeColors) =>
       marginHorizontal: 5,
       backgroundColor: "#f00",
       borderRadius: 25,
-      width: 50,
-      height: 50,
+      width: 40,
+      height: 40,
       justifyContent: "center",
       alignItems: "center",
     },
     stopIcon: {
       backgroundColor: "#fff",
-      width: 30,
-      height: 30,
+      width: 20,
+      height: 20,
       borderRadius: 5,
     },
   });

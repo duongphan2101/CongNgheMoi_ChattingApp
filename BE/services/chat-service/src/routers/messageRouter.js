@@ -2,7 +2,6 @@ const express = require("express");
 const AWS = require("aws-sdk");
 const Message = require("../models/message");
 const multer = require("multer");
-const ffmpeg = require("fluent-ffmpeg");
 const fs = require("fs").promises;
 const path = require("path");
 const router = express.Router();
@@ -11,6 +10,10 @@ const s3 = new AWS.S3();
 const TABLE_MESSAGE_NAME = "Message";
 const TABLE_CONVERSATION_NAME = "Conversations";
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "lab2s3aduong";
+
+const ffmpegPath = require('ffmpeg-static');
+const ffmpeg = require('fluent-ffmpeg');
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 // Cấu hình multer để lưu tệp tạm trên disk
 const storage = multer.diskStorage({
@@ -231,99 +234,88 @@ module.exports = (io, redisPublisher) => {
 
   router.post("/sendAudio", upload.single("file"), async (req, res) => {
     try {
-      const { chatRoomId, sender, receiver, convertTo } = req.body;
-
+      const { chatRoomId, sender, receiver } = req.body;
+  
       if (!req.file || !chatRoomId || !sender || !receiver) {
         return res.status(400).json({ error: "Thiếu dữ liệu!" });
       }
-
-      let filePath = req.file.path;
-      let fileName = `audio-${Date.now()}.m4a`;
-
-      // Convert .webm sang .m4a nếu yêu cầu
-      if (convertTo === "m4a" && req.file.originalname.endsWith(".webm")) {
-        const convertedPath = path.join(uploadDir, fileName);
-        await new Promise((resolve, reject) => {
-          ffmpeg(filePath)
-            .toFormat("m4a")
-            .audioCodec("aac")
-            .audioBitrate("128k")
-            .audioChannels(2)
-            .audioFrequency(44100)
-            .on("end", resolve)
-            .on("error", (err) => reject(`Lỗi convert: ${err.message}`))
-            .save(convertedPath);
-        });
-        filePath = convertedPath;
-      }
-
+  
+      const inputPath = req.file.path;
+      const outputPath = path.join(__dirname, "..", "uploads", `converted-${Date.now()}.mp3`);
+  
+      // Chuyển đổi tệp âm thanh sang .mp3
+      await new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+          .toFormat('mp3')
+          .audioBitrate(128)
+          .audioChannels(2)
+          .audioFrequency(44100)
+          .on('end', resolve)
+          .on('error', (err) => reject(new Error(`Lỗi chuyển đổi MP3: ${err.message}`)))
+          .save(outputPath);
+      });
+  
       // Tải lên S3
-      const fileContent = await fs.readFile(filePath);
+      const fileContent = await fs.readFile(outputPath);
+      const fileName = `audio-${Date.now()}.mp3`;
       const uploadParams = {
         Bucket: BUCKET_NAME,
         Key: fileName,
         Body: fileContent,
-        ContentType: "audio/m4a",
+        ContentType: "audio/mpeg", // Đúng cho .mp3
         ACL: "public-read",
       };
       const uploadResult = await s3.upload(uploadParams).promise();
-
+  
       // Xóa tệp tạm
-      await fs.unlink(filePath);
-
+      await fs.unlink(inputPath);
+      await fs.unlink(outputPath);
+  
       const audioUrl = uploadResult.Location;
       const audioMessage = new Message(chatRoomId, sender, receiver, audioUrl, "audio");
-
+  
       await dynamoDB.put({
         TableName: TABLE_MESSAGE_NAME,
         Item: audioMessage,
       }).promise();
-
+  
       console.log("✅ Tin nhắn ghi âm đã lưu vào DB:", audioMessage);
-
+  
       const chatId = [sender, receiver].sort().join("_");
-
       const getConversationParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
       };
-
+  
       const conversationData = await dynamoDB.get(getConversationParams).promise();
-
+  
       if (!conversationData.Item || !conversationData.Item.participants) {
         return res.status(404).json({ error: "Không tìm thấy cuộc trò chuyện!" });
       }
-
+  
       const participants = conversationData.Item.participants;
       const unreadFor = participants.filter((p) => p !== sender);
       const currentUnreadList = conversationData.Item.isUnreadBy || [];
       const updatedUnreadList = Array.from(new Set([...currentUnreadList, ...unreadFor]));
-
+  
       const updateParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
         UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnreadBy = :updatedUnreadList",
         ExpressionAttributeValues: {
           ":lastMessage": "Tin Nhắn Thoại",
-          ":lastMessageAt": new Date(audioMessage.timestamp).toLocaleDateString("vi-VN", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          }),
+          ":lastMessageAt": new Date(audioMessage.timestamp).toISOString(),
           ":updatedUnreadList": updatedUnreadList,
         },
         ReturnValues: "UPDATED_NEW",
       };
-
+  
       await dynamoDB.update(updateParams).promise();
-
+  
       console.log("✅ Đã cập nhật thông tin cuộc trò chuyện:", chatId);
-
+  
       io.to(chatRoomId).emit("receiveMessage", audioMessage);
-
+  
       const notifyPayload = JSON.stringify({
         type: "audio",
         to: receiver,
@@ -331,14 +323,14 @@ module.exports = (io, redisPublisher) => {
         message: "Tin nhắn thoại",
         timestamp: audioMessage.timestamp,
       });
-
+  
       redisPublisher.publish("notifications", notifyPayload);
       console.log("Đã publish thông báo:", notifyPayload);
-
+  
       res.status(201).json({ success: true, data: audioMessage });
     } catch (err) {
       console.error("❌ Lỗi khi gửi ghi âm:", err);
-      res.status(500).json({ error: "Lỗi server!" });
+      res.status(500).json({ error: `Lỗi server: ${err.message}` });
     }
   });
 
