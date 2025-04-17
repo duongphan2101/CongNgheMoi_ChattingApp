@@ -68,6 +68,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         setIsRecording(true);
       } catch (err) {
         console.error("Lỗi truy cập mic:", err);
+        alert("Không thể truy cập microphone.");
       }
     }
   };
@@ -99,11 +100,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   const sendAudioBlob = async (blob) => {
     const formData = new FormData();
-    formData.append("file", blob, "voice.webm");
+    formData.append("file", blob, `voice-${Date.now()}.m4a`);
     formData.append("chatRoomId", chatRoom?.chatRoomId);
     formData.append("sender", currentUserPhone);
     formData.append("receiver", otherUserPhone);
-
+    formData.append("convertTo", "m4a");
+  
     try {
       const response = await fetch("http://localhost:3618/sendAudio", {
         method: "POST",
@@ -112,10 +114,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       if (!response.ok) throw new Error("Gửi ghi âm thất bại");
       const audioMessage = await response.json();
       console.log("Gửi ghi âm thành công:", audioMessage);
-
       setAudioBlob(null);
     } catch (err) {
       console.error("Lỗi khi gửi ghi âm:", err);
+      alert("Không thể gửi tin nhắn thoại.");
     }
   };
 
@@ -126,23 +128,24 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
     notificationSocket.on("notification", async (data) => {
       try {
+        if (data.from === user.phoneNumber) return;
         let senderName;
 
-          const senderInfo = (await getUserbySearch(data.from, data.from))[0];
-          senderName = senderInfo?.fullName || data.from;
-        
+        const senderInfo = (await getUserbySearch(data.from, data.from))[0];
+        senderName = senderInfo?.fullName || data.from;
+
         playNotificationSound();
-        if(data.type === "new_message") {
+        if (data.type === "new_message") {
           toast.info(`Tin nhắn từ ${senderName}: ${data.message}`, {
-          position: "bottom-right",
-          autoClose: 5000,
-        });
-        }else if(data.type === "file") {
+            position: "bottom-right",
+            autoClose: 5000,
+          });
+        } else if (data.type === "file") {
           toast.info(`Nhận được một file từ ${senderName}`, {
             position: "bottom-right",
             autoClose: 5000,
           });
-        }else if(data.type === "audio") {
+        } else if (data.type === "audio") {
           toast.info(`Nhận được một tin nhắn thoại từ ${senderName}`, {
             position: "bottom-right",
             autoClose: 5000,
@@ -171,7 +174,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     socket.emit("joinRoom", chatRoom.chatRoomId);
 
     socket.on("receiveMessage", (newMessage) => {
-      setMessages((prev) => [...prev, newMessage]);
+      setMessages((prev) => {
+        if (prev.some((msg) => msg.timestamp === newMessage.timestamp)) {
+          return prev;
+        }
+        return [...prev, newMessage];
+      });
 
       // Cập nhật lastMessage
       updateLastMessage(newMessage.sender, newMessage.receiver, newMessage.message);
@@ -432,7 +440,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                         {isFile ? (
                           renderFileMessage(msg)
                         ) : isAudio ? (
-                          <audio controls src={msg.message} style={{ marginTop: 5 }} />
+                          <audio
+                          controls
+                          src={msg.message}
+                          style={{ marginTop: 5 }}
+                          onError={(e) => console.error("Lỗi phát audio:", e.nativeEvent.error)}
+                        />
                         ) : (
                           <p>{msg.message}</p>
                         )}
@@ -520,7 +533,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           </>
         )}
       </div>
-
 
       {/* Modal xem ảnh */}
       {showImageModal && (

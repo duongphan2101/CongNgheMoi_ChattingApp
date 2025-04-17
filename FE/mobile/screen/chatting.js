@@ -1,100 +1,473 @@
+import React, { useEffect, useState, useRef } from "react";
 import {
-  StyleSheet,
-  Text,
   View,
-  Image,
-  TouchableOpacity,
+  Text,
+  StyleSheet,
   FlatList,
   TextInput,
+  TouchableOpacity,
+  Image,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import React from "react";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../contexts/themeContext";
 import colors from "../themeColors";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import io from "socket.io-client";
+import getIp from "../utils/getIp_notPORT";
+import Entypo from "@expo/vector-icons/Entypo";
+import moment from "moment";
+import getUserbySearch from "../api/api_searchUSer";
+import { showLocalNotification } from "../utils/notifications";
+import { Audio } from "expo-av";
+
+const BASE_URL = getIp();
+const socket = io(`http://${BASE_URL}:3618`);
+const notificationSocket = io(`http://${BASE_URL}:3515`);
+
 export default function App({ navigation, route }) {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const themeColors = colors[theme];
 
-  const { user } = route.params;
-  const styles = getStyles(themeColors);
+  const otherUser = route.params.otherUser;
+  const chatRoomId = route.params.chatRoom;
+  const thisUser = route.params.thisUser;
+  const [messages, setMessages] = useState([]);
+  const [message, setMessage] = useState("");
+  const [currentUserPhone, setCurrentUserPhone] = useState();
+  const flatListRef = useRef();
+  const [soundObject, setSoundObject] = useState(null);
+  const [recording, setRecording] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
 
-  const [isRecording, setIsRecording] = React.useState(false);
+  useEffect(() => {
+    if (!chatRoomId || !thisUser?.phoneNumber) return;
 
-  const handleMicPress = () => {
-    setIsRecording(true);
+    setCurrentUserPhone(thisUser.phoneNumber);
+
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(
+          `http://${BASE_URL}:3618/messages?chatRoomId=${chatRoomId}`
+        );
+        const data = await res.json();
+
+        if (Array.isArray(data)) {
+          setMessages(data);
+        } else {
+          console.warn("Dữ liệu không phải mảng:", data);
+        }
+      } catch (err) {
+        console.error("Lỗi khi lấy tin nhắn:", err);
+        Alert.alert("Lỗi", "Không thể tải tin nhắn");
+      }
+    };
+
+    fetchMessages();
+
+    socket.emit("joinRoom", chatRoomId);
+
+    const handleReceiveMessage = (newMessage) => {
+      console.log("Tin nhắn mới:", newMessage);
+      setMessages((prev) => {
+        if (prev.some((msg) => msg.timestamp === newMessage.timestamp)) {
+          return prev;
+        }
+        return [...prev, newMessage];
+      });
+    };
+
+    const handleTyping = () => setTyping(true);
+    const handleStopTyping = () => setTyping(false);
+
+    const handleDeleteMessage = ({ messageId }) => {
+      setMessages((prev) => prev.filter((msg) => msg.timestamp !== messageId));
+    };
+
+    socket.on("receiveMessage", handleReceiveMessage);
+    socket.on("userTyping", handleTyping);
+    socket.on("userStopTyping", handleStopTyping);
+    socket.on("messageDeleted", handleDeleteMessage);
+
+    return () => {
+      socket.off("receiveMessage", handleReceiveMessage);
+      socket.off("userTyping", handleTyping);
+      socket.off("userStopTyping", handleStopTyping);
+      socket.off("messageDeleted", handleDeleteMessage);
+    };
+  }, [chatRoomId, thisUser?.phoneNumber]);
+
+  useEffect(() => {
+    return () => {
+      if (soundObject) {
+        soundObject.unloadAsync();
+      }
+    };
+  }, [soundObject]);
+
+  const handleSend = async () => {
+    if (isRecording && recording) {
+      // Đang ghi âm, dừng và gửi tin nhắn thoại
+      try {
+        await recording.stopAndUnloadAsync();
+        const uri = recording.getURI();
+        setIsRecording(false);
+        setRecording(null);
+        await handleSendAudio(uri);
+      } catch (error) {
+        console.error("Lỗi khi dừng và gửi ghi âm:", error);
+        Alert.alert("Lỗi", "Không thể gửi tin nhắn thoại.");
+      }
+      return;
+    }
+
+    if (!message.trim()) return;
+
+    const newMsg = {
+      chatRoomId: chatRoomId,
+      sender: currentUserPhone,
+      receiver: otherUser.phoneNumber,
+      message: message,
+      timestamp: Date.now(),
+      type: "text",
+    };
+
+    setMessage("");
+
+    try {
+      const response = await fetch(`http://${BASE_URL}:3618/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMsg),
+      });
+
+      if (!response.ok) throw new Error("Gửi tin nhắn thất bại!");
+      console.log("Tin nhắn gửi thành công:", newMsg);
+    } catch (error) {
+      console.error("Lỗi gửi tin nhắn:", error);
+      Alert.alert("Lỗi", "Không thể gửi tin nhắn. Vui lòng thử lại sau.");
+    }
   };
 
-  const handleStopRecording = () => {
-    setIsRecording(false);
+  const startRecording = async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        interruptionModeIOS: 1,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+      });
+
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Cần quyền truy cập microphone");
+        return;
+      }
+
+      const recordingOptions = {
+        isMeteringEnabled: true,
+        android: {
+          extension: ".m4a",
+          outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
+          audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: ".m4a",
+          outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_MPEG4AAC,
+          audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 128000,
+        },
+      };
+
+      const { recording } = await Audio.Recording.createAsync(recordingOptions);
+      setRecording(recording);
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Lỗi ghi âm:", error);
+      Alert.alert("Lỗi", "Không thể bắt đầu ghi âm. Vui lòng thử lại.");
+    }
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.head}>
-        <View style={styles.user}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-              <Ionicons name="chevron-back" size={20} color="#fff" />
+  const stopRecording = async () => {
+    if (!recording) {
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      await recording.stopAndUnloadAsync();
+    } catch (error) {
+      console.error("Lỗi khi dừng ghi âm:", error);
+      Alert.alert("Lỗi", "Không thể dừng ghi âm. Vui lòng thử lại.");
+    } finally {
+      setIsRecording(false);
+      setRecording(null);
+    }
+  };
+
+  const handleSendAudio = async (uri) => {
+    if (!uri) {
+      Alert.alert("Lỗi", "Không có bản ghi âm để gửi.");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", {
+      uri,
+      name: `voice-${Date.now()}.m4a`,
+      type: "audio/m4a",
+    });
+    formData.append("chatRoomId", chatRoomId);
+    formData.append("sender", currentUserPhone);
+    formData.append("receiver", otherUser.phoneNumber);
+
+    try {
+      const response = await fetch(`http://${BASE_URL}:3618/sendAudio`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Gửi ghi âm thất bại");
+      }
+      const audioMessageFromServer = await response.json();
+      if (audioMessageFromServer.success && audioMessageFromServer.data) {
+        setMessages((prev) => {
+          if (prev.some((msg) => msg.timestamp === audioMessageFromServer.data.timestamp)) {
+            return prev;
+          }
+          return [...prev, audioMessageFromServer.data];
+        });
+        console.log("Gửi ghi âm thành công:", audioMessageFromServer);
+      } else {
+        throw new Error("Phản hồi server không hợp lệ");
+      }
+    } catch (error) {
+      console.error("Lỗi khi gửi ghi âm:", error);
+      Alert.alert("Lỗi", "Không thể gửi tin nhắn thoại.");
+    }
+  };
+
+  useEffect(() => {
+    if (!thisUser?.phoneNumber) return;
+
+    notificationSocket.emit("join", thisUser.phoneNumber);
+
+    notificationSocket.on("notification", async (data) => {
+      try {
+        let senderName = "Không rõ";
+        const senderInfo = await getUserbySearch(data.from, data.from);
+        if (senderInfo?.[0]?.fullName) senderName = senderInfo[0].fullName;
+
+        let message = "";
+        switch (data.type) {
+          case "new_message":
+            message = `Tin nhắn từ ${senderName}: ${data.message}`;
+            break;
+          case "file":
+            message = `Bạn nhận được một file từ ${senderName}`;
+            break;
+          case "audio":
+            message = `Bạn nhận được tin nhắn thoại từ ${senderName}`;
+            break;
+          default:
+            message = `Thông báo mới từ ${senderName}`;
+        }
+
+        showLocalNotification("VChat", message);
+      } catch (err) {
+        console.error("Lỗi thông báo:", err);
+      }
+    });
+
+    return () => {
+      notificationSocket.off("notification");
+    };
+  }, [thisUser?.phoneNumber]);
+
+  const handlePlayAudio = async (audioUrl) => {
+    console.log("Bắt đầu phát:", audioUrl);
+    try {
+      if (!audioUrl || typeof audioUrl !== "string") {
+        throw new Error("URL âm thanh không hợp lệ");
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        interruptionModeIOS: 1,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+
+      const response = await fetch(audioUrl, { method: "HEAD" });
+      if (!response.ok) {
+        throw new Error(`Không thể truy cập file âm thanh: ${response.status}`);
+      }
+
+      if (soundObject) {
+        await soundObject.unloadAsync();
+      }
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: true }
+      );
+      setSoundObject(sound);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish && !status.isLooping) {
+          setSoundObject(null);
+          sound.unloadAsync();
+        } else if (status.error) {
+          console.error("Lỗi phát âm thanh:", status.error);
+          Alert.alert("Lỗi", "Không thể phát âm thanh do lỗi: " + status.error);
+        }
+      });
+    } catch (error) {
+      console.error("Chi tiết lỗi khi phát âm thanh:", error.message);
+      Alert.alert("Lỗi", `Không thể phát tin nhắn thoại: ${error.message}`);
+    }
+  };
+
+  const renderItem = ({ item }) => (
+    <View
+      style={[
+        styles.userChatting,
+        {
+          justifyContent:
+            item.sender === thisUser.phoneNumber ? "flex-end" : "flex-start",
+        },
+      ]}
+    >
+      {item.sender !== thisUser.phoneNumber && (
+        <Image
+          source={{ uri: otherUser.avatar }}
+          style={{
+            height: 50,
+            width: 50,
+            marginTop: 15,
+            borderRadius: 50,
+          }}
+        />
+      )}
+      <View style={{ alignItems: "center" }}>
+        <Text style={{ color: themeColors.text, fontSize: 10 }}>
+          {moment(item.timestamp).format("HH:mm dd/MM/YY")}
+        </Text>
+        <View
+          style={[
+            styles.blockChat,
+            {
+              backgroundColor:
+                item.sender === thisUser.phoneNumber ? "#6fd39f" : "#8bb9f2",
+              borderRadius: 15,
+              padding: 10,
+            },
+          ]}
+        >
+          {item.type === "text" ? (
+            <Text
+              style={{
+                color: "#fff",
+                maxWidth: "90%",
+                flexWrap: "wrap",
+              }}
+            >
+              {item.message}
+            </Text>
+          ) : item.type === "audio" ? (
+            <TouchableOpacity onPress={() => handlePlayAudio(item.message)}>
+              <Ionicons name="play-circle" size={30} color="#fff" />
             </TouchableOpacity>
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
-            <Text style={styles.name}>{user.name}</Text>
-          </View>
-          {/* <View style={{flexDirection: 'row', alignItems: 'center'}}>
-              <TouchableOpacity>
-                <Ionicons style={{marginRight: 20}} name="call" size={30} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity>
-                <Ionicons name="videocam" size={30} color="#fff" />
-              </TouchableOpacity>
-            </View> */}
+          ) : (
+            <Text style={{ color: "#fff" }}>[Tin nhắn không hỗ trợ]</Text>
+          )}
         </View>
       </View>
+      {item.sender === thisUser.phoneNumber && (
+        <Image
+          source={{ uri: thisUser.avatar }}
+          style={{
+            height: 50,
+            width: 50,
+            marginTop: 15,
+            borderRadius: 50,
+          }}
+        />
+      )}
+    </View>
+  );
 
-      <View style={styles.content}>
-        <View style={styles.contextChat}>
-          <View style={styles.userChatting}>
-            <Image
-              source={{ uri: user.avatar }}
-              style={{ height: 35, width: 35, marginTop: 15 }}
-            />
-            <View style={{ alignItems: "center", paddingHorizontal: 10 }}>
-              <Text style={{ color: "#ccc" }}>{user.time}</Text>
-              <View style={styles.blockChat}>
-                <Text style={{ color: "#fff" }}>{user.mess}</Text>
-              </View>
+  const styles = getStyles(themeColors);
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <View style={styles.container}>
+        <View style={styles.head}>
+          <View style={styles.user}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Ionicons name="chevron-back" size={20} color="#fff" />
+              </TouchableOpacity>
+              <Image source={{ uri: otherUser.avatar }} style={styles.avatar} />
+              <Text style={styles.name}>{otherUser.fullName}</Text>
             </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.bottomtab}>
-        <TouchableOpacity style={styles.touch}>
-          <Ionicons name="image" size={40} color={themeColors.text} />
-        </TouchableOpacity>
-        {isRecording && (
-          <View style={styles.recordingBox}>
-            <Text style={styles.recordingText}> Đang ghi âm...</Text>
-            <TouchableOpacity
-              style={styles.stopBtn}
-              onPress={handleStopRecording}
-            >
-              <Text style={styles.stopText}></Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        <TouchableOpacity style={styles.touch} onPress={handleMicPress}>
-          <Ionicons name="mic" size={40} color={themeColors.text} />
-        </TouchableOpacity>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Nhập nội dung ..."
-          placeholderTextColor={"#ccc"}
+        <FlatList
+          ref={flatListRef}
+          style={styles.content}
+          data={messages}
+          keyExtractor={(item, index) => index.toString()}
+          onContentSizeChange={() =>
+            flatListRef.current.scrollToEnd({ animated: true })
+          }
+          onLayout={() => flatListRef.current.scrollToEnd({ animated: true })}
+          renderItem={renderItem}
         />
-        <TouchableOpacity style={styles.touch}>
-          <Ionicons name="send" size={40} color={themeColors.text} />
-        </TouchableOpacity>
+
+        <View style={styles.bottomtab}>
+          <TouchableOpacity style={styles.touch}>
+            <Ionicons name="image" size={30} color={themeColors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.touch}>
+            <Entypo name="emoji-flirt" size={24} color={themeColors.text} />
+          </TouchableOpacity>
+          {!isRecording ? (
+            <TouchableOpacity style={styles.touch} onPress={startRecording}>
+              <Ionicons name="mic" size={30} color={themeColors.text} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.recordingControl} onPress={stopRecording}>
+              <View style={styles.stopIcon} />
+            </TouchableOpacity>
+          )}
+          <TextInput
+            style={styles.textInput}
+            placeholder="Nhập nội dung ..."
+            placeholderTextColor="#ccc"
+            value={message}
+            onChangeText={setMessage}
+            editable={true}
+          />
+          <TouchableOpacity style={styles.touch} onPress={handleSend}>
+            <Ionicons name="send" size={30} color={themeColors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -131,15 +504,13 @@ const getStyles = (themeColors) =>
       flex: 1,
     },
     bottomtab: {
-      height: 90,
+      height: 100,
       backgroundColor: themeColors.primary,
       flexDirection: "row",
       justifyContent: "space-around",
       alignItems: "center",
       paddingHorizontal: 10,
       paddingBottom: 20,
-      borderTopColor: "#ccc",
-      borderTopWidth: 1,
     },
     textInput: {
       flex: 1,
@@ -151,49 +522,33 @@ const getStyles = (themeColors) =>
       borderWidth: 1,
       color: themeColors.text,
     },
-    contextChat: {
-      paddingVertical: 20,
-      paddingHorizontal: 10,
-    },
     userChatting: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "start",
+      padding: 5,
     },
     blockChat: {
       backgroundColor: "#7399C3",
       padding: 15,
       borderRadius: 20,
     },
-    recordingBox: {
-      position: 'absolute',
-      bottom: 100,
-      left: 20,
-      right: 20,
-      backgroundColor: '#333',
-      padding: 8,
-      borderRadius: 15,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      zIndex: 10,
+    touch: {
+      marginHorizontal: 5,
     },
-    recordingText: {
-      color: '#fff',
-      fontSize: 16,
+    recordingControl: {
+      marginHorizontal: 5,
+      backgroundColor: "#f00",
+      borderRadius: 25,
+      width: 50,
+      height: 50,
+      justifyContent: "center",
+      alignItems: "center",
     },
-    stopBtn: {
-      width: 40,
-      height: 40,
-      backgroundColor: '#ffff', 
-      borderRadius: 20, 
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    stopText: {
-      width: 18,
-      height: 18,
-      backgroundColor: '#0066FF',
-      borderRadius: 3,
+    stopIcon: {
+      backgroundColor: "#fff",
+      width: 30,
+      height: 30,
+      borderRadius: 5,
     },
   });
