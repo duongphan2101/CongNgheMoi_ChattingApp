@@ -3,6 +3,8 @@ const AWS = require("aws-sdk");
 const Message = require("../models/message");
 const multer = require("multer");
 const multerS3 = require("multer-s3");
+const fs = require("fs").promises;
+const path = require("path");
 const router = express.Router();
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const s3 = new AWS.S3();
@@ -302,7 +304,7 @@ module.exports = (io, redisPublisher) => {
         .promise();
 
       console.log("✅ Tin nhắn ghi âm đã lưu vào DB:", audioMessage);
-
+  
       const chatId = [sender, receiver].sort().join("_");
 
       // Lấy thông tin participants từ bảng Conversations
@@ -310,15 +312,15 @@ module.exports = (io, redisPublisher) => {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
       };
-
+  
       const conversationData = await dynamoDB.get(getConversationParams).promise();
-
+  
       if (!conversationData.Item || !conversationData.Item.participants) {
         return res
           .status(404)
           .json({ error: "Không tìm thấy cuộc trò chuyện!" });
       }
-
+  
       const participants = conversationData.Item.participants;
       const unreadFor = participants.filter((p) => p !== sender); // Loại sender ra khỏi danh sách unread
 
@@ -350,9 +352,9 @@ module.exports = (io, redisPublisher) => {
         },
         ReturnValues: "UPDATED_NEW",
       };
-
+  
       await dynamoDB.update(updateParams).promise();
-
+  
       console.log("✅ Đã cập nhật thông tin cuộc trò chuyện:", chatId);
 
       // Gửi tin nhắn đến các client trong phòng
@@ -366,14 +368,14 @@ module.exports = (io, redisPublisher) => {
         audioMessage,
         timestamp: audioMessage.timestamp,
       });
-
+  
       redisPublisher.publish("notifications", notifyPayload);
       console.log("Đã publish thông báo:", notifyPayload);
-
+  
       res.status(201).json({ success: true, data: audioMessage });
     } catch (err) {
       console.error("❌ Lỗi khi gửi ghi âm:", err);
-      res.status(500).json({ error: "Lỗi server!" });
+      res.status(500).json({ error: `Lỗi server: ${err.message}` });
     }
   });
 

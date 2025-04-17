@@ -5,7 +5,7 @@ import io from "socket.io-client";
 import a1 from "../../assets/imgs/9306614.jpg";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
-import { playNotificationSound } from '../../utils/sound.js';
+import { playNotificationSound } from "../../utils/sound.js";
 import { toast } from "react-toastify";
 import getUserbySearch from "../../API/api_searchUSer";
 import fetchFriends from "../../API/api_getListFriends";
@@ -29,7 +29,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImage, setCurrentImage] = useState({
     src: "",
-    name: ""
+    name: "",
   });
 
   const [modalListFriends, setModalListFriends] = useState(false)
@@ -38,7 +38,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const messagesEndRef = useRef(null);
   const emojiPickerRef = useRef(null);
 
-  const otherUserPhone = chatRoom?.participants?.find(phone => phone !== currentUserPhone);
+  const otherUserPhone = chatRoom?.participants?.find(
+    (phone) => phone !== currentUserPhone
+  );
 
   const addEmoji = (emoji) => {
     setMessage((prev) => prev + emoji.native);
@@ -57,25 +59,34 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   };
 
   const handleMicClick = async () => {
-    if (!isRecording) {
+    if (isRecording) {
+      // If already recording, stop and send the audio
+      handleStopRecording();
+    } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
+        const supportedMimeTypes = ["audio/webm", "audio/mp4"];
+        const mimeType =
+          supportedMimeTypes.find((type) => MediaRecorder.isTypeSupported(type)) || "audio/webm";
+        const mediaRecorder = new MediaRecorder(stream, { mimeType });
+  
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
-
+  
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
         };
-
+  
         mediaRecorder.onstop = () => {
-          const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          const blob = new Blob(audioChunksRef.current, { type: mimeType });
           setAudioBlob(blob);
           setIsRecording(false);
+          stream.getTracks().forEach((track) => track.stop());
+          sendAudioBlob(blob); // Send the audio blob immediately after stopping
         };
-
+  
         mediaRecorder.start();
         setIsRecording(true);
       } catch (err) {
@@ -85,26 +96,18 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   };
 
   const handleStopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
+      mediaRecorderRef.current.stop();
+    }
   };
 
   const handleSendAudio = () => {
     if (isRecording) {
-      // Nếu vẫn đang ghi âm, dừng lại và gửi sau khi đã xử lý xong
-      const mediaRecorder = mediaRecorderRef.current;
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-          setAudioBlob(blob);
-          setIsRecording(false);
-
-          // Tiến hành gửi ngay sau khi blob đã được tạo
-          sendAudioBlob(blob);
-        };
-        mediaRecorder.stop();
-      }
+      handleStopRecording();
     } else if (audioBlob) {
-      // Nếu đã có blob, gửi luôn
       sendAudioBlob(audioBlob);
     }
   };
@@ -121,7 +124,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         method: "POST",
         body: formData,
       });
-      if (!response.ok) throw new Error("Gửi ghi âm thất bại");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          `Gửi ghi âm thất bại: ${errorData.error || response.statusText}`
+        );
+      }
       const audioMessage = await response.json();
       console.log("Gửi ghi âm thành công:", audioMessage);
 
@@ -179,7 +187,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       .then((data) => {
         setMessages(data);
       })
-      .catch(err => console.error("Error fetching messages:", err));
+      .catch((err) => console.error("Error fetching messages:", err));
 
     socket.emit("joinRoom", chatRoom.chatRoomId);
 
@@ -187,13 +195,17 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       setMessages((prev) => [...prev, newMessage]);
 
       // Cập nhật lastMessage
-      updateLastMessage(newMessage.sender, newMessage.receiver, newMessage.message);
+      updateLastMessage(
+        newMessage.sender,
+        newMessage.receiver,
+        newMessage.message
+      );
     });
 
     socket.on("userTyping", () => setTyping(true));
     socket.on("userStopTyping", () => setTyping(false));
     socket.on("messageDeleted", ({ messageId }) => {
-      setMessages((prev) => prev.filter(msg => msg.timestamp !== messageId));
+      setMessages((prev) => prev.filter((msg) => msg.timestamp !== messageId));
     });
 
     return () => {
@@ -212,11 +224,17 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target)
+      ) {
         setShowPicker(false);
       }
       // tắt menu khi click ra ngoài
-      if (!event.target.closest('.message-options') && !event.target.closest('.message-options-menu')) {
+      if (
+        !event.target.closest(".message-options") &&
+        !event.target.closest(".message-options-menu")
+      ) {
         setActiveMessageId(null);
       }
     }
@@ -228,11 +246,11 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         setShowImageModal(false);
       }
     };
-    window.addEventListener('keydown', handleEsc);
+    window.addEventListener("keydown", handleEsc);
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      window.removeEventListener('keydown', handleEsc);
+      window.removeEventListener("keydown", handleEsc);
     };
   }, []);
 
@@ -250,7 +268,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       receiver: otherUserPhone,
       message,
       timestamp: Date.now(),
-      type: "text"
+      type: "text",
     };
     setMessage("");
     try {
@@ -275,7 +293,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chatRoomId: chatRoom.chatRoomId,
-          messageId: messageId
+          messageId: messageId,
         }),
       });
       if (!response.ok) throw new Error("Xóa tin nhắn thất bại!");
@@ -323,7 +341,11 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       if (!response.ok) {
         const errorData = await response.json();
         console.error("Lỗi Server:", response.status, errorData);
-        throw new Error(`Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`}`);
+        throw new Error(
+          `Tải file lên thất bại: ${
+            errorData.error || `Mã lỗi: ${response.status}`
+          }`
+        );
       }
 
       fileInputRef.current.value = null;
@@ -345,15 +367,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     try {
       const fileInfo = JSON.parse(msg.message);
       const { name, size, type } = fileInfo;
-      const isImage = type.startsWith('image/');
+      const isImage = type.startsWith("image/");
 
       const formatFileSize = (bytes) => {
-        if (bytes < 1024)
-          return bytes + ' B';
-        else if (bytes < 1024 * 1024)
-          return (bytes / 1024).toFixed(1) + ' KB';
-        else
-          return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        if (bytes < 1024) return bytes + " B";
+        else if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        else return (bytes / (1024 * 1024)).toFixed(1) + " MB";
       };
 
       const downloadFile = (e) => {
@@ -361,7 +380,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
         const downloadUrl = `http://localhost:3618/download/${chatRoom.chatRoomId}/${msg.timestamp}`;
 
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = downloadUrl;
         link.download = name;
         document.body.appendChild(link);
@@ -377,10 +396,18 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 src={`http://localhost:3618/view/${chatRoom.chatRoomId}/${msg.timestamp}`}
                 alt={name}
                 className="img-preview"
-                onClick={() => openImageModal(`http://localhost:3618/view/${chatRoom.chatRoomId}/${msg.timestamp}`, name)}
+                onClick={() =>
+                  openImageModal(
+                    `http://localhost:3618/view/${chatRoom.chatRoomId}/${msg.timestamp}`,
+                    name
+                  )
+                }
               />
               <div className="file-info">
-                <button onClick={downloadFile} className="file-name btn btn-link">
+                <button
+                  onClick={downloadFile}
+                  className="file-name btn btn-link"
+                >
                   {name}
                 </button>
                 <span className="file-size">{formatFileSize(size)}</span>
@@ -392,7 +419,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 <i className="bi bi-file-earmark"></i>
               </div>
               <div className="file-info">
-                <button onClick={downloadFile} className="file-name btn btn-link">
+                <button
+                  onClick={downloadFile}
+                  className="file-name btn btn-link"
+                >
                   {name}
                 </button>
                 <span className="file-size">{formatFileSize(size)}</span>
@@ -420,7 +450,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     <>
       <div className="chat-box container">
         {!chatRoom || !userChatting.length ? (
-          <p className="text-center mt-3 centered-text">Chưa có cuộc trò chuyện nào</p>
+          <p className="text-center mt-3 centered-text">
+            Chưa có cuộc trò chuyện nào
+          </p>
         ) : (
           <>
             <div className="chat-header row">
@@ -442,9 +474,18 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 const isFile = msg.type === "file";
 
                 return (
-                  <div key={index} className={`message ${isSentByCurrentUser ? "sent" : "received"}`}>
+                  <div
+                    key={index}
+                    className={`message ${
+                      isSentByCurrentUser ? "sent" : "received"
+                    }`}
+                  >
                     {!isSentByCurrentUser && (
-                      <img src={userChatting[0]?.avatar || a1} alt="User Avatar" className="user-avt" />
+                      <img
+                        src={userChatting[0]?.avatar || a1}
+                        alt="User Avatar"
+                        className="user-avt"
+                      />
                     )}
                     <div className="message-wrapper">
                       <div className="message-info">
@@ -486,13 +527,19 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                       </div>
                     )}
                     {isSentByCurrentUser && (
-                      <img src={user?.avatar || a1} alt="User Avatar" className="user-avt" />
+                      <img
+                        src={user?.avatar || a1}
+                        alt="User Avatar"
+                        className="user-avt"
+                      />
                     )}
                   </div>
                 );
               })}
               {typing && <p className="typing-indicator">Đang nhập...</p>}
-              {uploading && <p className="typing-indicator">Đang tải file lên...</p>}
+              {uploading && (
+                <p className="typing-indicator">Đang tải file lên...</p>
+              )}
               <div ref={messagesEndRef}></div>
             </div>
 
@@ -500,7 +547,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
               {isRecording && (
                 <div className="record-timer">
                   <span>Đang ghi âm...</span>
-                  <button className="stop-btn" onClick={handleStopRecording}>⏹</button>
+                  <button className="stop-btn" onClick={handleStopRecording}>
+                    ⏹
+                  </button>
                 </div>
               )}
 
@@ -512,14 +561,30 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   handleSendAudio();
                 }}
               >
-                <div className="emoji-picker-container" ref={emojiPickerRef} style={{ position: "absolute", bottom: "50px", left: "10px" }}>
-                  {showPicker && <Picker data={data} onEmojiSelect={addEmoji} />}
+                <div
+                  className="emoji-picker-container"
+                  ref={emojiPickerRef}
+                  style={{ position: "absolute", bottom: "50px", left: "10px" }}
+                >
+                  {showPicker && (
+                    <Picker data={data} onEmojiSelect={addEmoji} />
+                  )}
                 </div>
-                <button type="button" className="btn" onClick={() => setShowPicker((prev) => !prev)}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setShowPicker((prev) => !prev)}
+                >
                   <i className="bi bi-emoji-smile text-light"></i>
                 </button>
 
-                <input type="file" name="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: "none" }} />
+                <input
+                  type="file"
+                  name="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  style={{ display: "none" }}
+                />
                 <button
                   type="button"
                   className="btn"
@@ -551,8 +616,14 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
       {/* Modal xem ảnh */}
       {showImageModal && (
-        <div className="image-modal-overlay" onClick={() => setShowImageModal(false)}>
-          <div className="image-modal-content" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="image-modal-overlay"
+          onClick={() => setShowImageModal(false)}
+        >
+          <div
+            className="image-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="image-modal-header">
               <h5 className="image-modal-title">{currentImage.name}</h5>
               <button
@@ -563,15 +634,19 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
               </button>
             </div>
             <div className="image-modal-body">
-              <img src={currentImage.src} alt={currentImage.name} className="image-modal-img" />
+              <img
+                src={currentImage.src}
+                alt={currentImage.name}
+                className="image-modal-img"
+              />
             </div>
             <div className="image-modal-footer">
               <button
                 className="image-modal-download"
                 onClick={() => {
-                  const link = document.createElement('a');
+                  const link = document.createElement("a");
                   const chatRoomId = chatRoom.chatRoomId;
-                  const messageId = currentImage.src.split('/').pop();
+                  const messageId = currentImage.src.split("/").pop();
                   link.href = `http://localhost:3618/download/${chatRoomId}/${messageId}`;
                   link.download = currentImage.name;
                   document.body.appendChild(link);
