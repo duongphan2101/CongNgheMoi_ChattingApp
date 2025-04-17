@@ -69,16 +69,16 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         const mimeType =
           supportedMimeTypes.find((type) => MediaRecorder.isTypeSupported(type)) || "audio/webm";
         const mediaRecorder = new MediaRecorder(stream, { mimeType });
-  
+
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
-  
+
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
         };
-  
+
         mediaRecorder.onstop = () => {
           const blob = new Blob(audioChunksRef.current, { type: mimeType });
           setAudioBlob(blob);
@@ -86,7 +86,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           stream.getTracks().forEach((track) => track.stop());
           sendAudioBlob(blob); // Send the audio blob immediately after stopping
         };
-  
+
         mediaRecorder.start();
         setIsRecording(true);
       } catch (err) {
@@ -342,8 +342,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         const errorData = await response.json();
         console.error("Lỗi Server:", response.status, errorData);
         throw new Error(
-          `Tải file lên thất bại: ${
-            errorData.error || `Mã lỗi: ${response.status}`
+          `Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`
           }`
         );
       }
@@ -438,12 +437,21 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   };
 
   const handleTogglePhoneNumber = (phoneNumber) => {
-    setListAddtoGroup((prev) =>
-      prev.includes(phoneNumber)
-        ? prev.filter((p) => p !== phoneNumber)
-        : [...prev, phoneNumber]
-    );
+    setListAddtoGroup((prev) => {
+      const mustHave = [user.phoneNumber, userChatting[0].phoneNumber];
+      const withoutRemoved = prev.filter((p) => p !== phoneNumber);
+      const isAlreadyChecked = prev.includes(phoneNumber);
+
+      const newList = isAlreadyChecked
+        ? withoutRemoved
+        : [...prev, phoneNumber];
+
+      // Đảm bảo always có user + userChatting
+      const finalList = Array.from(new Set([...newList, ...mustHave]));
+      return finalList;
+    });
   };
+
 
 
   return (
@@ -476,9 +484,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 return (
                   <div
                     key={index}
-                    className={`message ${
-                      isSentByCurrentUser ? "sent" : "received"
-                    }`}
+                    className={`message ${isSentByCurrentUser ? "sent" : "received"
+                      }`}
                   >
                     {!isSentByCurrentUser && (
                       <img
