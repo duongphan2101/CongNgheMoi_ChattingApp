@@ -50,7 +50,7 @@
     border-radius: 25px;
     color: black;
     margin-right: 10px;
-    word-break: break-word; 
+    word-break: break-word;
 }
 
 .message.received {
@@ -60,11 +60,12 @@
 }
 
 .centered-text {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh; /* Chiều cao full màn hình */
-  width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    /* Chiều cao full màn hình */
+    width: 100%;
 }
 
 .message.received p {
@@ -73,7 +74,7 @@
     border-radius: 25px;
     color: black;
     margin-left: 10px;
-    word-break: break-word; 
+    word-break: break-word;
 }
 
 .message-info span {
@@ -223,12 +224,13 @@
     font-size: 2rem;
     z-index: 10;
     animation: slideUp 3s ease forwards;
-}  
+}
 
 @keyframes slideUp {
     0% {
         transform: translateY(0);
     }
+
     100% {
         transform: translateY(-100%);
     }
@@ -247,6 +249,7 @@
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -261,6 +264,7 @@
     from {
         transform: scale(0.9);
     }
+
     to {
         transform: scale(1);
     }
@@ -280,12 +284,12 @@
 .modal-body .btn-link {
     color: #fff;
     font-size: 1.2rem;
-  }
+}
 
 .modal-content {
     background-color: #252f41;
     color: #fff;
-  }
+}
 
 .modal-body img {
     border: 2px solid #303336;
@@ -297,6 +301,7 @@
     background-color: #252f41;
     padding: 15px;
 }
+
 .personal-info p {
     font-size: 10px;
     margin-bottom: 10rem;
@@ -310,7 +315,7 @@
 
 .custom-button {
     background-color: #007bff;
-    color: #ffffff !important; 
+    color: #ffffff !important;
     border: none;
     transition: all 0.3s ease;
 }
@@ -404,9 +409,11 @@
     0% {
         opacity: 0.5;
     }
+
     50% {
         opacity: 1;
     }
+
     100% {
         opacity: 0.5;
     }
@@ -416,6 +423,7 @@
     from {
         opacity: 1;
     }
+
     to {
         opacity: 0;
         transform: translateY(-10px);
@@ -529,13 +537,25 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes zoomIn {
-    from { transform: scale(0.95); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .record-timer {
@@ -555,13 +575,13 @@
     display: flex;
     align-items: center;
     gap: 6px;
-  }
+}
 
-  audio {
+audio {
     margin: 0 10px;
     background-color: #fff;
-  }
-  
+}
+
 
 .record-timer {
     position: absolute;
@@ -580,27 +600,34 @@
     display: flex;
     align-items: center;
     gap: 6px;
-  }
-  
-  .record-timer::before {
+}
+
+.record-timer::before {
     content: "⏺";
     animation: pulse-dot 1s infinite;
     color: red;
-  }
-  
-  .stop-btn {
+}
+
+.stop-btn {
     background: transparent;
     border: none;
     color: white;
     font-size: 18px;
     cursor: pointer;
     transition: transform 0.2s ease;
-  }
-  .stop-btn:hover {
+}
+
+.stop-btn:hover {
     transform: scale(1.2);
     color: red;
+}
 
-  }
+.li-mem-group {
+    background-color: transparent;
+    color: #fff;
+    border: none;
+}
 
-  
-
+.li-mem-group:hover {
+    background-color: rgba(52, 73, 94, 0.5);
+}

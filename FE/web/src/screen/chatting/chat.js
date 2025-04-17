@@ -8,6 +8,7 @@ import data from "@emoji-mart/data";
 import { playNotificationSound } from '../../utils/sound.js';
 import { toast } from "react-toastify";
 import getUserbySearch from "../../API/api_searchUSer";
+import fetchFriends from "../../API/api_getListFriends";
 
 const socket = io("http://localhost:3618");
 const notificationSocket = io("http://localhost:3515");
@@ -21,6 +22,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [activeMessageId, setActiveMessageId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const [listAddtoGroup, setListAddtoGroup] = useState([])
+  console.log("list add to gr ", listAddtoGroup)
 
   // Trạng thái cho modal xem ảnh
   const [showImageModal, setShowImageModal] = useState(false);
@@ -28,6 +31,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     src: "",
     name: ""
   });
+
+  const [modalListFriends, setModalListFriends] = useState(false)
+  const [listFriends, setListFriends] = useState([])
 
   const messagesEndRef = useRef(null);
   const emojiPickerRef = useRef(null);
@@ -43,6 +49,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [audioBlob, setAudioBlob] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+
+  const handleOpenFriendsModal = async () => {
+    setModalListFriends(true);
+    const data = await fetchFriends();
+    setListFriends(data);
+  };
 
   const handleMicClick = async () => {
     if (!isRecording) {
@@ -395,6 +407,15 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     }
   };
 
+  const handleTogglePhoneNumber = (phoneNumber) => {
+    setListAddtoGroup((prev) =>
+      prev.includes(phoneNumber)
+        ? prev.filter((p) => p !== phoneNumber)
+        : [...prev, phoneNumber]
+    );
+  };
+
+
   return (
     <>
       <div className="chat-box container">
@@ -403,9 +424,14 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         ) : (
           <>
             <div className="chat-header row">
-              <div className="col-sm-12 d-flex align-items-center">
+              <div className="col-sm-8 d-flex align-items-center">
                 <img className="chat-header_avt" src={userChatting[0]?.avatar || a1} alt="" />
                 <p className="chat-header_name px-2 m-0">{userChatting[0]?.fullName || "VChat!"}</p>
+              </div>
+              <div className="col-sm-4 d-flex align-items-center justify-content-end">
+                <button className="btn" onClick={handleOpenFriendsModal}>
+                  <i class="bi bi-people-fill" style={{ fontSize: 25, color: '#fff' }}></i>
+                </button>
               </div>
             </div>
 
@@ -559,6 +585,87 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           </div>
         </div>
       )}
+
+      {modalListFriends && (
+        <div className="modal show d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg" role="document">
+            <div className="modal-content p-0">
+              <div className="modal-header">
+                <h5 className="modal-title">Tạo Nhóm</h5>
+                <button type="button" className="btn-close" onClick={() => setModalListFriends(false)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="p-1 mb-2">
+                  <p>Thành viên hiện tại</p>
+                  <ul className="list-group">
+                    <li key={user.phoneNumber} className="list-group-item d-flex align-items-center li-mem-group">
+                      <img
+                        src={user.avatar}
+                        alt="avatar"
+                        className="rounded-circle me-2"
+                        style={{ width: 40, height: 40, objectFit: "cover" }}
+                      />
+                      <span>{user.fullName}</span>
+                    </li>
+                    <li key={userChatting[0].phoneNumber} className="list-group-item d-flex align-items-center li-mem-group">
+                      <img
+                        src={userChatting[0].avatar}
+                        alt="avatar"
+                        className="rounded-circle me-2"
+                        style={{ width: 40, height: 40, objectFit: "cover" }}
+                      />
+                      <span>{userChatting[0].fullName}</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {listFriends.length === 0 ? (
+                  <p>Không có bạn bè nào.</p>
+                ) : (
+                  <ul className="list-group">
+                    <p>Những người bạn có thể thêm vào nhóm</p>
+                    {listFriends
+                      .filter(
+                        (friend) =>
+                          friend.phoneNumber !== userChatting[0]?.phoneNumber
+                      )
+                      .map((friend) => (
+                        <li
+                          key={friend.phoneNumber}
+                          className="list-group-item d-flex justify-content-between align-items-center li-mem-group"
+                          style={{
+                            padding: "10px 15px",
+                            borderRadius: "8px",
+                            marginBottom: "8px",
+                            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+                            transition: "background-color 0.3s",
+                          }}
+                        >
+                          <div className="d-flex align-items-center">
+                            <img
+                              src={friend.avatar}
+                              alt="avatar"
+                              className="rounded-circle"
+                              style={{ width: 45, height: 45, objectFit: "cover", marginRight: 12 }}
+                            />
+                            <span style={{ fontWeight: 500 }}>{friend.fullName}</span>
+                          </div>
+                          <input type="checkbox" style={{ transform: "scale(1.2)" }} value={friend.phoneNumber}
+                            onChange={() => handleTogglePhoneNumber(friend.phoneNumber)}
+                            checked={listAddtoGroup.includes(friend.phoneNumber)}
+                          />
+                        </li>
+
+                      ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </>
   );
 }

@@ -459,7 +459,7 @@ useEffect(() => {
       }
     } catch (e) {}
 
-    if (lastMessage.endsWith(".webm")) {
+    if (lastMessage.endsWith(".mp3")) {
       return "Tin nhắn thoại";
     }
 
