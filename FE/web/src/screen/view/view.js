@@ -35,39 +35,39 @@ function View({ setIsLoggedIn }) {
 
   const renderView = () => {
     switch (currentView) {
-        case "chat":
-            return (
-                <Chat
-                    setCurrentView={setCurrentView}
-                    chatRoom={chatRoom || {}}
-                    userChatting={userChatting || []}
-                    user={userInfo || {}}
-                    updateLastMessage={updateLastMessage}
-                />
-            );
-        case "setting":
-            return (
-                <Setting
-                    setCurrentView={setCurrentView}
-                    setIsLoggedIn={setIsLoggedIn}
-                />
-            );
-        case "cloud":
-            return <Cloud setCurrentView={setCurrentView} />;
-        case "contacts":
-            return (
-                <Contacts
-                    setCurrentView={setCurrentView}
-                    friendRequests={friendRequests} // Truyền danh sách lời mời kết bạn
-                    friends={friends} // Truyền danh sách bạn bè
-                    handleAcceptFriendRequest={handleAcceptFriendRequest} // Truyền hàm chấp nhận
-                    handleRejectFriendRequest={handleRejectFriendRequest} // Truyền hàm từ chối
-                />
-            );
-        default:
-            return <Chat setCurrentView={setCurrentView} />;
+      case "chat":
+        return (
+          <Chat
+            setCurrentView={setCurrentView}
+            chatRoom={chatRoom || {}}
+            userChatting={userChatting || []}
+            user={userInfo || {}}
+            updateLastMessage={updateLastMessage}
+          />
+        );
+      case "setting":
+        return (
+          <Setting
+            setCurrentView={setCurrentView}
+            setIsLoggedIn={setIsLoggedIn}
+          />
+        );
+      case "cloud":
+        return <Cloud setCurrentView={setCurrentView} />;
+      case "contacts":
+        return (
+          <Contacts
+            setCurrentView={setCurrentView}
+            friendRequests={friendRequests} // Truyền danh sách lời mời kết bạn
+            friends={friends} // Truyền danh sách bạn bè
+            handleAcceptFriendRequest={handleAcceptFriendRequest} // Truyền hàm chấp nhận
+            handleRejectFriendRequest={handleRejectFriendRequest} // Truyền hàm từ chối
+          />
+        );
+      default:
+        return <Chat setCurrentView={setCurrentView} />;
     }
-};
+  };
 
   const [currentDate] = useState({
     year: new Date().getFullYear(),
@@ -105,61 +105,37 @@ function View({ setIsLoggedIn }) {
   const fetchFriendRequests = useCallback(async () => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
-        toast.error("Vui lòng đăng nhập!");
-        return;
+      toast.error("Vui lòng đăng nhập!");
+      return;
     }
 
     try {
-        const response = await fetch("http://localhost:3824/user/friendRequests", {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
-
-        if (!response.ok) throw new Error("Lỗi khi lấy danh sách lời mời kết bạn!");
-
-        const data = await response.json();
-
-        // Kiểm tra nếu có lời mời mới
-        if (data.length > friendRequests.length) {
-            setHasNewFriendRequest(true);
-        }
-
-        setFriendRequests(data);
-    } catch (error) {
-        console.error("Lỗi khi lấy danh sách lời mời kết bạn:", error);
-        toast.error("Không thể lấy danh sách lời mời kết bạn!");
-    }
-}, [friendRequests.length]); // Thêm dependency nếu cần
-
-const fetchFriends = useCallback(async () => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) {
-      toast.error("Vui lòng đăng nhập!");
-      return;
-  }
-
-  try {
-      const response = await fetch("http://localhost:3824/user/friends", {
-          method: "GET",
-          headers: {
-              Authorization: `Bearer ${token}`,
-          },
+      const response = await fetch("http://localhost:3824/user/friendRequests", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
-      if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
+      if (!response.ok) throw new Error("Lỗi khi lấy danh sách lời mời kết bạn!");
 
       const data = await response.json();
-      setFriends(data);
-  } catch (error) {
-      
-  }
-}, []);
 
-useEffect(() => {
+      // Kiểm tra nếu có lời mời mới
+      if (data.length > friendRequests.length) {
+        setHasNewFriendRequest(true);
+      }
+
+      setFriendRequests(data);
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách lời mời kết bạn:", error);
+      toast.error("Không thể lấy danh sách lời mời kết bạn!");
+    }
+  }, [friendRequests.length]); // Thêm dependency nếu cần
+
+  useEffect(() => {
     fetchFriendRequests();
-}, [fetchFriendRequests]);
+  }, [fetchFriendRequests]);
 
 useEffect(() => {
   fetchFriends();
@@ -197,23 +173,23 @@ useEffect(() => {
       editData.month = defaultDate.getMonth() + 1;
       editData.day = defaultDate.getDate();
     }
-    
+
     setEditInfo(editData);
     setShowEditModal(true);
   };
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
-    
+
     setEditInfo((prev) => {
       const newInfo = { ...prev };
-      
+
       if (name === "year" || name === "month" || name === "day") {
         newInfo[name] = parseInt(value, 10);
       } else {
         newInfo[name] = value;
       }
-      
+
       // Kiểm tra ngày tháng để ngăn ngày tương lai
       if (name === "year" || name === "month") {
         // Nếu năm là năm hiện tại, kiểm tra tháng
@@ -223,7 +199,7 @@ useEffect(() => {
             newInfo.month = currentDate.month;
           }
         }
-        
+
         //kiểm tra xem ngày hiện tại có hợp lệ cho tháng,năm mới kh
         if (newInfo.year && newInfo.month && newInfo.day) {
           const daysInMonth = getDaysInMonth(newInfo.year, newInfo.month);
@@ -232,7 +208,7 @@ useEffect(() => {
           }
         }
       }
-      
+
       if (name === "day") {
         if (newInfo.year === currentDate.year && newInfo.month === currentDate.month) {
           //nếu ngày lớn hơn ngày hiện tại, đặt lại thành ngày hiện tại
@@ -241,7 +217,7 @@ useEffect(() => {
           }
         }
       }
-      
+
       return newInfo;
     });
   };
@@ -349,34 +325,34 @@ useEffect(() => {
     e.preventDefault();
 
     if (!keyWord.trim()) {
-        toast.warning("Vui lòng nhập từ khóa tìm kiếm.");
-        return;
+      toast.warning("Vui lòng nhập từ khóa tìm kiếm.");
+      return;
     }
 
     try {
-        const result = await getUserbySearch(keyWord, keyWord);
+      const result = await getUserbySearch(keyWord, keyWord);
 
-        if (!result || result.length === 0) {
-            toast.warning("Không tìm thấy user!");
-            setUserSearch([]);
-        } else {
-            // Lọc bỏ chính số điện thoại của người dùng
-            const filteredResult = result.filter(
-                (user) => user.phoneNumber !== userInfo.phoneNumber
-            );
+      if (!result || result.length === 0) {
+        toast.warning("Không tìm thấy user!");
+        setUserSearch([]);
+      } else {
+        // Lọc bỏ chính số điện thoại của người dùng
+        const filteredResult = result.filter(
+          (user) => user.phoneNumber !== userInfo.phoneNumber
+        );
 
-            if (filteredResult.length === 0) {
-                toast.warning("Không tìm thấy user phù hợp!");
-            }
-
-            setUserSearch(filteredResult);
-            setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
+        if (filteredResult.length === 0) {
+          toast.warning("Không tìm thấy user phù hợp!");
         }
+
+        setUserSearch(filteredResult);
+        setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
+      }
     } catch (error) {
-        console.error("Lỗi khi gọi API:", error);
-        toast.warning("Lỗi khi tìm kiếm user!");
+      console.error("Lỗi khi gọi API:", error);
+      toast.warning("Lỗi khi tìm kiếm user!");
     }
-};
+  };
 
   const [userChatList, setUserChatList] = useState([]);
 
@@ -393,6 +369,21 @@ useEffect(() => {
 
       const userData = await Promise.all(
         data.map(async (convo) => {
+          // Trường hợp nhóm
+          if (convo.isGroup) {
+            return {
+              name: convo.nameGroup,
+              avatar: convo.avatar,
+              isUnreadBy:
+                Array.isArray(convo.isUnreadBy) &&
+                convo.isUnreadBy.includes(myPhone),
+              lastMessage: convo.lastMessage,
+              isGroup: true,
+              chatRoomId: convo.chatRoomId,
+            };
+          }
+
+          // Trường hợp chat đơn
           const partnerPhone = convo.participants.find((p) => p !== myPhone);
 
           if (!partnerPhone) return null;
@@ -402,12 +393,14 @@ useEffect(() => {
 
           return user
             ? {
-                ...user,
-                lastMessage: convo.lastMessage,
-                isUnreadBy:
-                  Array.isArray(convo.isUnreadBy) &&
-                  convo.isUnreadBy.includes(myPhone),
-              }
+              ...user,
+              lastMessage: convo.lastMessage,
+              isUnreadBy:
+                Array.isArray(convo.isUnreadBy) &&
+                convo.isUnreadBy.includes(myPhone),
+              isGroup: false,
+              chatRoomId: convo.chatRoomId,
+            }
             : null;
         })
       );
@@ -419,6 +412,7 @@ useEffect(() => {
       isMounted = false;
     };
   }, [userInfo?.phoneNumber]);
+
 
   const check = async (phone1, phone2) => {
     const chatting = await getUserbySearch(phone2, phone2);
@@ -457,7 +451,7 @@ useEffect(() => {
       if (parsed.name && parsed.url && parsed.size && parsed.type) {
         return "Vừa gửi một file";
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (lastMessage.endsWith(".mp3")) {
       return "Tin nhắn thoại";
@@ -493,19 +487,19 @@ useEffect(() => {
 
           return user
             ? {
-                ...user,
-                lastMessage: convo.lastMessage,
-                isUnreadBy:
-                  Array.isArray(convo.isUnreadBy) &&
-                  convo.isUnreadBy.includes(myPhone),
-              }
+              ...user,
+              lastMessage: convo.lastMessage,
+              isUnreadBy:
+                Array.isArray(convo.isUnreadBy) &&
+                convo.isUnreadBy.includes(myPhone),
+            }
             : null;
         })
       );
 
       setUserChatList(updatedUserData.filter((user) => user !== null));
     } catch (error) {
-      console.error("❌ Lỗi khi cập nhật trạng thái đọc:", error);
+      console.error("Lỗi khi cập nhật trạng thái đọc:", error);
     }
   };
 
@@ -606,7 +600,7 @@ useEffect(() => {
         toast.error("Vui lòng đăng nhập để gửi yêu cầu kết bạn!");
         return;
       }
-  
+
       const response = await fetch("http://localhost:3824/user/sendFriendRequest", {
         method: "POST",
         headers: {
@@ -615,9 +609,9 @@ useEffect(() => {
         },
         body: JSON.stringify({ receiverPhone }),
       });
-  
+
       if (!response.ok) throw new Error("Gửi yêu cầu kết bạn thất bại!");
-  
+
       toast.success("Gửi yêu cầu kết bạn thành công!");
     } catch (error) {
       console.error("Lỗi gửi yêu cầu kết bạn:", error);
@@ -628,55 +622,56 @@ useEffect(() => {
   const handleAcceptFriendRequest = async (requestId) => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
-        toast.error("Vui lòng đăng nhập!");
-        return;
+      toast.error("Vui lòng đăng nhập!");
+      return;
     }
 
     try {
-        const response = await fetch("http://localhost:3824/user/acceptFriendRequest", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ requestId }),
-        });
+      const response = await fetch("http://localhost:3824/user/acceptFriendRequest", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ requestId }),
+      });
 
-        if (!response.ok) throw new Error("Chấp nhận lời mời kết bạn thất bại!");
+      if (!response.ok) throw new Error("Chấp nhận lời mời kết bạn thất bại!");
 
-        toast.success("Đã chấp nhận lời mời kết bạn!");
-        fetchFriendRequests(); // Cập nhật lại danh sách lời mời
+      toast.success("Đã chấp nhận lời mời kết bạn!");
+      fetchFriendRequests(); // Cập nhật lại danh sách lời mời
     } catch (error) {
-        console.error("Lỗi khi chấp nhận lời mời kết bạn:", error);
-        toast.error("Không thể chấp nhận lời mời kết bạn!");
+      console.error("Lỗi khi chấp nhận lời mời kết bạn:", error);
+      toast.error("Không thể chấp nhận lời mời kết bạn!");
     }
-};
+  };
 
-
-const handleRejectFriendRequest = async (requestId) => {
+  const handleRejectFriendRequest = async (requestId) => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
-        toast.error("Vui lòng đăng nhập!");
-        return;
+      toast.error("Vui lòng đăng nhập!");
+      return;
     }
 
     try {
-        const response = await fetch("http://localhost:3824/user/rejectFriendRequest", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ requestId }),
-        });
+      const response = await fetch("http://localhost:3824/user/rejectFriendRequest", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ requestId }),
+      });
 
-        if (!response.ok) throw new Error("Từ chối lời mời kết bạn thất bại!");
-        toast.success("Đã từ chối lời mời kết bạn!");
+      if (!response.ok) throw new Error("Từ chối lời mời kết bạn thất bại!");
+
+      toast.success("Đã từ chối lời mời kết bạn!");
+      fetchFriendRequests(); // Cập nhật lại danh sách lời mời
     } catch (error) {
-        console.error("Lỗi khi từ chối lời mời kết bạn:", error);
-        toast.error("Không thể từ chối lời mời kết bạn!");
+      console.error("Lỗi khi từ chối lời mời kết bạn:", error);
+      toast.error("Không thể từ chối lời mời kết bạn!");
     }
-};
+  };
 
   return (
     <div className="wrapper">
@@ -700,69 +695,69 @@ const handleRejectFriendRequest = async (requestId) => {
             <div className="search_theme" ref={searchRef}>
               <ul className="m-0 p-0" style={{ flex: 1 }}>
                 {userSearch.map((user, index) => {
-    const isFriend = friends.some((friend) => friend.phoneNumber === user.phoneNumber);
+                  const isFriend = friends.some((friend) => friend.phoneNumber === user.phoneNumber);
 
-    return (
-        <li
-            key={user.id || user.phoneNumber || index}
-            style={{
-                listStyleType: "none",
-                width: "100%",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                padding: "10px",
-                borderRadius: "8px",
-                transition: "background 0.2s ease-in-out",
-                justifyContent: "space-between", // Thêm để căn nút sang phải
-            }}
-            onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#222")
-            }
-            onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "transparent")
-            }
-        >
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                }}
-                onClick={() =>
-                    handleUserClick(userInfo.phoneNumber, user.phoneNumber)
-                }
-            >
-                <img
-                    className="user-avt"
-                    src={user?.avatar}
-                    alt="Avatar"
-                    style={{
-                        width: "40px",
-                        height: "40px",
-                        borderRadius: "50%",
-                    }}
-                />
-                <span
-                    className="mx-4"
-                    style={{ fontSize: "16px", fontWeight: "500" }}
-                >
-                    {user.fullName}
-                </span>
-            </div>
-            {!isFriend && ( // Chỉ hiển thị nút "Thêm bạn" nếu chưa kết bạn
-                <button
-                    className="btn btn-primary btn-sm"
-                    onClick={(e) => {
-                        e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
-                        handleSendFriendRequest(user.phoneNumber);
-                    }}
-                >
-                    Thêm bạn
-                </button>
-            )}
-        </li>
-    );
-})}
+                  return (
+                    <li
+                      key={user.id || user.phoneNumber || index}
+                      style={{
+                        listStyleType: "none",
+                        width: "100%",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        transition: "background 0.2s ease-in-out",
+                        justifyContent: "space-between", // Thêm để căn nút sang phải
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = "#222")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "transparent")
+                      }
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                        onClick={() =>
+                          handleUserClick(userInfo.phoneNumber, user.phoneNumber)
+                        }
+                      >
+                        <img
+                          className="user-avt"
+                          src={user?.avatar}
+                          alt="Avatar"
+                          style={{
+                            width: "40px",
+                            height: "40px",
+                            borderRadius: "50%",
+                          }}
+                        />
+                        <span
+                          className="mx-4"
+                          style={{ fontSize: "16px", fontWeight: "500" }}
+                        >
+                          {user.fullName}
+                        </span>
+                      </div>
+                      {!isFriend && ( // Chỉ hiển thị nút "Thêm bạn" nếu chưa kết bạn
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
+                            handleSendFriendRequest(user.phoneNumber);
+                          }}
+                        >
+                          Thêm bạn
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -782,7 +777,7 @@ const handleRejectFriendRequest = async (requestId) => {
               >
                 <img className="user-avt" src={user.avatar} alt="User" />
                 <div>
-                  <strong>{user.fullName || "Chưa Cập Nhật"}</strong>
+                  <strong>{user.fullName || "Chưa cập nhật"}</strong>
                   <br />
                   <small className={user.isUnreadBy ? "bold-message" : ""}>
                     {renderLastMessage(user.lastMessage)}
@@ -829,31 +824,31 @@ const handleRejectFriendRequest = async (requestId) => {
             )}
           </div>
           <button
-    className={`sidebar-bottom-btn btn ${hasNewFriendRequest ? "active" : ""}`}
-    onClick={() => {
-        setCurrentView("contacts");
-        setHasNewFriendRequest(false); // Xóa trạng thái lời mời mới khi người dùng vào trang "Contacts"
-    }}
-    style={{ position: "relative" }}
->
-    <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i>
-    {hasNewFriendRequest && (
-        <span
-            style={{
-                position: "absolute",
-                top: "5px",
-                right: "5px",
-                backgroundColor: "red",
-                color: "white",
-                borderRadius: "50%",
-                padding: "2px 6px",
-                fontSize: "12px",
+            className={`sidebar-bottom-btn btn ${hasNewFriendRequest ? "active" : ""}`}
+            onClick={() => {
+              setCurrentView("contacts");
+              setHasNewFriendRequest(false);
             }}
-        >
-            !
-        </span>
-    )}
-</button>
+            style={{ position: "relative" }}
+          >
+            <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i>
+            {hasNewFriendRequest && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "5px",
+                  right: "5px",
+                  backgroundColor: "red",
+                  color: "white",
+                  borderRadius: "50%",
+                  padding: "2px 6px",
+                  fontSize: "12px",
+                }}
+              >
+                !
+              </span>
+            )}
+          </button>
           {/* <button
             className="sidebar-bottom-btn btn"
             onClick={() => setCurrentView("cloud")}
@@ -959,8 +954,8 @@ const handleRejectFriendRequest = async (requestId) => {
                       {userInfo?.gender === "Male"
                         ? "Nam"
                         : userInfo?.gender === "Female"
-                        ? "Nữ"
-                        : "Chưa cập nhật"}
+                          ? "Nữ"
+                          : "Chưa cập nhật"}
                     </strong>
                   </p>
                   <p>
@@ -1022,34 +1017,34 @@ const handleRejectFriendRequest = async (requestId) => {
                   <div className="mb-3">
                     <label className="form-label">Giới tính</label>
                     <div>
-                    <div className="form-check form-check-inline">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        name="gender"
-                        id="genderMale"
-                        value="Male"
-                        checked={editInfo?.gender === "Male"}
-                        onChange={handleEditChange}
-                      />
-                      <label className="form-check-label" htmlFor="genderMale">
-                        Nam
-                      </label>
-                    </div>
-                    <div className="form-check form-check-inline">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        name="gender"
-                        id="genderFemale"
-                        value="Female"
-                        checked={editInfo?.gender === "Female"}
-                        onChange={handleEditChange}
-                      />
-                      <label className="form-check-label" htmlFor="genderFemale">
-                        Nữ
-                      </label>
-                    </div>
+                      <div className="form-check form-check-inline">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="gender"
+                          id="genderMale"
+                          value="Male"
+                          checked={editInfo?.gender === "Male"}
+                          onChange={handleEditChange}
+                        />
+                        <label className="form-check-label" htmlFor="genderMale">
+                          Nam
+                        </label>
+                      </div>
+                      <div className="form-check form-check-inline">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="gender"
+                          id="genderFemale"
+                          value="Female"
+                          checked={editInfo?.gender === "Female"}
+                          onChange={handleEditChange}
+                        />
+                        <label className="form-check-label" htmlFor="genderFemale">
+                          Nữ
+                        </label>
+                      </div>
                     </div>
                   </div>
                   <div className="mb-3">
@@ -1062,12 +1057,12 @@ const handleRejectFriendRequest = async (requestId) => {
                         onChange={handleEditChange}
                       >
                         <option value="" disabled>Ngày</option>
-                        {editInfo.year && editInfo.month ? 
+                        {editInfo.year && editInfo.month ?
                           Array.from({ length: getDaysInMonth(editInfo.year, editInfo.month) }, (_, i) => {
                             const day = i + 1;
-                            const isDisabled = editInfo.year === currentDate.year && 
-                                              editInfo.month === currentDate.month && 
-                                              day > currentDate.day;
+                            const isDisabled = editInfo.year === currentDate.year &&
+                              editInfo.month === currentDate.month &&
+                              day > currentDate.day;
                             return (
                               <option key={day} value={day} disabled={isDisabled}>
                                 {day}
@@ -1078,9 +1073,9 @@ const handleRejectFriendRequest = async (requestId) => {
                           // Mặc định hiển thị 31 ngày nếu chưa chọn tháng hoặc năm
                           Array.from({ length: 31 }, (_, i) => {
                             const day = i + 1;
-                            const isDisabled = editInfo.year === currentDate.year && 
-                                              editInfo.month === currentDate.month && 
-                                              day > currentDate.day;
+                            const isDisabled = editInfo.year === currentDate.year &&
+                              editInfo.month === currentDate.month &&
+                              day > currentDate.day;
                             return (
                               <option key={day} value={day} disabled={isDisabled}>
                                 {day}

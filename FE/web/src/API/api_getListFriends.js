@@ -17,7 +17,6 @@ const fetchFriends = async () => {
         }
 
         const friends = await response.json();
-        console.log("Danh sách bạn bè:", friends);
         return friends;
     } catch (error) {
         console.error("Lỗi fetch:", error);

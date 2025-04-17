@@ -9,6 +9,7 @@ import { playNotificationSound } from "../../utils/sound.js";
 import { toast } from "react-toastify";
 import getUserbySearch from "../../API/api_searchUSer";
 import fetchFriends from "../../API/api_getListFriends";
+import createChatRoom from "../../API/api_createChatRoomforGroup"
 
 const socket = io("http://localhost:3618");
 const notificationSocket = io("http://localhost:3515");
@@ -23,8 +24,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
   const [listAddtoGroup, setListAddtoGroup] = useState([])
-  console.log("list add to gr ", listAddtoGroup)
-
+  const [nameGroup, setNameGroup] = useState("")
   // Trạng thái cho modal xem ảnh
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImage, setCurrentImage] = useState({
@@ -446,12 +446,47 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         ? withoutRemoved
         : [...prev, phoneNumber];
 
-      // Đảm bảo always có user + userChatting
       const finalList = Array.from(new Set([...newList, ...mustHave]));
       return finalList;
     });
   };
 
+  const handleCreateGroup = async () => {
+    console.log("Group Name: ", nameGroup);
+    console.log("List Member: ", listAddtoGroup);
+
+    const nameGroupRegex = /^(?! )[A-Za-zÀ-ỹ0-9 ]{3,50}$/;
+
+    if (!nameGroup.trim()) {
+      toast.error("Tên nhóm không được để trống.");
+      return;
+    }
+
+    if (!nameGroupRegex.test(nameGroup)) {
+      toast.error("Tên nhóm không hợp lệ. Không được bắt đầu bằng dấu cách và chỉ chứa chữ, số, khoảng trắng (3-50 ký tự).");
+      return;
+    }
+
+    if (listAddtoGroup.length < 2) {
+      toast.error("Một nhóm phải có ít nhất ba thành viên.");
+      return;
+    }
+
+    const createdBy = user.phoneNumber;
+    const participants = [...listAddtoGroup];
+
+    try {
+      const res = await createChatRoom({ nameGroup, createdBy, participants });
+      toast.success("Tạo nhóm thành công!");
+      console.log("Tạo nhóm thành công:", res);
+      setNameGroup("");
+      setListAddtoGroup([]);
+      setModalListFriends(false);
+    } catch (err) {
+      console.error("Lỗi khi tạo nhóm:", err);
+      toast.error(err.message || "Tạo nhóm thất bại!");
+    }
+  };
 
 
   return (
@@ -669,83 +704,125 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       )}
 
       {modalListFriends && (
-        <div className="modal show d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
           <div className="modal-dialog modal-dialog-centered modal-lg" role="document">
             <div className="modal-content p-0">
-              <div className="modal-header">
+              <div className="modal-header d-flex justify-content-between align-items-center">
                 <h5 className="modal-title">Tạo Nhóm</h5>
-                <button type="button" className="btn-close" onClick={() => setModalListFriends(false)}></button>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setModalListFriends(false)}
+                ></button>
               </div>
+
               <div className="modal-body">
-                <div className="p-1 mb-2">
-                  <p>Thành viên hiện tại</p>
+                {/* Input tên nhóm */}
+                <div className="mb-3">
+                  <label className="form-label fw-bold">Tên nhóm</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Nhập tên nhóm..."
+                    value={nameGroup}
+                    onChange={(e) => setNameGroup(e.target.value)}
+                  />
+                </div>
+
+                {/* Thành viên mặc định */}
+                <div className="mb-3">
+                  <p className="fw-bold">Thành viên hiện tại</p>
                   <ul className="list-group">
-                    <li key={user.phoneNumber} className="list-group-item d-flex align-items-center li-mem-group">
-                      <img
-                        src={user.avatar}
-                        alt="avatar"
-                        className="rounded-circle me-2"
-                        style={{ width: 40, height: 40, objectFit: "cover" }}
-                      />
-                      <span>{user.fullName}</span>
-                    </li>
-                    <li key={userChatting[0].phoneNumber} className="list-group-item d-flex align-items-center li-mem-group">
-                      <img
-                        src={userChatting[0].avatar}
-                        alt="avatar"
-                        className="rounded-circle me-2"
-                        style={{ width: 40, height: 40, objectFit: "cover" }}
-                      />
-                      <span>{userChatting[0].fullName}</span>
-                    </li>
+                    {[user, userChatting[0]].map((member) => (
+                      <li
+                        key={member.phoneNumber}
+                        className="list-group-item d-flex align-items-center li-mem-group"
+                      >
+                        <img
+                          src={member.avatar}
+                          alt="avatar"
+                          className="rounded-circle me-2"
+                          style={{
+                            width: 40,
+                            height: 40,
+                            objectFit: "cover",
+                          }}
+                        />
+                        <span>{member.fullName}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
+                {/* Danh sách bạn bè có thể thêm */}
                 {listFriends.length === 0 ? (
-                  <p>Không có bạn bè nào.</p>
+                  <p className="text-muted">Không có bạn bè nào.</p>
                 ) : (
-                  <ul className="list-group">
-                    <p>Những người bạn có thể thêm vào nhóm</p>
-                    {listFriends
-                      .filter(
-                        (friend) =>
-                          friend.phoneNumber !== userChatting[0]?.phoneNumber
-                      )
-                      .map((friend) => (
-                        <li
-                          key={friend.phoneNumber}
-                          className="list-group-item d-flex justify-content-between align-items-center li-mem-group"
-                          style={{
-                            padding: "10px 15px",
-                            borderRadius: "8px",
-                            marginBottom: "8px",
-                            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-                            transition: "background-color 0.3s",
-                          }}
-                        >
-                          <div className="d-flex align-items-center">
-                            <img
-                              src={friend.avatar}
-                              alt="avatar"
-                              className="rounded-circle"
-                              style={{ width: 45, height: 45, objectFit: "cover", marginRight: 12 }}
+                  <div>
+                    <p className="fw-bold">Những người bạn có thể thêm vào nhóm</p>
+                    <ul className="list-group">
+                      {listFriends
+                        .filter(
+                          (friend) =>
+                            friend.phoneNumber !== userChatting[0]?.phoneNumber
+                        )
+                        .map((friend) => (
+                          <li
+                            key={friend.phoneNumber}
+                            className="list-group-item d-flex justify-content-between align-items-center li-mem-group"
+                            style={{
+                              padding: "10px 15px",
+                              borderRadius: "8px",
+                              marginBottom: "8px",
+                              boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+                              transition: "background-color 0.3s",
+                            }}
+                          >
+                            <div className="d-flex align-items-center">
+                              <img
+                                src={friend.avatar}
+                                alt="avatar"
+                                className="rounded-circle"
+                                style={{
+                                  width: 45,
+                                  height: 45,
+                                  objectFit: "cover",
+                                  marginRight: 12,
+                                }}
+                              />
+                              <span style={{ fontWeight: 500 }}>{friend.fullName}</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              style={{ transform: "scale(1.2)" }}
+                              value={friend.phoneNumber}
+                              onChange={() =>
+                                handleTogglePhoneNumber(friend.phoneNumber)
+                              }
+                              checked={listAddtoGroup.includes(friend.phoneNumber)}
                             />
-                            <span style={{ fontWeight: 500 }}>{friend.fullName}</span>
-                          </div>
-                          <input type="checkbox" style={{ transform: "scale(1.2)" }} value={friend.phoneNumber}
-                            onChange={() => handleTogglePhoneNumber(friend.phoneNumber)}
-                            checked={listAddtoGroup.includes(friend.phoneNumber)}
-                          />
-                        </li>
-
-                      ))}
-                  </ul>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
                 )}
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn btn-primary w-100" onClick={handleCreateGroup}>
+                  Tạo nhóm
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
 
 
     </>
