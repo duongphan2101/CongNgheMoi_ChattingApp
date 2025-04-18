@@ -45,7 +45,7 @@ const upload = multer({
             cb(new Error('Định dạng file không được hỗ trợ.'));
         }
     }
-});
+}).array('files', 10);
 
 module.exports = (io, redisPublisher) => {
     // Middleware xử lý lỗi multer
@@ -74,83 +74,99 @@ module.exports = (io, redisPublisher) => {
     };
 
     // Route upload file
-    router.post("/uploadFile", upload.single("file"), handleMulterError, async (req, res) => {
+    router.post("/uploadFile", upload, handleMulterError, async (req, res) => {
         try {
             console.log("Nhận yêu cầu tải file lên");
-
-            if (!req.file) {
+    
+            if (!req.files || req.files.length === 0) {
                 return res.status(400).json({ error: "Không có file nào được tải lên!" });
             }
-
+    
             const { chatRoomId, sender, receiver } = req.body;
-
+    
             if (!chatRoomId || !sender || !receiver) {
                 return res.status(400).json({
                     error: "Thiếu thông tin bắt buộc!",
                     fields: { chatRoomId, sender, receiver }
                 });
             }
-
-            console.log("Tải file lên thành công:", {
-                location: req.file.location,
-                size: req.file.size,
-                mimetype: req.file.mimetype
-            });
-
-            const fileInfo = {
-                name: req.file.originalname,
-                url: req.file.location,
-                size: req.file.size,
-                type: req.file.mimetype
-            };
-
-            const newMessage = new Message(
-                chatRoomId,
-                sender,
-                receiver,
-                JSON.stringify(fileInfo),
-                "file"
-            );
-
-            const params = {
-                TableName: TABLE_NAME,
-                Item: newMessage,
-            };
-
-            await dynamoDB.put(params).promise();
+    
+            console.log(`Tải ${req.files.length} file lên thành công`);
+    
+            const uploadedMessages = [];
             const chatId = [sender, receiver].sort().join("_");
-
+    
             // Lấy thông tin participants từ bảng Conversations
             const getConversationParams = {
                 TableName: TABLE_CONVERSATION_NAME,
                 Key: { chatId },
             };
-
+    
             const conversationData = await dynamoDB.get(getConversationParams).promise();
-
+    
             if (!conversationData.Item || !conversationData.Item.participants) {
                 return res
                     .status(404)
                     .json({ error: "Không tìm thấy cuộc trò chuyện!" });
             }
-
+    
             const participants = conversationData.Item.participants;
-            const unreadFor = participants.filter((p) => p !== sender); // Loại sender ra khỏi danh sách unread
-
-            // Lấy danh sách hiện tại từ conversation
+            const unreadFor = participants.filter((p) => p !== sender);
             const currentUnreadList = conversationData.Item.isUnreadBy || [];
-
-            // Thêm các phần tử mới vào danh sách, đảm bảo không trùng lặp
             const updatedUnreadList = Array.from(new Set([...currentUnreadList, ...unreadFor]));
-
-            // Cập nhật bảng Conversation
+    
+            // Xử lý từng file và tạo tin nhắn cho mỗi file
+            for (const file of req.files) {
+                const fileInfo = {
+                    name: file.originalname,
+                    url: file.location,
+                    size: file.size,
+                    type: file.mimetype
+                };
+    
+                const newMessage = new Message(
+                    chatRoomId,
+                    sender,
+                    receiver,
+                    JSON.stringify(fileInfo),
+                    "file"
+                );
+    
+                const params = {
+                    TableName: TABLE_NAME,
+                    Item: newMessage,
+                };
+    
+                await dynamoDB.put(params).promise();
+                uploadedMessages.push(newMessage);
+                
+                // Emit mỗi tin nhắn qua socket
+                io.to(chatRoomId).emit("receiveMessage", newMessage);
+                
+                // Publish thông báo cho mỗi file
+                const notifyPayload = JSON.stringify({
+                    type: "file",
+                    to: receiver,
+                    from: sender,
+                    newMessage,
+                    timestamp: newMessage.timestamp,
+                });
+    
+                redisPublisher.publish("notifications", notifyPayload);
+            }
+    
+            // Cập nhật cuộc trò chuyện với tin nhắn cuối
+            const fileCountText = req.files.length > 1 
+                ? `Đã gửi ${req.files.length} file` 
+                : "Vừa nhận được file";
+                
             const updateParams = {
                 TableName: TABLE_CONVERSATION_NAME,
                 Key: { chatId },
                 UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnreadBy = :updatedUnreadList",
                 ExpressionAttributeValues: {
-                    ":lastMessage": "Vừa nhận được file",
-                    ":lastMessageAt": new Date(newMessage.timestamp).toLocaleDateString(
+                    ":lastMessage": fileCountText,
+                    ":lastMessageAt": new Date().toLocaleDateString(
                         "vi-VN",
                         {
                             year: "numeric",
@@ -165,26 +181,13 @@ module.exports = (io, redisPublisher) => {
                 },
                 ReturnValues: "UPDATED_NEW",
             };
-
+    
             await dynamoDB.update(updateParams).promise();
-            console.log("✅ Lưu tin nhắn file vào DB:", newMessage);
-            io.to(chatRoomId).emit("receiveMessage", newMessage);
-
-            // Publish notify to Redis (đẩy qua channel 'notifications')
-            const notifyPayload = JSON.stringify({
-                type: "file",
-                to: receiver,
-                from: sender,
-                newMessage,
-                timestamp: newMessage.timestamp,
-            });
-
-            redisPublisher.publish("notifications", notifyPayload);
-            console.log("Đã publish thông báo:", notifyPayload);
-
+            console.log(`✅ Lưu ${req.files.length} tin nhắn file vào DB`);
+    
             res.status(201).json({
-                message: "Tải file lên thành công!",
-                data: newMessage
+                message: `Tải ${req.files.length} file lên thành công!`,
+                data: uploadedMessages
             });
         } catch (error) {
             console.error("❌ Lỗi khi lưu tin nhắn file:", error);
@@ -193,7 +196,7 @@ module.exports = (io, redisPublisher) => {
                 details: error.message
             });
         }
-    });
+    });    
 
     return router;
 };

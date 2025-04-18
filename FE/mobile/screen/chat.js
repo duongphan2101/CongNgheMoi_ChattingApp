@@ -5,6 +5,8 @@ import colors from "../themeColors";
 import getConversations from "../api/api_getConversation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import getUserbySearch from "../api/api_searchUSer";
+import io from "socket.io-client";
+import getIp from "../utils/getIp_notPORT";
 
 export default function App({ navigation }) {
   const { theme } = useTheme();
@@ -12,7 +14,64 @@ export default function App({ navigation }) {
   const [conversations, setConversations] = useState([]);
   const [currentUserPhone, setCurrentUserPhone] = useState(null);
   const [usersInfo, setUsersInfo] = useState({}); // lưu user theo số điện thoại
-  const [thisUser, setThisUser] = useState()
+  const [thisUser, setThisUser] = useState();
+  const [socket, setSocket] = useState(null);
+  const BASE_URL = getIp();
+
+  useEffect(() => {
+    const newSocket = io(`http://${BASE_URL}:3618`);
+    setSocket(newSocket);
+
+    newSocket.on("receiveMessage", (newMessage) => {
+      console.log("Nhận tin nhắn mới trong list chat:", newMessage);
+      updateConversationWithNewMessage(newMessage);
+    });
+
+    newSocket.on("messageRevoked", (revokedMessage) => {
+      console.log("Tin nhắn đã bị thu hồi:", revokedMessage);
+      updateConversationWithRevokedMessage(revokedMessage);
+    });
+
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, []);
+
+  const updateConversationWithNewMessage = (newMessage) => {
+    setConversations(prevConversations => {
+      return prevConversations.map(conv => {
+        if (conv.chatRoomId === newMessage.chatRoomId) {
+          return {
+            ...conv,
+            lastMessage: newMessage.type === "text" ? newMessage.message : 
+                        newMessage.type === "audio" ? "[Tin nhắn thoại]" : 
+                        newMessage.type === "file" ? "[File đính kèm]" : "[Tin nhắn]",
+            lastMessageTime: newMessage.timestamp
+          };
+        }
+        return conv;
+      });
+    });
+  };
+
+  const updateConversationWithRevokedMessage = (revokedMessage) => {
+    setConversations(prevConversations => {
+      return prevConversations.map(conv => {
+        // Chỉ cập nhật nếu tin nhắn bị thu hồi là tin nhắn cuối cùng
+        // Để làm điều này cần so sánh timestamp
+        if (conv.chatRoomId === revokedMessage.chatRoomId && 
+            conv.lastMessageTime === revokedMessage.timestamp) {
+          return {
+            ...conv,
+            lastMessage: "[Tin nhắn đã bị thu hồi]"
+          };
+        }
+        return conv;
+      });
+    });
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -28,7 +87,18 @@ export default function App({ navigation }) {
         setCurrentUserPhone(user.phoneNumber);
         const data = await getConversations();
         if (data) {
-          setConversations(data);
+          // Thêm lastMessageTime để có thể so sánh khi tin nhắn bị thu hồi
+          const conversationsWithTime = data.map(conv => ({
+            ...conv,
+            lastMessageTime: conv.lastMessageTime || Date.now()
+          }));
+          setConversations(conversationsWithTime);
+
+          if (socket) {
+            conversationsWithTime.forEach(conv => {
+              socket.emit("joinRoom", conv.chatRoomId);
+            });
+          }
 
           const phonesToFetch = data.map(c => c.participants.find(p => p !== user.phoneNumber));
           const uniquePhones = [...new Set(phonesToFetch)];
@@ -49,7 +119,7 @@ export default function App({ navigation }) {
     };
 
     fetchData();
-  }, []);
+  }, [socket]);
 
   const styles = getStyles(themeColors);
 
@@ -65,6 +135,16 @@ export default function App({ navigation }) {
             );
             const otherUser = usersInfo[otherPhone];
 
+            // Format hiển thị thời gian tin nhắn cuối cùng
+            let lastMessageDisplay = item.lastMessage;
+            
+            // Định dạng thời gian nếu cần
+            // let lastMessageTime = '';
+            // if (item.lastMessageTime) {
+            //   const date = new Date(item.lastMessageTime);
+            //   lastMessageTime = `${date.getHours()}:${date.getMinutes()}`;
+            // }
+
             return (
               <TouchableOpacity
                 style={styles.user}
@@ -78,8 +158,11 @@ export default function App({ navigation }) {
                 />
                 <View style={styles.userInfo}>
                   <Text style={styles.text}>{otherUser?.fullName || 'Đang tải...'}</Text>
-                  <Text style={styles.mess}>{item.lastMessage}</Text>
+                  <Text style={styles.mess} numberOfLines={1} ellipsizeMode="tail">
+                    {lastMessageDisplay}
+                  </Text>
                 </View>
+                {/* <Text style={styles.time}>{lastMessageTime}</Text> */}
               </TouchableOpacity>
             );
           }}
@@ -121,9 +204,16 @@ const getStyles = (themeColors) => StyleSheet.create({
   },
   mess: {
     color: themeColors.text,
+    flex: 1,
   },
   userInfo: {
     justifyContent: 'center',
     flex: 1,
+  },
+  time: {
+    color: themeColors.text,
+    fontSize: 12,
+    alignSelf: 'flex-start',
+    marginTop: 5
   }
 });

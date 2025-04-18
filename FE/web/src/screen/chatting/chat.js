@@ -21,6 +21,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [activeMessageId, setActiveMessageId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const [revokedMessages, setRevokedMessages] = useState([]);
 
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImage, setCurrentImage] = useState({
@@ -38,12 +39,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     setReplyingTo({
       ...msg,
       message:
-      msg.type === "audio"
-        ? "Tin nhắn thoại"
-        : msg.type === "file"
-        ? "File đính kèm"
-        : msg.message,
-  });
+        msg.type === "audio"
+          ? "Tin nhắn thoại"
+          : msg.type === "file"
+          ? "File đính kèm"
+          : msg.message,
+    });
     setActiveMessageId(null);
     setHighlightedMessageId(msg.timestamp);
     const repliedMessageElement = document.getElementById(
@@ -210,11 +211,15 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       .then((res) => res.json())
       .then((data) => {
         setMessages(data);
+        const revoked = data.filter(msg => msg.isRevoked);
+        if (revoked.length > 0) {
+          setRevokedMessages(revoked.map(msg => msg.timestamp));
+        }
       })
       .catch((err) => console.error("Error fetching messages:", err));
-
+  
     socket.emit("joinRoom", chatRoom.chatRoomId);
-
+  
     socket.on("receiveMessage", (newMessage) => {
       setMessages((prev) => {
         if (prev.some((msg) => msg.timestamp === newMessage.timestamp)) {
@@ -222,25 +227,38 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         }
         return [...prev, newMessage];
       });
-
+  
       updateLastMessage(
         newMessage.sender,
         newMessage.receiver,
         newMessage.message
       );
     });
-
+  
     socket.on("userTyping", () => setTyping(true));
     socket.on("userStopTyping", () => setTyping(false));
-    socket.on("messageDeleted", ({ messageId }) => {
-      setMessages((prev) => prev.filter((msg) => msg.timestamp !== messageId));
+    
+    socket.on("messageRevoked", (data) => {
+      setMessages((prev) => 
+        prev.map(msg => 
+          msg.timestamp === data.timestamp ? data : msg
+        )
+      );
+      setRevokedMessages(prev => [...prev, data.timestamp]);
+      if (data.lastMessage) {
+        updateLastMessage(
+          data.sender,
+          data.receiver,
+          data.lastMessage
+        );
+      }
     });
-
+  
     return () => {
       socket.off("receiveMessage");
       socket.off("userTyping");
       socket.off("userStopTyping");
-      socket.off("messageDeleted");
+      socket.off("messageRevoked");
     };
   }, [chatRoom?.chatRoomId, user.phoneNumber, updateLastMessage]);
 
@@ -321,7 +339,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     }
   };
 
-  const handleDeleteMessage = async (messageId) => {
+  const handleRevokeMessage = async (messageId) => {
     try {
       const response = await fetch("http://localhost:3618/deleteMessage", {
         method: "DELETE",
@@ -331,10 +349,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           messageId: messageId,
         }),
       });
-      if (!response.ok) throw new Error("Xóa tin nhắn thất bại!");
+      if (!response.ok) throw new Error("Thu hồi tin nhắn thất bại!");
       setActiveMessageId(null);
     } catch (error) {
-      console.error("Lỗi xóa tin nhắn:", error);
+      console.error("Lỗi thu hồi tin nhắn:", error);
     }
   };
 
@@ -351,28 +369,33 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   };
 
   const handleFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    console.log("Đang tải file lên:", file.name);
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+  
+    console.log(`Đang tải ${files.length} file lên`);
     setUploading(true);
-
+  
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      
+      for (let i = 0; i < files.length; i++) {
+        formData.append("files", files[i]);
+      }
+      
       formData.append("chatRoomId", chatRoom.chatRoomId);
       formData.append("sender", currentUserPhone);
       formData.append("receiver", otherUserPhone);
-
+  
       console.log("ChatRoomId:", chatRoom.chatRoomId);
       console.log("Sender:", currentUserPhone);
       console.log("Receiver:", otherUserPhone);
-
+      console.log(`Số lượng file: ${files.length}`);
+  
       const response = await fetch("http://localhost:3618/uploadFile", {
         method: "POST",
         body: formData,
       });
-
+  
       if (!response.ok) {
         const errorData = await response.json();
         console.error("Lỗi Server:", response.status, errorData);
@@ -382,13 +405,62 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           }`
         );
       }
-
+  
+      const result = await response.json();
+      console.log(`✅ Đã tải lên thành công ${files.length} file:`, result);
+      
       fileInputRef.current.value = null;
     } catch (error) {
-      console.error("Error uploading file:", error);
+      console.error("Error uploading files:", error);
       alert(error.message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const renderMessageContent = (msg) => {
+    const isRevoked = msg.isRevoked;
+    const isAudio = msg.type === "audio" || msg.originalType === "audio";
+    const isFile = msg.type === "file" || msg.originalType === "file";
+  
+    if (isRevoked) {
+      return (
+        <p className="revoked-message">
+          <i className="bi bi-clock-history"></i> {msg.message}
+        </p>
+      );
+    } else if (isFile) {
+      return renderFileMessage(msg);
+    } else if (isAudio) {
+      return (
+        <div className="audio-message">
+          <audio
+            controls
+            src={msg.fileInfo?.url || msg.message}
+            type="audio/mpeg"
+            style={{ marginTop: 5 }}
+            onError={(e) => {
+              console.error("Lỗi phát audio:", e.nativeEvent.error);
+              alert(
+                "Không thể phát tin nhắn thoại: " + e.nativeEvent.error.message
+              );
+            }}
+          />
+        </div>
+      );
+    } else {
+      return (
+        <p
+          style={{
+            borderRadius: "25px",
+            color: "black",
+            padding: "12px",
+            width: "95%",
+          }}
+        >
+          {msg.message}
+        </p>
+      );
     }
   };
 
@@ -523,9 +595,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                               <span>Bạn đã trả lời tin nhắn của mình</span>
                             ) : (
                               <span>
-                                Trả lời từ{" "}
-                                {userChatting[0]?.fullName ||
-                                  msg.replyTo.sender}
+                                Trả lời từ {userChatting[0]?.fullName || msg.replyTo.sender}
                               </span>
                             )}
                             <p
@@ -542,10 +612,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                                 cursor: "pointer",
                               }}
                               onClick={() => {
-                                const repliedMessageElement =
-                                  document.getElementById(
-                                    `message-${msg.replyTo.timestamp}`
-                                  );
+                                const repliedMessageElement = document.getElementById(
+                                  `message-${msg.replyTo.timestamp}`
+                                );
                                 repliedMessageElement?.scrollIntoView({
                                   behavior: "smooth",
                                   block: "start",
@@ -556,40 +625,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                             </p>
                           </div>
                         )}
-
-                        {isFile ? (
-                          renderFileMessage(msg)
-                        ) : isAudio ? (
-                          <div className="audio-message">
-                            <audio
-                              controls
-                              src={msg.fileInfo?.url || msg.message}
-                              type="audio/mpeg"
-                              style={{ marginTop: 5 }}
-                              onError={(e) => {
-                                console.error(
-                                  "Lỗi phát audio:",
-                                  e.nativeEvent.error
-                                );
-                                alert(
-                                  "Không thể phát tin nhắn thoại: " +
-                                    e.nativeEvent.error.message
-                                );
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <p
-                            style={{
-                              borderRadius: "25px",
-                              color: "black",
-                              padding: "12px",
-                              width: "95%",
-                            }}
-                          >
-                            {msg.message}{" "}
-                          </p>
-                        )}
+                        {renderMessageContent(msg)}
                         <span
                           className="timestamp"
                           style={{
@@ -629,9 +665,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                           <div className="message-options-menu">
                             <button
                               className="message-option-item"
-                              onClick={() => handleDeleteMessage(msg.timestamp)}
+                              onClick={() => handleRevokeMessage(msg.timestamp)}
                             >
-                              <i className="bi bi-trash"></i> Xóa tin nhắn
+                              <i className="bi bi-arrow-counterclockwise"></i> Thu hồi tin nhắn
                             </button>
                           </div>
                         )}
@@ -701,7 +737,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 </button>
                 <input
                   type="file"
-                  name="file"
+                  name="files"
+                  multiple
                   ref={fileInputRef}
                   onChange={handleFileChange}
                   style={{ display: "none" }}
@@ -711,6 +748,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   className="btn"
                   onClick={handleFileButtonClick}
                   disabled={uploading}
+                  title="Đính kèm nhiều file"
                 >
                   <i className="bi bi-file-earmark-arrow-up text-light"></i>
                 </button>

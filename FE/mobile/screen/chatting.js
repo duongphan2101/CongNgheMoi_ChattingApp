@@ -12,6 +12,12 @@ import getUserbySearch from "../api/api_searchUSer";
 import { showLocalNotification } from "../utils/notifications";
 import deleteMessage from '../api/api_deleteMessage';
 import { Audio } from "expo-av";
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import sendFile from '../api/api_sendFile';
+import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 
 const BASE_URL = getIp();
 const socket = io(`http://${BASE_URL}:3618`);
@@ -33,6 +39,12 @@ export default function App({ navigation, route }) {
   const [soundObject, setSoundObject] = useState(null);
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [filePreview, setFilePreview] = useState(null);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [showFileOptions, setShowFileOptions] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (!chatRoomId || !thisUser?.phoneNumber) return;
@@ -67,6 +79,10 @@ export default function App({ navigation, route }) {
         if (prev.some((msg) => msg.timestamp === newMessage.timestamp)) {
           return prev;
         }
+        socket.emit("updateLastMessage", {
+          chatRoomId: chatRoomId,
+          message: newMessage
+        });
         return [...prev, newMessage];
       });
     };
@@ -74,20 +90,24 @@ export default function App({ navigation, route }) {
     const handleTyping = () => setTyping(true);
     const handleStopTyping = () => setTyping(false);
 
-    const handleDeleteMessage = ({ messageId }) => {
-      setMessages((prev) => prev.filter((msg) => msg.timestamp !== messageId));
+    const handleMessageRevoked = (data) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.timestamp === data.timestamp ? { ...msg, ...data } : msg
+        )
+      );
     };
 
     socket.on("receiveMessage", handleReceiveMessage);
     socket.on("userTyping", handleTyping);
     socket.on("userStopTyping", handleStopTyping);
-    socket.on("messageDeleted", handleDeleteMessage);
+    socket.on("messageRevoked", handleMessageRevoked);
 
     return () => {
       socket.off("receiveMessage", handleReceiveMessage);
       socket.off("userTyping", handleTyping);
       socket.off("userStopTyping", handleStopTyping);
-      socket.off("messageDeleted", handleDeleteMessage);
+      socket.off("messageRevoked", handleMessageRevoked);
     };
   }, [chatRoomId, thisUser?.phoneNumber]);
 
@@ -143,18 +163,17 @@ export default function App({ navigation, route }) {
     }
   };
 
-  // Hàm xử lý xóa tin nhắn
+  // Hàm xử lý thu hồi tin nhắn
   const handleDeleteMessagePress = async () => {
     if (!selectedMessage) return;
     
     try {
       await deleteMessage(chatRoomId, selectedMessage.timestamp);
-      // Tin nhắn sẽ được cập nhật thông qua socket
       setShowMessageOptions(false);
       setSelectedMessage(null);
     } catch (error) {
-      console.error("Lỗi xóa tin nhắn:", error);
-      Alert.alert("Lỗi", "Không thể xóa tin nhắn. Vui lòng thử lại sau.");
+      console.error("Lỗi thu hồi tin nhắn:", error);
+      Alert.alert("Lỗi", "Không thể thu hồi tin nhắn. Vui lòng thử lại sau.");
     }
   };
 
@@ -353,74 +372,391 @@ export default function App({ navigation, route }) {
     }
   };
 
-  const renderItem = ({ item }) => (
-    <View
-      style={[
-        styles.userChatting,
-        {
-          justifyContent:
-            item.sender === thisUser.phoneNumber ? "flex-end" : "flex-start",
-        },
-      ]}
-    >
-      {item.sender !== thisUser.phoneNumber && (
-        <Image
-          source={{ uri: otherUser.avatar }}
-          style={{
-            height: 50,
-            width: 50,
-            marginTop: 15,
-            borderRadius: 50,
-          }}
-        />
-      )}
-      <View style={{ alignItems: "center" }}>
-        <Text style={{ color: themeColors.text, fontSize: 10 }}>
-          {moment(item.timestamp).format("HH:mm dd/MM/YY")}
-        </Text>
-        <View
-          style={[
-            styles.blockChat,
-            {
-              backgroundColor:
-                item.sender === thisUser.phoneNumber ? "#6fd39f" : "#8bb9f2",
-              borderRadius: 15,
-              padding: 10,
-            },
-          ]}
-        >
-          {item.type === "text" ? (
-            <Text
-              style={{
-                color: "#fff",
-                maxWidth: "90%",
-                flexWrap: "wrap",
-              }}
-            >
-              {item.message}
-            </Text>
-          ) : item.type === "audio" ? (
-            <TouchableOpacity onPress={() => handlePlayAudio(item.message)}>
-              <Ionicons name="play-circle" size={30} color="#fff" />
-            </TouchableOpacity>
-          ) : (
-            <Text style={{ color: "#fff" }}>[Tin nhắn không hỗ trợ]</Text>
-          )}
+  const pickImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert("Cần quyền truy cập", "Ứng dụng cần quyền truy cập thư viện ảnh để gửi ảnh.");
+        return;
+      }
+      
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        allowsMultipleSelection: true,
+        selectionLimit: 5, // gioi han 5 anh
+        quality: 0.8,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImages = result.assets;
+        
+        let totalSize = 0;
+        const fileObjects = [];
+        
+        for (const image of selectedImages) {
+          const fileInfo = await FileSystem.getInfoAsync(image.uri);
+          totalSize += fileInfo.size;
+          
+          if (fileInfo.size > 10 * 1024 * 1024) {
+            Alert.alert("File quá lớn", `File ${image.fileName || 'ảnh'} vượt quá 10MB`);
+            return;
+          }
+          
+          const fileType = image.mimeType || 'image/jpeg';
+          const fileName = image.fileName || `image-${Date.now()}-${fileObjects.length}.jpg`;
+          
+          fileObjects.push({
+            uri: image.uri,
+            type: fileType,
+            name: fileName
+          });
+        }
+        
+        if (totalSize > 30 * 1024 * 1024) { // 30MB
+          Alert.alert("Files quá lớn", "Tổng kích thước các file không được vượt quá 30MB");
+          return;
+        }
+        
+        // gui nhieu file
+        if (fileObjects.length > 0) {
+          try {
+            
+            console.log(`Sending ${fileObjects.length} files`);
+            const result = await sendFile(
+              chatRoomId,
+              currentUserPhone,
+              otherUser.phoneNumber,
+              fileObjects
+            );
+            console.log("Files sent successfully:", result);
+            
+          } catch (uploadError) {
+            
+            console.error("Upload error details:", uploadError);
+            Alert.alert("Lỗi Upload", "Không thể gửi ảnh. Lỗi kết nối đến server.");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi khi chọn ảnh:", error);
+      Alert.alert("Lỗi", "Không thể chọn ảnh. Vui lòng thử lại sau.");
+    }
+  };
+  
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+        multiple: true
+      });
+      
+      if (result.canceled === false && result.assets && result.assets.length > 0) {
+        const selectedDocs = result.assets;
+        
+        let totalSize = 0;
+        const fileObjects = [];
+        
+        for (const doc of selectedDocs) {
+          // Kiểm tra kích thước file
+          const fileInfo = await FileSystem.getInfoAsync(doc.uri);
+          totalSize += fileInfo.size;
+          
+          if (fileInfo.size > 10 * 1024 * 1024) { // 10MB
+            Alert.alert("File quá lớn", `File ${doc.name} vượt quá 10MB`);
+            return;
+          }
+          
+          // Kiểm tra extension file
+          const fileExt = doc.name.split('.').pop().toLowerCase();
+          const allowedExts = ['jpeg', 'jpg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 
+                              'xlsx', 'ppt', 'pptx', 'zip', 'rar', 'txt', 'mp3', 'mp4', 'm4a'];
+          
+          if (!allowedExts.includes(fileExt)) {
+            Alert.alert("Định dạng không hỗ trợ", `File ${doc.name} có định dạng không được hỗ trợ.`);
+            return;
+          }
+          
+          fileObjects.push({
+            uri: doc.uri,
+            type: doc.mimeType || `application/${fileExt}`,
+            name: doc.name
+          });
+        }
+        
+        // 
+        if (totalSize > 30 * 1024 * 1024) { // tong kich co 30MB
+          Alert.alert("Files quá lớn", "Tổng kích thước các file không được vượt quá 30MB");
+          return;
+        }
+        
+        // gui nhieu file
+        if (fileObjects.length > 0) {
+          try {
+            
+            console.log(`Sending ${fileObjects.length} documents`);
+            const result = await sendFile(
+              chatRoomId,
+              currentUserPhone,
+              otherUser.phoneNumber,
+              fileObjects
+            );
+            console.log("Documents sent successfully:", result);
+            
+          } catch (uploadError) {
+            
+            console.error("Upload error details:", uploadError);
+            Alert.alert("Lỗi Upload", "Không thể gửi tài liệu. Lỗi kết nối đến server.");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi khi chọn file:", error);
+      Alert.alert("Lỗi", "Không thể chọn file. Vui lòng thử lại sau.");
+    }
+  };
+  
+  const handleSendFile = async (fileObjs) => {
+    setIsUploading(true);
+    try {
+      console.log(`Starting to send ${Array.isArray(fileObjs) ? fileObjs.length : 1} file(s):`, {
+        chatRoomId,
+        from: currentUserPhone,
+        to: otherUser.phoneNumber
+      });
+      
+      const BASE_URL = getIp();
+      console.log("Using BASE_URL:", BASE_URL);
+      
+      const result = await sendFile(
+        chatRoomId,
+        currentUserPhone,
+        otherUser.phoneNumber,
+        fileObjs
+      );
+      
+      console.log("Kết quả gửi file:", result);
+      setIsUploading(false);
+    } catch (error) {
+      setIsUploading(false);
+      console.error("Lỗi gửi file:", error);
+      if (error.message && error.message.includes("Network request failed")) {
+        Alert.alert("Lỗi kết nối", "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và địa chỉ IP máy chủ.");
+      } else {
+        Alert.alert("Lỗi", "Không thể gửi file. Vui lòng thử lại sau.");
+      }
+    }
+  };
+
+  const renderItem = ({ item }) => {
+    const isCurrentUser = item.sender === thisUser.phoneNumber;
+    
+    const renderMessageContent = () => {
+      if (item.isRevoked) {
+        return (
+          <Text style={{
+            color: '#a0a0a0',
+            fontStyle: 'italic',
+            maxWidth: '90%',
+            flexWrap: 'wrap',
+            backgroundColor: isCurrentUser ? 'rgba(111, 211, 159, 0.2)' : 'rgba(139, 185, 242, 0.2)',
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: '#a0a0a0',
+            borderStyle: 'dashed',
+          }}>
+            Tin nhắn đã được thu hồi
+          </Text>
+        );
+      } else if (item.type === "text") {
+        return (
+          <Text style={{
+            color: '#fff',
+            maxWidth: '90%',
+            flexWrap: 'wrap'
+          }}>
+            {item.message}
+          </Text>
+        );
+      } else if (item.type === "audio") {
+        return (
+          <TouchableOpacity onPress={() => handlePlayAudio(item.fileInfo?.url || item.message)}>
+            <Ionicons name="play-circle" size={30} color="#fff" />
+          </TouchableOpacity>
+        );
+      } else if (item.type === "file") {
+        try {
+          const fileInfo = JSON.parse(item.message);
+          const fileExt = fileInfo.name.split('.').pop().toLowerCase();
+          const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(fileExt);
+          
+          if (isImage) {
+            return (
+              <TouchableOpacity onPress={() => handleViewImage(fileInfo.url, fileInfo.name)}>
+                <Image 
+                  source={{ uri: fileInfo.url }} 
+                  style={{ width: 150, height: 150, borderRadius: 10 }}
+                  resizeMode="cover"
+                />
+                <Text style={{ color: '#fff', fontSize: 12, marginTop: 5 }}>
+                  {fileInfo.name.length > 20 ? fileInfo.name.substring(0, 20) + '...' : fileInfo.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          } else {
+            return (
+              <TouchableOpacity 
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+                onPress={() => handleViewFile(fileInfo)}
+              >
+                <Ionicons name="document-attach" size={30} color="#fff" />
+                <View style={{ marginLeft: 10 }}>
+                  <Text style={{ color: '#fff' }}>
+                    {fileInfo.name.length > 20 ? fileInfo.name.substring(0, 20) + '...' : fileInfo.name}
+                  </Text>
+                  <Text style={{ color: '#fff', fontSize: 12 }}>
+                    {Math.round(fileInfo.size / 1024)} KB
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }
+        } catch (error) {
+          console.log("Lỗi parse JSON:", error, "message:", item.message);
+          return <Text style={{ color: '#fff' }}>[Tin nhắn file lỗi]</Text>;
+        }
+      } else {
+        return <Text style={{ color: '#fff' }}>[Tin nhắn không hỗ trợ]</Text>;
+      }
+    };
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.userChatting,
+          { justifyContent: isCurrentUser ? 'flex-end' : 'flex-start' }
+        ]}
+        onLongPress={() => handleLongPressMessage(item)}
+        delayLongPress={500}
+      >
+        {!isCurrentUser && (
+          <Image source={{ uri: otherUser.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
+        )}
+        <View style={{ alignItems: 'center' }}>
+          <Text style={{ color: themeColors.text, fontSize: 10 }}>
+            {moment(item.timestamp).format('HH:mm dd/MM/YY')}
+          </Text>
+          <View
+            style={[
+              styles.blockChat,
+              {
+                backgroundColor: item.isRevoked 
+                  ? (isCurrentUser ? 'rgba(111, 211, 159, 0.2)' : 'rgba(139, 185, 242, 0.2)') 
+                  : (isCurrentUser ? '#6fd39f' : '#8bb9f2'),
+                borderRadius: 15,
+                padding: item.isRevoked ? 0 : 10,
+                borderWidth: item.isRevoked ? 1 : 0,
+                borderColor: item.isRevoked ? '#a0a0a0' : 'transparent',
+                borderStyle: item.isRevoked ? 'dashed' : 'solid',
+              },
+            ]}
+          >
+            {renderMessageContent()}
+          </View>
         </View>
-      </View>
-      {item.sender === thisUser.phoneNumber && (
-        <Image
-          source={{ uri: thisUser.avatar }}
-          style={{
-            height: 50,
-            width: 50,
-            marginTop: 15,
-            borderRadius: 50,
-          }}
-        />
-      )}
-    </View>
-  );
+        {isCurrentUser && (
+          <Image source={{ uri: thisUser.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const handleViewImage = (imageUrl, imageName) => {
+    setSelectedImage({ url: imageUrl, name: imageName });
+    setShowImageViewer(true);
+  };
+  
+  const handleViewFile = (fileInfo) => {
+    setSelectedFile(fileInfo);
+    setShowFileOptions(true);
+  };
+
+  const downloadFile = async (fileUrl, fileName) => {
+    setIsDownloading(true); // Bật trạng thái tải
+    try {
+      // Kiểm tra quyền truy cập
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        setIsDownloading(false); // Tắt trạng thái tải nếu không có quyền
+        Alert.alert('Cần quyền truy cập', 'Ứng dụng cần quyền truy cập bộ nhớ để tải xuống file.');
+        return;
+      }
+  
+      // Tạo đường dẫn lưu file tạm thời
+      const tempFileUri = FileSystem.cacheDirectory + fileName;
+  
+      // Tải file xuống
+      const downloadResumable = FileSystem.createDownloadResumable(
+        fileUrl,
+        tempFileUri,
+        {},
+        (downloadProgress) => {
+          const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+          console.log(`Tiến độ tải: ${progress * 100}%`);
+        }
+      );
+  
+      const { uri } = await downloadResumable.downloadAsync();
+      console.log('File đã tải xuống tại:', uri);
+  
+      if (uri) {
+        // Kiểm tra loại file dựa trên phần mở rộng
+        const fileExt = fileName.split('.').pop().toLowerCase();
+        const mediaExts = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'mp3', 'wav', 'm4a'];
+  
+        if (mediaExts.includes(fileExt)) {
+          // Nếu là file media, lưu vào MediaLibrary
+          const asset = await MediaLibrary.createAssetAsync(uri);
+          console.log('Asset created:', asset);
+          setIsDownloading(false); // Tắt trạng thái tải
+          Alert.alert('Thành công', 'File media đã được lưu vào thư viện.');
+        } else {
+          // Nếu không phải file media, lưu vào thư mục Downloads
+          const downloadsDir = `${FileSystem.documentDirectory}Downloads/`;
+          await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
+          const finalUri = downloadsDir + fileName;
+          await FileSystem.moveAsync({
+            from: uri,
+            to: finalUri,
+          });
+          console.log('File đã được lưu tại:', finalUri);
+          setIsDownloading(false); // Tắt trạng thái tải
+          // Nếu muốn thông báo thành công, bạn có thể bật lại dòng này:
+          // Alert.alert('Thành công', `File đã được lưu tại: ${finalUri}`);
+  
+          // Nếu có thể chia sẻ, cung cấp tùy chọn chia sẻ file
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(finalUri);
+          }
+        }
+  
+        // Xóa file tạm nếu cần
+        try {
+          await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
+        } catch (deleteError) {
+          console.log('Lỗi khi xóa file tạm:', deleteError);
+        }
+      }
+    } catch (error) {
+      setIsDownloading(false); // Tắt trạng thái tải nếu có lỗi
+      console.error('Lỗi chi tiết khi tải file:', error);
+      Alert.alert('Lỗi', `Không thể tải xuống file: ${error.message}. Vui lòng thử lại sau.`);
+    }
+  };
 
   const styles = getStyles(themeColors);
   return (
@@ -450,48 +786,15 @@ export default function App({ navigation, route }) {
             flatListRef.current.scrollToEnd({ animated: true })
           }
           onLayout={() => flatListRef.current.scrollToEnd({ animated: true })}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.userChatting,
-                { justifyContent: item.sender === thisUser.phoneNumber ? 'flex-end' : 'flex-start' }
-              ]}
-              onLongPress={() => handleLongPressMessage(item)}
-              delayLongPress={500}
-            >
-              {item.sender !== thisUser.phoneNumber && (
-                <Image source={{ uri: otherUser.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
-              )}
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ color: themeColors.text, fontSize: 10 }}>
-                  {moment(item.timestamp).format('HH:mm dd/MM/YY')}
-                </Text>
-                <View
-                  style={[
-                    styles.blockChat,
-                    {
-                      backgroundColor: item.sender === thisUser.phoneNumber ? '#6fd39f' : '#8bb9f2',
-                      borderRadius: 15,
-                      padding: 10
-                    },
-                  ]}
-                >
-                  <Text style={{
-                    color: '#fff', maxWidth: '90%',
-                    flexWrap: 'wrap'
-                  }}>{item.message}</Text>
-                </View>
-              </View>
-              {item.sender === thisUser.phoneNumber && (
-                <Image source={{ uri: thisUser.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
-              )}
-            </TouchableOpacity>
-          )}
+          renderItem={renderItem}
         />
 
         <View style={styles.bottomtab}>
-          <TouchableOpacity style={styles.touch}>
+          <TouchableOpacity style={styles.touch} onPress={pickImage}>
             <Ionicons name="image" size={30} color={themeColors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.touch} onPress={pickDocument}>
+            <Ionicons name="document-attach" size={30} color={themeColors.text} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.touch}>
             <Entypo name="emoji-flirt" size={24} color={themeColors.text} />
@@ -536,7 +839,7 @@ export default function App({ navigation, route }) {
                 onPress={handleDeleteMessagePress}
               >
                 <MaterialIcons name="delete" size={24} color="red" />
-                <Text style={styles.modalOptionText}>Xóa tin nhắn</Text>
+                <Text style={styles.modalOptionText}>Thu hồi tin nhắn</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.modalOption}
@@ -544,6 +847,93 @@ export default function App({ navigation, route }) {
               >
                 <MaterialIcons name="cancel" size={24} color={themeColors.text} />
                 <Text style={styles.modalOptionText}>Hủy</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Modal xem ảnh toàn màn hình */}
+        <Modal
+          transparent={true}
+          visible={showImageViewer}
+          animationType="fade"
+          onRequestClose={() => setShowImageViewer(false)}
+        >
+          <View style={styles.imageViewerContainer}>
+            <View style={styles.imageViewerHeader}>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => setShowImageViewer(false)}
+              >
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.downloadButton}
+                onPress={() => downloadFile(selectedImage?.url, selectedImage?.name)}
+              >
+                <Ionicons name="download-outline" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.imageViewerContent}>
+              {selectedImage && (
+                <Image
+                  source={{ uri: selectedImage.url }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+            <View style={styles.imageNameContainer}>
+              <Text style={styles.imageName}>{selectedImage?.name}</Text>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal tùy chọn tải xuống file */}
+        <Modal
+          transparent={true}
+          visible={showFileOptions}
+          animationType="slide"
+          onRequestClose={() => setShowFileOptions(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowFileOptions(false)}
+          >
+            <View style={styles.fileOptionsContainer}>
+              <View style={styles.fileOptionsHeader}>
+                <Text style={styles.fileOptionsTitle}>Tùy chọn file</Text>
+                <TouchableOpacity onPress={() => setShowFileOptions(false)}>
+                  <Ionicons name="close" size={24} color={themeColors.text} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.fileDetailsContainer}>
+                <Ionicons name="document-outline" size={40} color={themeColors.text} />
+                <View style={styles.fileDetails}>
+                  <Text style={[styles.fileName, {color: themeColors.text}]}>
+                    {selectedFile?.name}
+                  </Text>
+                  <Text style={[styles.fileSize, {color: themeColors.text}]}>
+                    {selectedFile && Math.round(selectedFile.size / 1024)} KB
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.downloadFileButton}
+                onPress={() => {
+                  downloadFile(selectedFile?.url, selectedFile?.name);
+                  setShowFileOptions(false);
+                }}
+              >
+                <Ionicons name="download-outline" size={24} color="#fff" />
+                <Text style={styles.downloadButtonText}>Tải xuống</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setShowFileOptions(false)}
+              >
+                <Text style={styles.cancelButtonText}>Hủy</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -661,5 +1051,142 @@ const getStyles = (themeColors) => StyleSheet.create({
     fontSize: 16,
     marginLeft: 10,
     color: themeColors.text
-  }
+  },
+  // Style mới cho xem ảnh toàn màn hình
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+  },
+  imageViewerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 40,
+    paddingBottom: 20,
+    zIndex: 10,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  downloadButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImage: {
+    width: '100%',
+    height: '80%',
+  },
+  imageNameContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  imageName: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  // Style cho modal tùy chọn file
+  fileOptionsContainer: {
+    backgroundColor: themeColors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    elevation: 5,
+  },
+  fileOptionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  fileOptionsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: themeColors.text,
+  },
+  fileDetailsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 10,
+    backgroundColor: themeColors.backgroundLight || '#f0f0f0',
+    marginBottom: 20,
+  },
+  fileDetails: {
+    marginLeft: 15,
+    flex: 1,
+  },
+  fileName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  fileSize: {
+    fontSize: 14,
+    marginTop: 5,
+    opacity: 0.7,
+  },
+  downloadFileButton: {
+    backgroundColor: themeColors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+  downloadButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 10,
+  },
+  cancelButton: {
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: themeColors.backgroundLight || '#f0f0f0',
+    marginBottom: 10,
+  },
+  cancelButtonText: {
+    color: themeColors.text,
+    fontSize: 16,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Nền mờ
+    zIndex: 1000,
+  },
+  blockChat: {
+    padding: 15,
+    borderRadius: 20,
+  },
+  revokedMessage: {
+    color: '#a0a0a0',
+    fontStyle: 'italic',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#a0a0a0',
+    borderStyle: 'dashed',
+  },
 });

@@ -9,9 +9,9 @@ const deleteMessage = async (chatRoomId, messageId) => {
         }
 
         const response = await fetch(`http://${BASE_URL}:3618/deleteMessage`, {
-            method: 'DELETE',
+            method: "DELETE",
             headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
             },
             body: JSON.stringify({
                 chatRoomId,
@@ -20,13 +20,14 @@ const deleteMessage = async (chatRoomId, messageId) => {
         });
 
         if (!response.ok) {
-            throw new Error("Không thể xóa tin nhắn");
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Không thể thu hồi tin nhắn");
         }
 
         const data = await response.json();
         return data;
     } catch (error) {
-        console.error("Lỗi khi xóa tin nhắn:", error);
+        console.error("Lỗi khi thu hồi tin nhắn:", error);
         throw error;
     }
 };
