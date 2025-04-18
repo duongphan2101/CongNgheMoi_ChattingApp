@@ -621,9 +621,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                                 cursor: "pointer",
                               }}
                               onClick={() => {
-                                const repliedMessageElement = document.getElementById(
-                                  `message-${msg.replyTo.timestamp}`
-                                );
+                                const repliedMessageElement =
+                                  document.getElementById(
+                                    `message-${msg.replyTo.timestamp}`
+                                  );
                                 repliedMessageElement?.scrollIntoView({
                                   behavior: "smooth",
                                   block: "start",
