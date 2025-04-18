@@ -38,7 +38,7 @@ module.exports = (io, redisPublisher) => {
 
   router.post("/sendMessage", async (req, res) => {
     try {
-      const { chatRoomId, sender, receiver, message } = req.body;
+      const { chatRoomId, sender, receiver, message, replyTo } = req.body;
 
       if (!chatRoomId || !sender || !receiver || !message) {
         console.error("❌ Thiếu dữ liệu từ client:", req.body);
@@ -47,6 +47,26 @@ module.exports = (io, redisPublisher) => {
 
       const chatId = [sender, receiver].sort().join("_");
       const newMessage = new Message(chatRoomId, sender, receiver, message, "text");
+      
+      if (replyTo) {
+        // Kiểm tra nếu tin nhắn được reply là tin nhắn thoại
+        const repliedMessageParams = {
+          TableName: TABLE_MESSAGE_NAME,
+          Key: {
+            chatRoomId: chatRoomId,
+            timestamp: replyTo.timestamp,
+          },
+        };
+        const repliedMessageData = await dynamoDB.get(repliedMessageParams).promise();
+        const repliedMessage = repliedMessageData.Item;
+  
+        newMessage.replyTo = {
+          timestamp: replyTo.timestamp,
+          message: repliedMessage && repliedMessage.type === "audio" ? "Tin nhắn thoại" : replyTo.message,
+          sender: replyTo.sender,
+        };
+      }
+    
 
       const params = {
         TableName: TABLE_MESSAGE_NAME,
@@ -272,7 +292,8 @@ module.exports = (io, redisPublisher) => {
       await fs.unlink(outputPath);
   
       const audioUrl = uploadResult.Location;
-      const audioMessage = new Message(chatRoomId, sender, receiver, audioUrl, "audio");
+      const audioMessage = new Message(chatRoomId, sender, receiver, "Tin nhắn thoại", "audio");
+      audioMessage.fileInfo = { url: audioUrl };
   
       await dynamoDB.put({
         TableName: TABLE_MESSAGE_NAME,
