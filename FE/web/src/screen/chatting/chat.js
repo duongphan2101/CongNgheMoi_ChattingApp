@@ -37,8 +37,13 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const handleReplyMessage = (msg) => {
     setReplyingTo({
       ...msg,
-      message: msg.type === "audio" ? "Tin nhắn thoại" : msg.message,
-    });
+      message:
+      msg.type === "audio"
+        ? "Tin nhắn thoại"
+        : msg.type === "file"
+        ? "File đính kèm"
+        : msg.message,
+  });
     setActiveMessageId(null);
     setHighlightedMessageId(msg.timestamp);
     const repliedMessageElement = document.getElementById(
@@ -529,7 +534,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                                 color: "#B0B3B8",
                                 fontSize: "13px",
                                 margin: "5px 0 0 0",
-                                padding: "10px ", 
+                                padding: "10px ",
                                 borderRadius: "20px",
                                 maxWidth: "95%",
                                 wordWrap: "break-word",
@@ -537,9 +542,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                                 cursor: "pointer",
                               }}
                               onClick={() => {
-                                const repliedMessageElement = document.getElementById(
-                                  `message-${msg.replyTo.timestamp}`
-                                );
+                                const repliedMessageElement =
+                                  document.getElementById(
+                                    `message-${msg.replyTo.timestamp}`
+                                  );
                                 repliedMessageElement?.scrollIntoView({
                                   behavior: "smooth",
                                   block: "start",
@@ -555,21 +561,23 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                           renderFileMessage(msg)
                         ) : isAudio ? (
                           <div className="audio-message">
-                          
-                          <audio
-                            controls
-                            src={msg.fileInfo?.url || msg.message}
-                            type="audio/mpeg"
-                            style={{ marginTop: 5 }}
-                            onError={(e) => {
-                              console.error("Lỗi phát audio:", e.nativeEvent.error);
-                              alert(
-                                "Không thể phát tin nhắn thoại: " +
-                                  e.nativeEvent.error.message
-                              );
-                            }}
-                          />
-                        </div>
+                            <audio
+                              controls
+                              src={msg.fileInfo?.url || msg.message}
+                              type="audio/mpeg"
+                              style={{ marginTop: 5 }}
+                              onError={(e) => {
+                                console.error(
+                                  "Lỗi phát audio:",
+                                  e.nativeEvent.error
+                                );
+                                alert(
+                                  "Không thể phát tin nhắn thoại: " +
+                                    e.nativeEvent.error.message
+                                );
+                              }}
+                            />
+                          </div>
                         ) : (
                           <p
                             style={{
@@ -580,7 +588,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                             }}
                           >
                             {msg.message}{" "}
-                        
                           </p>
                         )}
                         <span
@@ -659,7 +666,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
               {replyingTo && (
                 <div className="replying-to-message">
                   <p>Đang trả lời: {replyingTo.message}</p>
-                  
+
                   <button
                     onClick={handleCancelReply}
                     className="message-options-btn x"

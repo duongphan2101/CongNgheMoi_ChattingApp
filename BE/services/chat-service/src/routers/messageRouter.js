@@ -62,7 +62,12 @@ module.exports = (io, redisPublisher) => {
   
         newMessage.replyTo = {
           timestamp: replyTo.timestamp,
-          message: repliedMessage && repliedMessage.type === "audio" ? "Tin nhắn thoại" : replyTo.message,
+          message:
+          repliedMessage && repliedMessage.type === "audio"
+            ? "Tin nhắn thoại"
+            : repliedMessage && repliedMessage.type === "file"
+            ? "file"
+            : replyTo.message,
           sender: replyTo.sender,
         };
       }
