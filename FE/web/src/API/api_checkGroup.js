@@ -1,19 +1,28 @@
 const checkGroup = async (chatRoomId) => {
   try {
-    // Gửi yêu cầu GET để lấy thông tin của nhóm chat
-    const res = await fetch(`http://localhost:3618/getChatRoom/${chatRoomId}`);
-    const data = await res.json();
+    // Gửi yêu cầu GET với query parameter
+    const res = await fetch(`http://localhost:3618/chatRoom?chatRoomId=${chatRoomId}`);
 
+    const text = await res.text(); // lấy nội dung gốc
+
+    // Kiểm tra mã trạng thái HTTP
     if (!res.ok) {
-      throw new Error(data.message || "Không thể lấy thông tin nhóm.");
+      throw new Error(`Lỗi ${res.status}: ${text}`);
     }
 
-    // Trả về thông tin nhóm hoặc thực hiện hành động sau khi kiểm tra thành công
-    console.log("Thông tin nhóm:", data);
+    // Parse JSON nếu có thể
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (jsonErr) {
+      throw new Error(`Không thể parse JSON: ${jsonErr.message}`);
+    }
+
     return data;
   } catch (err) {
     console.error("Lỗi khi kiểm tra nhóm:", err);
     throw err;
   }
 };
+
 export default checkGroup;

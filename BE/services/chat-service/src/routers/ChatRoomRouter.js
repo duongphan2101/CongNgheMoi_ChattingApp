@@ -151,7 +151,7 @@ router.post("/createChatRoomForGroup", async (req, res) => {
       Item: chatRoomData,
     }).promise();
 
-  
+
     const chatId = uuidv4();
 
     const conversationData = {
@@ -183,57 +183,69 @@ router.post("/createChatRoomForGroup", async (req, res) => {
   }
 });
 
-// Cập nhật tên nhóm ở cả ChatRoom và Conversation
+//update thanh vien + nameGroup
 router.put("/updateChatRoom/:id", async (req, res) => {
-  const { nameGroup } = req.body;
+  const { nameGroup, participants } = req.body;
+  const roomId = req.params.id;
 
   if (!nameGroup || typeof nameGroup !== "string") {
     return res.status(400).json({ message: "Tên nhóm không hợp lệ." });
   }
 
-  try {
-    // Cập nhật ChatRoom
-    const updatedChatRoom = await ChatRoom.findByIdAndUpdate(
-      req.params.id,
-      { nameGroup },
-      { new: true }
-    );
+  if (!Array.isArray(participants) || participants.length < 3) {
+    return res.status(400).json({ message: "Danh sách thành viên phải là mảng và có ít nhất 3 thành viên." });
+  }
 
-    if (!updatedChatRoom) {
-      return res.status(404).json({ message: "Không tìm thấy nhóm." });
+  if (participants.some(p => typeof p !== 'string')) {
+    return res.status(400).json({ message: "Danh sách thành viên phải chứa chuỗi hợp lệ." });
+  }
+
+  try {
+    const updateChatRoomParams = {
+      TableName: CHATROOM_TABLE,
+      Key: { chatRoomId: roomId },
+      UpdateExpression: "set nameGroup = :nameGroup, participants = :newMembers",
+      ExpressionAttributeValues: {
+        ":nameGroup": nameGroup,
+        ":newMembers": participants,
+      },
+      ReturnValues: "ALL_NEW",
+    };
+
+    const chatRoomUpdateResult = await dynamoDB.update(updateChatRoomParams).promise();
+
+    const scanParams = {
+      TableName: "Conversations",
+      FilterExpression: "chatRoomId = :roomId",
+      ExpressionAttributeValues: {
+        ":roomId": roomId,
+      },
+    };
+
+    const scanResult = await dynamoDB.scan(scanParams).promise();
+
+    if (scanResult.Items.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện tương ứng trong Conversations." });
     }
 
-    // Cập nhật Conversation (nếu có)
-    await Conversation.findOneAndUpdate(
-      { chatRoomId: req.params.id },
-      { fullName: nameGroup }
-    );
+    const chatId = scanResult.Items[0].chatId;
 
-    res.json(updatedChatRoom);
+    const updateConvParams = {
+      TableName: "Conversations",
+      Key: { chatId },
+      UpdateExpression: "set fullName = :fullName, participants = :participants",
+      ExpressionAttributeValues: {
+        ":fullName": nameGroup,
+        ":participants": participants,
+      },
+    };
+
+    await dynamoDB.update(updateConvParams).promise();
+
+    res.json(chatRoomUpdateResult.Attributes);
   } catch (err) {
-    console.error("Lỗi cập nhật tên nhóm:", err);
-    res.status(500).json({ message: "Lỗi server khi cập nhật tên nhóm." });
-  }
-});
-
-// 2. Thêm thành viên vào nhóm
-router.put("/:id/add-members", async (req, res) => {
-  const { addMembers } = req.body;
-
-  if (!Array.isArray(addMembers)) {
-    return res.status(400).json({ message: "Danh sách thành viên không hợp lệ." });
-  }
-
-  try {
-    const updated = await ChatRoom.findByIdAndUpdate(
-      req.params.id,
-      { $addToSet: { participants: { $each: addMembers } } },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json({ message: "Không tìm thấy nhóm." });
-    res.json(updated);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Lỗi cập nhật:", err);
+    res.status(500).json({ message: "Lỗi server khi cập nhật nhóm." });
   }
 });
 

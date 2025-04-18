@@ -11,14 +11,13 @@ import getUserbySearch from "../../API/api_searchUSer";
 import fetchFriends from "../../API/api_getListFriends";
 import createChatRoom from "../../API/api_createChatRoomforGroup"
 import getChatRoom from "../../API/api_getMessagebyChatRoomId.js"
-import updateChatRoom from "../../API/api_updateChatRoom.js";
+import updateChatRoom from "../../API/api_updateChatRoomforGroup.js";
 import checkGroup from "../../API/api_checkGroup.js";
 
 const socket = io("http://localhost:3618");
 const notificationSocket = io("http://localhost:3515");
 
 function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
-  console.log("Chat ", chatRoom)
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [currentUserPhone, setCurrentUserPhone] = useState();
@@ -55,12 +54,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [audioBlob, setAudioBlob] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-
-  const handleOpenFriendsModal = async () => {
-    setModalListFriends(true);
-    const data = await fetchFriends();
-    setListFriends(data);
-  };
 
   const handleMicClick = async () => {
     if (isRecording) {
@@ -458,27 +451,39 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [currentChatRoom, setCurrentChatRoom] = useState(chatRoom);
+  console.log("current chat room ", currentChatRoom)
+
+  const handleOpenFriendsModal = async () => {
+    if (chatRoom.isGroup) {
+      openEditModal(chatRoom.chatRoomId);
+    } else {
+      openCreateModal();
+    }
+  };
+
   // Khi mở modal để tạo nhóm mới
-  const openCreateModal = () => {
+  const openCreateModal = async () => {
     setNameGroup("");
     setListAddtoGroup([]);
     setIsEditMode(false);
+
     setModalListFriends(true);
+    const data = await fetchFriends();
+    setListFriends(data);
   };
 
   // Khi mở modal để edit nhóm hiện tại
-  const openEditModal = async (roomId) => {
-    const room = await getChatRoom(roomId);
-    setCurrentChatRoom(room);
-    setNameGroup(room.nameGroup);
-    setListAddtoGroup([...room.participants]);
+  const openEditModal = async () => {
+    setNameGroup(chatRoom.nameGroup);
+    const data = await fetchFriends();
+    setListAddtoGroup([...chatRoom.participants]);
+    setListFriends(data);
     setIsEditMode(true);
-    setEditingRoomId(roomId);
+    setEditingRoomId(chatRoom.chatRoomId);
     setModalListFriends(true);
   };
 
   const handleSaveGroup = async () => {
-    console.log("list ", listAddtoGroup)
     if (!nameGroup.trim() || !/^(?! )[A-Za-zÀ-ỹ0-9 ]{3,50}$/.test(nameGroup)) {
       toast.error("Tên nhóm không hợp lệ.");
       return;
@@ -490,12 +495,13 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
     try {
       if (isEditMode) {
-
-        await updateChatRoom(editingRoomId, {
+        await updateChatRoom({
+          roomId: chatRoom.chatRoomId,
           nameGroup,
           participants: listAddtoGroup,
         });
         toast.success("Cập nhật nhóm thành công!");
+
       } else {
         await createChatRoom({
           nameGroup,
@@ -505,12 +511,14 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         toast.success("Tạo nhóm thành công!");
       }
 
+      const refreshed = isEditMode ? await getChatRoom(editingRoomId) : await getChatRoom();
 
-      const refreshed = isEditMode
-        ? await getChatRoom(editingRoomId)
-        : await getChatRoom();
-      setCurrentChatRoom(refreshed);
-      await checkGroup(refreshed.chatRoomId);
+      if (Array.isArray(refreshed) && refreshed.length > 0) {
+        setCurrentChatRoom(refreshed[0]);
+        await checkGroup(refreshed[0].chatRoomId);
+      } else {
+        console.warn("Danh sách phòng chat trống.");
+      }
 
       setModalListFriends(false);
       setIsEditMode(false);
@@ -522,7 +530,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       toast.error(err.message || "Lưu nhóm thất bại!");
     }
   };
-
 
   return (
     <>

@@ -362,7 +362,6 @@ useEffect(() => {
     let isMounted = true;
     (async () => {
       const data = await getConversations();
-      console.log("data conversation ", data);
       if (!isMounted || !data?.length) return;
 
       const myPhone = userInfo.phoneNumber;
