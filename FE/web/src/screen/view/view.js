@@ -133,27 +133,53 @@ function View({ setIsLoggedIn }) {
     }
 }, [friendRequests.length]); // Thêm dependency nếu cần
 
-useEffect(() => {
-    fetchFriendRequests();
-}, [fetchFriendRequests]);
+const fetchFriends = useCallback(async () => {
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+      toast.error("Vui lòng đăng nhập!");
+      return;
+  }
+
+  try {
+      const response = await fetch("http://localhost:3824/user/friends", {
+          method: "GET",
+          headers: {
+              Authorization: `Bearer ${token}`,
+          },
+      });
+
+      if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
+
+      const data = await response.json();
+      setFriends(data);
+  } catch (error) {
+      
+  }
+}, []);
 
 useEffect(() => {
-  const interval = setInterval(() => {
     fetchFriendRequests();
-  }, 3000); // Poll every 3 seconds
-
-  return () => clearInterval(interval); // Cleanup interval on component unmount
-}, [fetchFriendRequests]);useEffect(() => {
-  const interval = setInterval(() => {
-    fetchFriendRequests();
-  }, 3000); // Poll every 3 seconds
-
-  return () => clearInterval(interval); // Cleanup interval on component unmount
 }, [fetchFriendRequests]);
 
 useEffect(() => {
   fetchFriends();
-}, []);
+}, [fetchFriends]);
+
+useEffect(() => {
+  const interval = setInterval(() => {
+    fetchFriendRequests();
+  }, 2000); // Poll every 3 seconds
+
+  return () => clearInterval(interval); // Cleanup interval on component unmount
+}, [fetchFriendRequests]);
+
+useEffect(() => {
+  const interval = setInterval(() => {
+    fetchFriends()
+  }, 1000); // Poll every 1 seconds
+
+  return () => clearInterval(interval); // Cleanup interval on component unmount
+}, [fetchFriends]);
 
   const handleEdit = () => {
     const editData = { ...userInfo };
@@ -620,7 +646,6 @@ useEffect(() => {
 
         toast.success("Đã chấp nhận lời mời kết bạn!");
         fetchFriendRequests(); // Cập nhật lại danh sách lời mời
-        fetchFriends();
     } catch (error) {
         console.error("Lỗi khi chấp nhận lời mời kết bạn:", error);
         toast.error("Không thể chấp nhận lời mời kết bạn!");
@@ -647,37 +672,11 @@ const handleRejectFriendRequest = async (requestId) => {
 
         if (!response.ok) throw new Error("Từ chối lời mời kết bạn thất bại!");
         toast.success("Đã từ chối lời mời kết bạn!");
-        fetchFriends();
     } catch (error) {
         console.error("Lỗi khi từ chối lời mời kết bạn:", error);
         toast.error("Không thể từ chối lời mời kết bạn!");
     }
 };
-
-  const fetchFriends = async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-        toast.error("Vui lòng đăng nhập!");
-        return;
-    }
-
-    try {
-        const response = await fetch("http://localhost:3824/user/friends", {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
-
-        if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
-
-        const data = await response.json();
-        console.log("Friends data:", data); // Kiểm tra dữ liệu trả về
-        setFriends(data);
-    } catch (error) {
-        
-    }
-  };
 
   return (
     <div className="wrapper">

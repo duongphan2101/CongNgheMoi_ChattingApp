@@ -20,8 +20,6 @@ function Contacts({
     contact.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  console.log("Friends in Contacts:", friends);
-
   const handleUnfriend = async (friendPhone) => {
     try {
       const token = localStorage.getItem('accessToken');
