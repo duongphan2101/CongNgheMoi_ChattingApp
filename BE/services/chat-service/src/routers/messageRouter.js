@@ -141,13 +141,13 @@ module.exports = (io, redisPublisher) => {
   router.delete("/deleteMessage", async (req, res) => {
     try {
       const { chatRoomId, messageId } = req.body;
-
+  
       if (!chatRoomId || !messageId) {
         return res
           .status(400)
           .json({ error: "Thiếu chatRoomId hoặc messageId!" });
       }
-
+  
       const getParams = {
         TableName: TABLE_MESSAGE_NAME,
         Key: {
@@ -155,7 +155,7 @@ module.exports = (io, redisPublisher) => {
           timestamp: messageId,
         },
       };
-
+  
       const messageResult = await dynamoDB.get(getParams).promise();
       const message = messageResult.Item;
 
@@ -166,11 +166,11 @@ module.exports = (io, redisPublisher) => {
           const fileUrl = fileInfo.url;
           const urlParts = fileUrl.split("/");
           let key = urlParts.slice(3).join("/");
-
+  
           if (key.indexOf("amazonaws.com/") > -1) {
             key = key.split("amazonaws.com/")[1];
           }
-
+  
           console.log("Đang xóa file với key:", key);
 
           // Xóa file từ S3
@@ -178,7 +178,7 @@ module.exports = (io, redisPublisher) => {
             Bucket: BUCKET_NAME,
             Key: key,
           };
-
+  
           await s3.deleteObject(deleteParams).promise();
           console.log("✅ Đã xóa file từ S3 thành công");
         } catch (fileError) {
@@ -193,16 +193,119 @@ module.exports = (io, redisPublisher) => {
           chatRoomId: chatRoomId,
           timestamp: messageId,
         },
+        UpdateExpression: "SET #msg = :newMsg, #isRevoked = :isRevoked, #originalType = :originalType",
+        ExpressionAttributeNames: {
+          "#msg": "message",
+          "#isRevoked": "isRevoked",
+          "#originalType": "originalType"
+        },
+        ExpressionAttributeValues: {
+          ":newMsg": "Tin nhắn đã được thu hồi",
+          ":isRevoked": true,
+          ":originalType": message.type
+        },
+        ReturnValues: "ALL_NEW"
       };
+  
+      if (message.type == "text" || message.type == "file" || message.type == "audio") {
+        updateParams.UpdateExpression += ", #type = :type";
+        updateParams.ExpressionAttributeNames["#type"] = "type";
+        updateParams.ExpressionAttributeValues[":type"] = "revoked";
+      }
+  
+      const updatedMessage = await dynamoDB.update(updateParams).promise();
+      console.log("Đã thu hồi tin nhắn:", messageId);
+  
+      // Kiểm tra xem tin nhắn được thu hồi có phải là tin nhắn cuối cùng không
+      const messagesParams = {
+        TableName: TABLE_MESSAGE_NAME,
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: { ":chatRoomId": chatRoomId }
+      };
+  
+      const messagesResult = await dynamoDB.scan(messagesParams).promise();
+      const messages = messagesResult.Items;
+      
+      // Sắp xếp tin nhắn theo thời gian, mới nhất đầu tiên
+      messages.sort((a, b) => parseInt(b.timestamp) - parseInt(a.timestamp));
+      
+      // Chuẩn bị dữ liệu để gửi qua socket
+      const sender = message.sender;
+      const receiver = message.receiver;
+      const chatId = [sender, receiver].sort().join("_");
+      
+      let lastMessageContent = "Tin nhắn đã được thu hồi";
+      let lastMessageAt = new Date().toLocaleDateString("vi-VN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
 
-      await dynamoDB.delete(deleteParams).promise();
-      console.log("Đã xóa tin nhắn:", messageId);
+      if (messages.length > 0 && messages[0].timestamp === messageId) {
+        // Tin nhắn bị thu hồi là tin nhắn mới nhất
+        const updateConversationParams = {
+          TableName: TABLE_CONVERSATION_NAME,
+          Key: { chatId },
+          UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
+          ExpressionAttributeValues: {
+            ":lastMessage": lastMessageContent,
+            ":lastMessageAt": lastMessageAt
+          }
+        };
+        
+        await dynamoDB.update(updateConversationParams).promise();
+        console.log(`✅ Đã cập nhật lastMessage cho chatId: ${chatId}`);
+      } else if (messages.length > 1) {
+        // Có tin nhắn khác, lấy tin nhắn mới nhất không bị thu hồi
+        const latestNonRevoked = messages.find(msg => !msg.isRevoked);
+        if (latestNonRevoked) {
+          lastMessageContent = latestNonRevoked.type === "audio" ? "Tin nhắn thoại" : 
+                              latestNonRevoked.type === "file" ? JSON.stringify({
+                                name: latestNonRevoked.fileInfo?.name || "File",
+                                url: latestNonRevoked.fileInfo?.url || "",
+                                size: latestNonRevoked.fileInfo?.size || 0,
+                                type: latestNonRevoked.fileInfo?.type || "file"
+                              }) : 
+                              latestNonRevoked.message;
+          lastMessageAt = new Date(parseInt(latestNonRevoked.timestamp)).toLocaleDateString("vi-VN", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
 
-      io.to(chatRoomId).emit("messageDeleted", { messageId });
-
-      res.status(200).json({ message: "Xóa tin nhắn thành công!" });
+          const updateConversationParams = {
+            TableName: TABLE_CONVERSATION_NAME,
+            Key: { chatId },
+            UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
+            ExpressionAttributeValues: {
+              ":lastMessage": lastMessageContent,
+              ":lastMessageAt": lastMessageAt
+            }
+          };
+          
+          await dynamoDB.update(updateConversationParams).promise();
+          console.log(`✅ Đã cập nhật lastMessage cho chatId: ${chatId}`);
+        }
+      }
+  
+      // Gửi tin nhắn đã thu hồi và thông tin lastMessage cho người dùng
+      io.to(chatRoomId).emit("messageRevoked", {
+        ...updatedMessage.Attributes,
+        lastMessage: lastMessageContent,
+        lastMessageAt: lastMessageAt,
+        sender,
+        receiver
+      });
+  
+      res.status(200).json({ message: "Thu hồi tin nhắn thành công!" });
     } catch (error) {
-      console.error("Lỗi khi xóa tin nhắn:", error);
+      console.error("Lỗi khi thu hồi tin nhắn:", error);
       res.status(500).json({ error: "Lỗi server!" });
     }
   });

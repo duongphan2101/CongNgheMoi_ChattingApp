@@ -37,7 +37,18 @@ export default function App({ navigation }) {
         setCurrentUserPhone(user.phoneNumber);
         const data = await getConversations();
         if (data) {
-          setConversations(data);
+          // Thêm lastMessageTime để có thể so sánh khi tin nhắn bị thu hồi
+          const conversationsWithTime = data.map(conv => ({
+            ...conv,
+            lastMessageTime: conv.lastMessageTime || Date.now()
+          }));
+          setConversations(conversationsWithTime);
+
+          if (socket) {
+            conversationsWithTime.forEach(conv => {
+              socket.emit("joinRoom", conv.chatRoomId);
+            });
+          }
 
           const phonesToFetch = data.map(c => c.participants.find(p => p !== user.phoneNumber));
           const uniquePhones = [...new Set(phonesToFetch)];
@@ -58,7 +69,7 @@ export default function App({ navigation }) {
     };
 
     fetchData();
-  }, []);
+  }, [socket]);
 
   const handlePress = (otherUser, chatRoom) => {
     hideSearch();
@@ -142,9 +153,16 @@ const getStyles = (themeColors) => StyleSheet.create({
   },
   mess: {
     color: themeColors.text,
+    flex: 1,
   },
   userInfo: {
     justifyContent: 'center',
     flex: 1,
+  },
+  time: {
+    color: themeColors.text,
+    fontSize: 12,
+    alignSelf: 'flex-start',
+    marginTop: 5
   }
 });

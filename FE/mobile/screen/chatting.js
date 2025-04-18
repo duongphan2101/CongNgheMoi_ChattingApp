@@ -69,13 +69,13 @@ export default function App({ navigation, route }) {
     socket.on("receiveMessage", handleReceiveMessage);
     socket.on("userTyping", handleTyping);
     socket.on("userStopTyping", handleStopTyping);
-    socket.on("messageDeleted", handleDeleteMessage);
+    socket.on("messageRevoked", handleMessageRevoked);
 
     return () => {
       socket.off("receiveMessage", handleReceiveMessage);
       socket.off("userTyping", handleTyping);
       socket.off("userStopTyping", handleStopTyping);
-      socket.off("messageDeleted", handleDeleteMessage);
+      socket.off("messageRevoked", handleMessageRevoked);
     };
   }, [chatRoomId, thisUser?.phoneNumber]);
 
