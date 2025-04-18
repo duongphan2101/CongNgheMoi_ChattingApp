@@ -19,7 +19,7 @@ import "./style.css";
 function View({ setIsLoggedIn }) {
   const [currentView, setCurrentView] = useState("chat");
   const [keyWord, setKeyWord] = useState("");
-  const [userChatting, setUserChatting] = useState({});
+  const [userChatting, setUserChatting] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -355,24 +355,23 @@ useEffect(() => {
   };
 
   const [userChatList, setUserChatList] = useState([]);
-
+  const [reloadConversations, setReloadConversations] = useState(false);
   useEffect(() => {
     if (!userInfo?.phoneNumber) return;
 
     let isMounted = true;
-
     (async () => {
       const data = await getConversations();
+      console.log("data conversation ", data);
       if (!isMounted || !data?.length) return;
 
       const myPhone = userInfo.phoneNumber;
-
       const userData = await Promise.all(
         data.map(async (convo) => {
           // Trường hợp nhóm
           if (convo.isGroup) {
             return {
-              name: convo.nameGroup,
+              name: convo.fullName,
               avatar: convo.avatar,
               isUnreadBy:
                 Array.isArray(convo.isUnreadBy) &&
@@ -382,15 +381,11 @@ useEffect(() => {
               chatRoomId: convo.chatRoomId,
             };
           }
-
           // Trường hợp chat đơn
           const partnerPhone = convo.participants.find((p) => p !== myPhone);
-
           if (!partnerPhone) return null;
-
           const userArray = await getUserbySearch(partnerPhone, "");
           const user = Array.isArray(userArray) ? userArray[0] : userArray;
-
           return user
             ? {
               ...user,
@@ -404,28 +399,59 @@ useEffect(() => {
             : null;
         })
       );
-
-      setUserChatList(userData.filter((user) => user !== null));
+      setUserChatList(userData.filter((u) => u !== null));
     })();
 
     return () => {
       isMounted = false;
     };
-  }, [userInfo?.phoneNumber]);
-
+  }, [userInfo?.phoneNumber, reloadConversations]);
 
   const check = async (phone1, phone2) => {
-    const chatting = await getUserbySearch(phone2, phone2);
-    setUserChatting(chatting);
+    try {
+      const chatting = await getUserbySearch(phone2, "");
 
-    const chatId = [phone1, phone2].sort().join("_");
-    const chatRoomId = await checkChatRoom(phone1, phone2);
+      const chatId = [phone1, phone2].sort().join("_");
+      const chatRoomId = await checkChatRoom(phone1, phone2);
+
+      const chatRoomInfo = await getChatRoom(chatRoomId);
+      if (chatRoomInfo.isGroup) {
+        console.warn("Cảnh báo: Chat đơn nhưng trả về chatRoom nhóm!");
+        chatRoomInfo.isGroup = false; // Gán lại đúng loại
+      }
+
+      setChatRoom(chatRoomInfo);
+      setUserChatting(Array.isArray(chatting) ? [chatting[0]] : []);
+
+      await markAsRead(chatId);
+    } catch (error) {
+      console.error("Lỗi trong check():", error.message);
+    }
+  };
+
+
+  const checkGroup = async (chatRoomId) => {
     const chatRoomInfo = await getChatRoom(chatRoomId);
     setChatRoom(chatRoomInfo);
 
-    // Mark the conversation as read
-    await markAsRead(chatId);
+    const otherUsers = chatRoomInfo.participants.filter(
+      (phone) => phone !== userInfo.phoneNumber
+    );
+
+    // Lấy thông tin user từ getUserbySearch
+    const users = await Promise.all(
+      otherUsers.map(async (phone) => {
+        const result = await getUserbySearch(phone, "");
+        // Lấy phần tử đầu tiên trong mảng trả về từ getUserbySearch
+        return result.length > 0 ? result[0] : null;
+      })
+    );
+
+    const usersData = users.filter((user) => user !== null); // Loại bỏ các phần tử null
+
+    setUserChatting(usersData); // Dù là group, vẫn truyền danh sách còn lại
   };
+
 
   const updateLastMessage = (senderPhone, receiverPhone, lastMessage) => {
     setUserChatList((prevList) =>
@@ -766,18 +792,28 @@ useEffect(() => {
         {/* User List */}
         <div className="user-list">
           {userChatList.length > 0 ? (
-            userChatList.map((user, index) => (
+            userChatList.map((user) => (
               <div
                 className="user"
-                key={index}
+                key={user.chatRoomId}
                 onClick={async () => {
-                  await markAsRead(user.chatId);
-                  check(userInfo.phoneNumber, user.phoneNumber);
+
+                  if (user.isGroup) {
+                    await checkGroup(user.chatRoomId);
+                  } else if (user.phoneNumber) {
+                    await check(userInfo.phoneNumber, user.phoneNumber);
+                  }
+
+                  setReloadConversations((prev) => !prev);
                 }}
               >
                 <img className="user-avt" src={user.avatar} alt="User" />
                 <div>
-                  <strong>{user.fullName || "Chưa cập nhật"}</strong>
+                  <strong>
+                    {user.isGroup
+                      ? user.name || "Nhóm chưa đặt tên"
+                      : user.fullName || "Chưa cập nhật"}
+                  </strong>
                   <br />
                   <small className={user.isUnreadBy ? "bold-message" : ""}>
                     {renderLastMessage(user.lastMessage)}
@@ -786,12 +822,12 @@ useEffect(() => {
               </div>
             ))
           ) : (
-            <p style={{
-              padding: "0 50px",
-            }}>
-              Hãy tìm bạn bè bằng số điện thoại và trò chuyện với họ ngay nào!</p>
+            <p style={{ padding: "0 50px" }}>
+              Hãy tìm bạn bè bằng số điện thoại và trò chuyện với họ ngay nào!
+            </p>
           )}
         </div>
+
 
         <div className="sidebar-bottom d-flex justify-content-around align-items-center">
           <button

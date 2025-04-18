@@ -10,6 +10,7 @@ const fetchChatRoom = async (chatRoomId) => {
         }
 
         const data = await response.json();
+                console.log("Chat room : ", data);
         return data;
     } catch (error) {
         console.error("Lỗi khi lấy thông tin phòng chat:", error);

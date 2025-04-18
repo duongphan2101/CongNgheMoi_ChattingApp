@@ -183,7 +183,101 @@ router.post("/createChatRoomForGroup", async (req, res) => {
   }
 });
 
+// Cập nhật tên nhóm ở cả ChatRoom và Conversation
+router.put("/updateChatRoom/:id", async (req, res) => {
+  const { nameGroup } = req.body;
 
+  if (!nameGroup || typeof nameGroup !== "string") {
+    return res.status(400).json({ message: "Tên nhóm không hợp lệ." });
+  }
+
+  try {
+    // Cập nhật ChatRoom
+    const updatedChatRoom = await ChatRoom.findByIdAndUpdate(
+      req.params.id,
+      { nameGroup },
+      { new: true }
+    );
+
+    if (!updatedChatRoom) {
+      return res.status(404).json({ message: "Không tìm thấy nhóm." });
+    }
+
+    // Cập nhật Conversation (nếu có)
+    await Conversation.findOneAndUpdate(
+      { chatRoomId: req.params.id },
+      { fullName: nameGroup }
+    );
+
+    res.json(updatedChatRoom);
+  } catch (err) {
+    console.error("Lỗi cập nhật tên nhóm:", err);
+    res.status(500).json({ message: "Lỗi server khi cập nhật tên nhóm." });
+  }
+});
+
+// 2. Thêm thành viên vào nhóm
+router.put("/:id/add-members", async (req, res) => {
+  const { addMembers } = req.body;
+
+  if (!Array.isArray(addMembers)) {
+    return res.status(400).json({ message: "Danh sách thành viên không hợp lệ." });
+  }
+
+  try {
+    const updated = await ChatRoom.findByIdAndUpdate(
+      req.params.id,
+      { $addToSet: { participants: { $each: addMembers } } },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ message: "Không tìm thấy nhóm." });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// 3. Xóa thành viên khỏi nhóm
+// router.put("/:id/remove-members", async (req, res) => {
+//   const { removeMembers } = req.body;
+
+//   if (!Array.isArray(removeMembers)) {
+//     return res.status(400).json({ message: "Danh sách cần xoá không hợp lệ." });
+//   }
+
+//   try {
+//     const updated = await ChatRoom.findByIdAndUpdate(
+//       req.params.id,
+//       { $pull: { participants: { $in: removeMembers } } },
+//       { new: true }
+//     );
+//     if (!updated) return res.status(404).json({ message: "Không tìm thấy nhóm." });
+//     res.json(updated);
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
+
+// 4. Cập nhật avatar nhóm
+// router.put("/:id/avatar", async (req, res) => {
+//   const { avatar } = req.body;
+
+//   if (!avatar || typeof avatar !== "string") {
+//     return res.status(400).json({ message: "Ảnh đại diện không hợp lệ." });
+//   }
+
+//   try {
+//     const updated = await ChatRoom.findByIdAndUpdate(
+//       req.params.id,
+//       { avatar },
+//       { new: true }
+//     );
+//     if (!updated) return res.status(404).json({ message: "Không tìm thấy nhóm." });
+//     res.json(updated);
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
 
 
 module.exports = router;
