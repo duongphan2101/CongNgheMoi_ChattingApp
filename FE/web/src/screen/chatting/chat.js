@@ -29,8 +29,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [currentImage, setCurrentImage] = useState({ src: "", name: "" });
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
-  const [replyingTo, setReplyingTo] = useState(null);
-  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
   const [modalListFriends, setModalListFriends] = useState(false);
   const [listFriends, setListFriends] = useState([]);
   const [listAddtoGroup, setListAddtoGroup] = useState([]);
@@ -44,6 +42,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+
   const otherUserPhone = chatRoom?.participants?.find(
     (phone) => phone !== currentUserPhone
   );
@@ -55,8 +56,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         msg.type === "audio"
           ? "Tin nhắn thoại"
           : msg.type === "file"
-          ? "File đính kèm"
-          : msg.message,
+            ? "File đính kèm"
+            : msg.message,
     });
     setActiveMessageId(null);
     setHighlightedMessageId(msg.timestamp);
@@ -84,7 +85,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       handleStopRecording();
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
         const supportedMimeTypes = ["audio/webm", "audio/mp4"];
         const mimeType =
           supportedMimeTypes.find((type) => MediaRecorder.isTypeSupported(type)) ||
@@ -125,7 +128,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     }
   };
 
-    const handleSendAudio = () => {
+  const handleSendAudio = () => {
     if (isRecording) {
       handleStopRecording();
     } else if (audioBlob) {
@@ -154,7 +157,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       }
       const audioMessage = await response.json();
       console.log("Gửi ghi âm thành công:", audioMessage);
-
       setAudioBlob(null);
     } catch (err) {
       console.error("Lỗi khi gửi ghi âm:", err);
@@ -304,7 +306,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     socket.on("receiveMessage", (newMessage) => {
       setMessages((prev) => [...prev, newMessage]);
 
-      // Cập nhật lastMessage
       updateLastMessage(
         newMessage.sender,
         newMessage.receiver,
@@ -380,10 +381,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       type: "text",
       replyTo: replyingTo
         ? {
-            timestamp: replyingTo.timestamp,
-            message: replyingTo.message,
-            sender: replyingTo.sender,
-          }
+          timestamp: replyingTo.timestamp,
+          message: replyingTo.message,
+          sender: replyingTo.sender,
+        }
         : null,
     };
     setMessage("");
@@ -575,9 +576,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   <div
                     key={index}
                     id={`message-${msg.timestamp}`}
-                    className={`message ${
-                      isSentByCurrentUser ? "sent" : "received"
-                    } ${isHighlighted ? "highlighted" : ""}`}
+                    className={`message ${isSentByCurrentUser ? "sent" : "received"
+                      } ${isHighlighted ? "highlighted" : ""}`}
                   >
                     {!isSentByCurrentUser && (
                       <img
@@ -647,7 +647,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                                 console.error("Lỗi phát audio:", e.nativeEvent.error);
                                 alert(
                                   "Không thể phát tin nhắn thoại: " +
-                                    e.nativeEvent.error.message
+                                  e.nativeEvent.error.message
                                 );
                               }}
                             />

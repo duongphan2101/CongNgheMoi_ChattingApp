@@ -31,7 +31,7 @@ module.exports = (io, redisPublisher) => {
 
   router.post("/sendMessage", async (req, res) => {
     try {
-      const { chatRoomId, sender, receiver, message } = req.body;
+      const { chatRoomId, sender, receiver, message, replyTo } = req.body;
 
       if (!chatRoomId || !sender || !receiver || !message) {
         console.error("❌ Thiếu dữ liệu từ client:", req.body);
