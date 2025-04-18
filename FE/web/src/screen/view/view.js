@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Chat from "../chatting/chat";
 import Setting from "../setting/setting";
 import Cloud from "../cloud/cloud";
@@ -29,34 +29,45 @@ function View({ setIsLoggedIn }) {
   const [userSearch, setUserSearch] = useState([]);
   const [isSearchVisible, setIsSearchVisible] = useState(false); // Trạng thái hiển thị danh sách
   const searchRef = useRef(null); // Tham chiếu đến phần tử danh sách tìm kiếm
+  const [friendRequests, setFriendRequests] = useState([]);
+  const [friends, setFriends] = useState([]);
+  const [hasNewFriendRequest, setHasNewFriendRequest] = useState(false);
 
   const renderView = () => {
     switch (currentView) {
-      case "chat":
-        return (
-          <Chat
-            setCurrentView={setCurrentView}
-            chatRoom={chatRoom || {}}
-            userChatting={userChatting || []}
-            user={userInfo || {}}
-            updateLastMessage={updateLastMessage} // Truyền hàm updateLastMessage
-          />
-        );
-      case "setting":
-        return (
-          <Setting
-            setCurrentView={setCurrentView}
-            setIsLoggedIn={setIsLoggedIn}
-          />
-        );
-      case "cloud":
-        return <Cloud setCurrentView={setCurrentView} />;
-      case "contacts":
-        return <Contacts setCurrentView={setCurrentView} />;
-      default:
-        return <Chat setCurrentView={setCurrentView} />;
+        case "chat":
+            return (
+                <Chat
+                    setCurrentView={setCurrentView}
+                    chatRoom={chatRoom || {}}
+                    userChatting={userChatting || []}
+                    user={userInfo || {}}
+                    updateLastMessage={updateLastMessage}
+                />
+            );
+        case "setting":
+            return (
+                <Setting
+                    setCurrentView={setCurrentView}
+                    setIsLoggedIn={setIsLoggedIn}
+                />
+            );
+        case "cloud":
+            return <Cloud setCurrentView={setCurrentView} />;
+        case "contacts":
+            return (
+                <Contacts
+                    setCurrentView={setCurrentView}
+                    friendRequests={friendRequests} // Truyền danh sách lời mời kết bạn
+                    friends={friends} // Truyền danh sách bạn bè
+                    handleAcceptFriendRequest={handleAcceptFriendRequest} // Truyền hàm chấp nhận
+                    handleRejectFriendRequest={handleRejectFriendRequest} // Truyền hàm từ chối
+                />
+            );
+        default:
+            return <Chat setCurrentView={setCurrentView} />;
     }
-  };
+};
 
   const [currentDate] = useState({
     year: new Date().getFullYear(),
@@ -90,6 +101,70 @@ function View({ setIsLoggedIn }) {
 
     fetchUser();
   }, []);
+
+  const fetchFriendRequests = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+        toast.error("Vui lòng đăng nhập!");
+        return;
+    }
+
+    try {
+        const response = await fetch("http://localhost:3824/user/friendRequests", {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) throw new Error("Lỗi khi lấy danh sách lời mời kết bạn!");
+
+        const data = await response.json();
+
+        // Kiểm tra nếu có lời mời mới
+        if (data.length > friendRequests.length) {
+            setHasNewFriendRequest(true);
+        }
+
+        setFriendRequests(data);
+    } catch (error) {
+        console.error("Lỗi khi lấy danh sách lời mời kết bạn:", error);
+        toast.error("Không thể lấy danh sách lời mời kết bạn!");
+    }
+}, [friendRequests.length]); // Thêm dependency nếu cần
+
+useEffect(() => {
+    fetchFriendRequests();
+}, [fetchFriendRequests]);
+
+useEffect(() => {
+  const fetchFriends = async () => {
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+          toast.error("Vui lòng đăng nhập!");
+          return;
+      }
+
+      try {
+          const response = await fetch("http://localhost:3824/user/friends", {
+              method: "GET",
+              headers: {
+                  Authorization: `Bearer ${token}`,
+              },
+          });
+
+          if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
+
+          const data = await response.json();
+          console.log("Friends data:", data); // Kiểm tra dữ liệu trả về
+          setFriends(data);
+      } catch (error) {
+          
+      }
+  };
+
+  fetchFriends();
+}, []);
 
   const handleEdit = () => {
     const editData = { ...userInfo };
@@ -217,12 +292,8 @@ function View({ setIsLoggedIn }) {
       toast.success("Cập nhật thông tin thành công!", {
         position: "top-right",
       });
-      // setNotification({ show: true, message: "Cập nhật thông tin thành công!", type: "success" });
-      // setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
     } catch (error) {
       toast.error("Cập nhật thông tin thất bại!", { position: "top-right" });
-      // setNotification({ show: true, message: "Cập nhật thông tin thất bại!", type: "error" });
-      // setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 5000);
     }
   };
 
@@ -231,8 +302,6 @@ function View({ setIsLoggedIn }) {
     const avatarFile = editInfo.avatar; //file được chọn lưu trong editInfo sau khi người dùng chọn file
     if (!token || !avatarFile) {
       toast.error("Vui lòng chọn ảnh trước!", { position: "top-right" });
-      // setNotification({ show: true, message: "Vui lòng chọn ảnh trước!", type: "error" });
-      // setTimeout(() => setNotification({ show: false, message: "", type: "success" }), 3000);
       return;
     }
 
@@ -272,25 +341,34 @@ function View({ setIsLoggedIn }) {
     e.preventDefault();
 
     if (!keyWord.trim()) {
-      toast.warning("Vui lòng nhập từ khóa tìm kiếm.");
-      return;
+        toast.warning("Vui lòng nhập từ khóa tìm kiếm.");
+        return;
     }
 
     try {
-      const result = await getUserbySearch(keyWord, keyWord);
-      setUserSearch(result);
+        const result = await getUserbySearch(keyWord, keyWord);
 
-      if (!result || result.length === 0) {
-        toast.warning("Không tìm thấy user!");
-        setUserSearch([]);
-      } else {
-        setUserSearch(result);
-        setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
-      }
+        if (!result || result.length === 0) {
+            toast.warning("Không tìm thấy user!");
+            setUserSearch([]);
+        } else {
+            // Lọc bỏ chính số điện thoại của người dùng
+            const filteredResult = result.filter(
+                (user) => user.phoneNumber !== userInfo.phoneNumber
+            );
+
+            if (filteredResult.length === 0) {
+                toast.warning("Không tìm thấy user phù hợp!");
+            }
+
+            setUserSearch(filteredResult);
+            setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
+        }
     } catch (error) {
-      toast.warning("Lỗi khi gọi API:", error);
+        console.error("Lỗi khi gọi API:", error);
+        toast.warning("Lỗi khi tìm kiếm user!");
     }
-  };
+};
 
   const [userChatList, setUserChatList] = useState([]);
 
@@ -513,6 +591,86 @@ function View({ setIsLoggedIn }) {
     };
   }, []);
 
+  const handleSendFriendRequest = async (receiverPhone) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        toast.error("Vui lòng đăng nhập để gửi yêu cầu kết bạn!");
+        return;
+      }
+  
+      const response = await fetch("http://localhost:3824/user/sendFriendRequest", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ receiverPhone }),
+      });
+  
+      if (!response.ok) throw new Error("Gửi yêu cầu kết bạn thất bại!");
+  
+      toast.success("Gửi yêu cầu kết bạn thành công!");
+    } catch (error) {
+      console.error("Lỗi gửi yêu cầu kết bạn:", error);
+      toast.error("Lỗi khi gửi yêu cầu kết bạn!");
+    }
+  };
+
+  const handleAcceptFriendRequest = async (requestId) => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+        toast.error("Vui lòng đăng nhập!");
+        return;
+    }
+
+    try {
+        const response = await fetch("http://localhost:3824/user/acceptFriendRequest", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ requestId }),
+        });
+
+        if (!response.ok) throw new Error("Chấp nhận lời mời kết bạn thất bại!");
+
+        toast.success("Đã chấp nhận lời mời kết bạn!");
+        fetchFriendRequests(); // Cập nhật lại danh sách lời mời
+    } catch (error) {
+        console.error("Lỗi khi chấp nhận lời mời kết bạn:", error);
+        toast.error("Không thể chấp nhận lời mời kết bạn!");
+    }
+};
+
+const handleRejectFriendRequest = async (requestId) => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+        toast.error("Vui lòng đăng nhập!");
+        return;
+    }
+
+    try {
+        const response = await fetch("http://localhost:3824/user/rejectFriendRequest", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ requestId }),
+        });
+
+        if (!response.ok) throw new Error("Từ chối lời mời kết bạn thất bại!");
+
+        toast.success("Đã từ chối lời mời kết bạn!");
+        fetchFriendRequests(); // Cập nhật lại danh sách lời mời
+    } catch (error) {
+        console.error("Lỗi khi từ chối lời mời kết bạn:", error);
+        toast.error("Không thể từ chối lời mời kết bạn!");
+    }
+};
+
   return (
     <div className="wrapper">
       {/* Sidebar */}
@@ -534,47 +692,70 @@ function View({ setIsLoggedIn }) {
           {isSearchVisible && userSearch.length > 0 && (
             <div className="search_theme" ref={searchRef}>
               <ul className="m-0 p-0" style={{ flex: 1 }}>
-                {userSearch.map((user, index) => (
-                  <li
-                    key={user.id || user.phoneNumber || index}
+                {userSearch.map((user, index) => {
+    const isFriend = friends.some((friend) => friend.phoneNumber === user.phoneNumber);
+
+    return (
+        <li
+            key={user.id || user.phoneNumber || index}
+            style={{
+                listStyleType: "none",
+                width: "100%",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                padding: "10px",
+                borderRadius: "8px",
+                transition: "background 0.2s ease-in-out",
+                justifyContent: "space-between", // Thêm để căn nút sang phải
+            }}
+            onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#222")
+            }
+            onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "transparent")
+            }
+        >
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                }}
+                onClick={() =>
+                    handleUserClick(userInfo.phoneNumber, user.phoneNumber)
+                }
+            >
+                <img
+                    className="user-avt"
+                    src={user?.avatar}
+                    alt="Avatar"
                     style={{
-                      listStyleType: "none",
-                      width: "100%",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "10px",
-                      borderRadius: "8px",
-                      transition: "background 0.2s ease-in-out",
-                    }}
-                    onClick={() =>
-                      handleUserClick(userInfo.phoneNumber, user.phoneNumber)
-                    }
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = "#222")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background = "transparent")
-                    }
-                  >
-                    <img
-                      className="user-avt"
-                      src={user?.avatar}
-                      alt="Avatar"
-                      style={{
                         width: "40px",
                         height: "40px",
                         borderRadius: "50%",
-                      }}
-                    />
-                    <span
-                      className="mx-4"
-                      style={{ fontSize: "16px", fontWeight: "500" }}
-                    >
-                      {user.fullName}
-                    </span>
-                  </li>
-                ))}
+                    }}
+                />
+                <span
+                    className="mx-4"
+                    style={{ fontSize: "16px", fontWeight: "500" }}
+                >
+                    {user.fullName}
+                </span>
+            </div>
+            {!isFriend && ( // Chỉ hiển thị nút "Thêm bạn" nếu chưa kết bạn
+                <button
+                    className="btn btn-primary btn-sm"
+                    onClick={(e) => {
+                        e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
+                        handleSendFriendRequest(user.phoneNumber);
+                    }}
+                >
+                    Thêm bạn
+                </button>
+            )}
+        </li>
+    );
+})}
               </ul>
             </div>
           )}
@@ -641,11 +822,31 @@ function View({ setIsLoggedIn }) {
             )}
           </div>
           <button
-            className="sidebar-bottom-btn btn"
-            onClick={() => setCurrentView("contacts")}
-          >
-            <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i>
-          </button>
+    className={`sidebar-bottom-btn btn ${hasNewFriendRequest ? "active" : ""}`}
+    onClick={() => {
+        setCurrentView("contacts");
+        setHasNewFriendRequest(false); // Xóa trạng thái lời mời mới khi người dùng vào trang "Contacts"
+    }}
+    style={{ position: "relative" }}
+>
+    <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i>
+    {hasNewFriendRequest && (
+        <span
+            style={{
+                position: "absolute",
+                top: "5px",
+                right: "5px",
+                backgroundColor: "red",
+                color: "white",
+                borderRadius: "50%",
+                padding: "2px 6px",
+                fontSize: "12px",
+            }}
+        >
+            !
+        </span>
+    )}
+</button>
           {/* <button
             className="sidebar-bottom-btn btn"
             onClick={() => setCurrentView("cloud")}

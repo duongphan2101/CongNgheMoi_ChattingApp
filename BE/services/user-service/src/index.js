@@ -10,7 +10,6 @@ app.use(express.json());
 
 const userRoutes = require("./routes/userRouters");
 app.use("/user", userRoutes);
-
 // Khởi động server
 const PORT = process.env.PORT || 3824;
 app.listen(PORT, () => {
