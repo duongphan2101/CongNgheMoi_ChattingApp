@@ -7,8 +7,11 @@ import getIp from '../utils/getIp_notPORT';
 import { useSearch } from '../contexts/searchContext';
 import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
-
+import io from "socket.io-client";
 const BASE_URL = getIp();
+
+const socket = io(`http://${BASE_URL}:3824`);
+console.log( "Da connect :" , socket.connected)
 
 export default function App({navigation}) {
   const { theme, toggleTheme } = useTheme();
@@ -192,6 +195,48 @@ export default function App({navigation}) {
     fetchFriends();
     fetchFriendRequests();
   }, []);
+
+  useEffect(() => {
+    if (!thisUser?.phoneNumber) return;
+
+    // Emit an event to register the user for real-time updates
+    socket.emit("register", thisUser.phoneNumber);
+
+    // Handle new friend requests
+    const handleNewFriendRequest = (newRequest) => {
+      console.log("Lời mời kết bạn mới:", newRequest);
+      setFriendRequests((prev) => [...prev, newRequest]);
+    };
+
+    // Handle friend request acceptance
+    const handleFriendRequestAccepted = ({ senderPhone }) => {
+      console.log("Yêu cầu kết bạn được chấp nhận:", senderPhone);
+      fetchFriends(); // Refresh the friends list
+      setFriendRequests((prev) =>
+        prev.filter((request) => request.senderPhone !== senderPhone)
+      );
+    };
+
+    // Handle friend request rejection
+    const handleFriendRequestRejected = ({ senderPhone }) => {
+      console.log("Yêu cầu kết bạn bị từ chối:", senderPhone);
+      setFriendRequests((prev) =>
+        prev.filter((request) => request.senderPhone !== senderPhone)
+      );
+    };
+
+    // Listen for socket events
+    socket.on("newFriendRequest", handleNewFriendRequest);
+    socket.on("friendRequestAccepted", handleFriendRequestAccepted);
+    socket.on("friendRequestRejected", handleFriendRequestRejected);
+
+    // Cleanup on component unmount
+    return () => {
+      socket.off("newFriendRequest", handleNewFriendRequest);
+      socket.off("friendRequestAccepted", handleFriendRequestAccepted);
+      socket.off("friendRequestRejected", handleFriendRequestRejected);
+    };
+  }, [thisUser?.phoneNumber]);
 
   useFocusEffect(
     React.useCallback(() => {

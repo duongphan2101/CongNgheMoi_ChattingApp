@@ -456,14 +456,6 @@ router.post("/rejectFriendRequest", async (req, res) => {
 
     await dynamoDB.update(updateRequestParams).promise();
 
-    // Gửi sự kiện realtime
-    io.emit('friendRequestRejected', {
-      RequestId: requestId,
-      senderPhone: friendRequest.senderPhone,
-      receiverPhone: friendRequest.receiverPhone,
-    });
-
-    res.status(200).json({ message: "Đã từ chối yêu cầu kết bạn!" });
   } catch (error) {
     console.error("Lỗi từ chối yêu cầu kết bạn:", error);
     res.status(500).json({ message: "Lỗi server!", error: error.message });
@@ -497,7 +489,6 @@ router.get("/friends", async (req, res) => {
         Key: { phoneNumber: friendPhone },
       };
       const { Item: friend } = await dynamoDB.get(friendParams).promise();
-      console.log("Friend data:", friend); // Kiểm tra dữ liệu của từng bạn bè
       return friend
         ? {
             phoneNumber: friend.phoneNumber,
@@ -580,13 +571,6 @@ router.post("/unfriend", async (req, res) => {
       dynamoDB.update(updateFriendParams).promise()
     ]);
 
-    // Gửi sự kiện realtime
-    io.emit('unfriend', {
-      currentUserPhone,
-      friendPhone
-    });
-
-    res.status(200).json({ message: "Đã hủy kết bạn thành công!" });
   } catch (error) {
     console.error("Lỗi hủy kết bạn:", error);
     res.status(500).json({ message: "Lỗi server!", error: error.message });

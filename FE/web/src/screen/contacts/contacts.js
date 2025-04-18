@@ -48,7 +48,7 @@ function Contacts({
 
       if (response.data.message === "Đã hủy kết bạn thành công!") {
         // Cập nhật UI bằng cách reload trang
-        window.location.reload();
+    
         alert("Đã hủy kết bạn!");
       }
     } catch (error) {
