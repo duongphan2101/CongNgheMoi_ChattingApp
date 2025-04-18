@@ -22,7 +22,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Trạng thái cho modal xem ảnh
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImage, setCurrentImage] = useState({
     src: "",
@@ -31,6 +30,30 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   const messagesEndRef = useRef(null);
   const emojiPickerRef = useRef(null);
+
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+
+  const handleReplyMessage = (msg) => {
+    setReplyingTo({
+      ...msg,
+      message: msg.type === "audio" ? "Tin nhắn thoại" : msg.message,
+    });
+    setActiveMessageId(null);
+    setHighlightedMessageId(msg.timestamp);
+    const repliedMessageElement = document.getElementById(
+      `message-${msg.timestamp}`
+    );
+    repliedMessageElement?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+    setHighlightedMessageId(null);
+  };
 
   const otherUserPhone = chatRoom?.participants?.find(
     (phone) => phone !== currentUserPhone
@@ -48,33 +71,36 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   const handleMicClick = async () => {
     if (isRecording) {
-      // If already recording, stop and send the audio
       handleStopRecording();
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
         const supportedMimeTypes = ["audio/webm", "audio/mp4"];
         const mimeType =
-          supportedMimeTypes.find((type) => MediaRecorder.isTypeSupported(type)) || "audio/webm";
+          supportedMimeTypes.find((type) =>
+            MediaRecorder.isTypeSupported(type)
+          ) || "audio/webm";
         const mediaRecorder = new MediaRecorder(stream, { mimeType });
-  
+
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
-  
+
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
         };
-  
+
         mediaRecorder.onstop = () => {
           const blob = new Blob(audioChunksRef.current, { type: mimeType });
           setAudioBlob(blob);
           setIsRecording(false);
           stream.getTracks().forEach((track) => track.stop());
-          sendAudioBlob(blob); // Send the audio blob immediately after stopping
+          sendAudioBlob(blob);
         };
-  
+
         mediaRecorder.start();
         setIsRecording(true);
       } catch (err) {
@@ -107,7 +133,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       "file",
       blob,
       `voice-${Date.now()}.${blob.type.split("/")[1]}`
-    ); // Gửi định dạng gốc
+    );
     formData.append("chatRoomId", chatRoom?.chatRoomId);
     formData.append("sender", currentUserPhone);
     formData.append("receiver", otherUserPhone);
@@ -125,7 +151,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       }
       const audioMessage = await response.json();
       console.log("Gửi ghi âm thành công:", audioMessage);
-      setAudioBlob(null); // Reset blob sau khi gửi
+      setAudioBlob(null);
     } catch (err) {
       console.error("Lỗi khi gửi ghi âm:", err);
       alert("Không thể gửi tin nhắn thoại: " + err.message);
@@ -192,7 +218,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         return [...prev, newMessage];
       });
 
-      // Cập nhật lastMessage
       updateLastMessage(
         newMessage.sender,
         newMessage.receiver,
@@ -228,7 +253,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       ) {
         setShowPicker(false);
       }
-      // tắt menu khi click ra ngoài
       if (
         !event.target.closest(".message-options") &&
         !event.target.closest(".message-options-menu")
@@ -238,7 +262,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     }
     document.addEventListener("mousedown", handleClickOutside);
 
-    // Thêm xử lý khi nhấn ESC để đóng modal
     const handleEsc = (event) => {
       if (event.keyCode === 27) {
         setShowImageModal(false);
@@ -260,6 +283,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   const handleSendMessage = async () => {
     if (!message.trim()) return;
+
     const newMsg = {
       chatRoomId: chatRoom?.chatRoomId || "",
       sender: currentUserPhone,
@@ -267,8 +291,17 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       message,
       timestamp: Date.now(),
       type: "text",
+      replyTo: replyingTo
+        ? {
+            timestamp: replyingTo.timestamp,
+            message: replyingTo.message,
+            sender: replyingTo.sender,
+          }
+        : null,
     };
     setMessage("");
+    setReplyingTo(null);
+
     try {
       const response = await fetch("http://localhost:3618/sendMessage", {
         method: "POST",
@@ -277,7 +310,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       });
       if (!response.ok) throw new Error("Gửi tin nhắn thất bại!");
 
-      // Cập nhật lastMessage trong danh sách userChatList
       updateLastMessage(currentUserPhone, otherUserPhone, newMsg.message);
     } catch (error) {
       console.error("Lỗi gửi tin nhắn:", error);
@@ -355,7 +387,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     }
   };
 
-  // Hàm mở modal xem ảnh
   const openImageModal = (src, name) => {
     setCurrentImage({ src, name });
     setShowImageModal(true);
@@ -462,13 +493,15 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 const isSentByCurrentUser = msg.sender === currentUserPhone;
                 const isAudio = msg.type === "audio";
                 const isFile = msg.type === "file";
+                const isHighlighted = highlightedMessageId === msg.timestamp;
 
                 return (
                   <div
                     key={index}
+                    id={`message-${msg.timestamp}`}
                     className={`message ${
                       isSentByCurrentUser ? "sent" : "received"
-                    }`}
+                    } ${isHighlighted ? "highlighted" : ""}`}
                   >
                     {!isSentByCurrentUser && (
                       <img
@@ -479,7 +512,86 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                     )}
                     <div className="message-wrapper">
                       <div className="message-info">
-                        <span>
+                        {msg.replyTo && (
+                          <div className="reply-preview">
+                            {msg.replyTo.sender === currentUserPhone ? (
+                              <span>Bạn đã trả lời tin nhắn của mình</span>
+                            ) : (
+                              <span>
+                                Trả lời từ{" "}
+                                {userChatting[0]?.fullName ||
+                                  msg.replyTo.sender}
+                              </span>
+                            )}
+                            <p
+                              style={{
+                                backgroundColor: "#3F4040",
+                                color: "#B0B3B8",
+                                fontSize: "13px",
+                                margin: "5px 0 0 0",
+                                padding: "10px ", 
+                                borderRadius: "20px",
+                                maxWidth: "95%",
+                                wordWrap: "break-word",
+                                width: "fit-content",
+                                cursor: "pointer",
+                              }}
+                              onClick={() => {
+                                const repliedMessageElement = document.getElementById(
+                                  `message-${msg.replyTo.timestamp}`
+                                );
+                                repliedMessageElement?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "start",
+                                });
+                              }}
+                            >
+                              {msg.replyTo.message}
+                            </p>
+                          </div>
+                        )}
+
+                        {isFile ? (
+                          renderFileMessage(msg)
+                        ) : isAudio ? (
+                          <div className="audio-message">
+                          
+                          <audio
+                            controls
+                            src={msg.fileInfo?.url || msg.message}
+                            type="audio/mpeg"
+                            style={{ marginTop: 5 }}
+                            onError={(e) => {
+                              console.error("Lỗi phát audio:", e.nativeEvent.error);
+                              alert(
+                                "Không thể phát tin nhắn thoại: " +
+                                  e.nativeEvent.error.message
+                              );
+                            }}
+                          />
+                        </div>
+                        ) : (
+                          <p
+                            style={{
+                              borderRadius: "25px",
+                              color: "black",
+                              padding: "12px",
+                              width: "95%",
+                            }}
+                          >
+                            {msg.message}{" "}
+                        
+                          </p>
+                        )}
+                        <span
+                          className="timestamp"
+                          style={{
+                            color: "lightgrey",
+                            fontSize: "12px",
+                            marginLeft: "8px",
+                            display: "block",
+                          }}
+                        >
                           {new Date(msg.timestamp).toLocaleString("en-US", {
                             timeZone: "Asia/Ho_Chi_Minh",
                             hour: "numeric",
@@ -487,29 +599,16 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                             hour12: true,
                           })}
                         </span>
-                        {isFile ? (
-                          renderFileMessage(msg)
-                        ) : isAudio ? (
-                          <audio
-                            controls
-                            src={msg.message}
-                            type="audio/mpeg" // Chỉ định type cho .mp3
-                            style={{ marginTop: 5 }}
-                            onError={(e) => {
-                              console.error(
-                                "Lỗi phát audio:",
-                                e.nativeEvent.error
-                              );
-                              alert(
-                                "Không thể phát tin nhắn thoại: " +
-                                  e.nativeEvent.error.message
-                              );
-                            }}
-                          />
-                        ) : (
-                          <p>{msg.message}</p>
-                        )}
                       </div>
+                    </div>
+                    <div className="message-options-container">
+                      <button
+                        className="message-options-btn reply-btn"
+                        title="Trả lời"
+                        onClick={() => handleReplyMessage(msg)}
+                      >
+                        <i className="bi bi-reply"></i>
+                      </button>
                     </div>
                     {isSentByCurrentUser && (
                       <div className="message-options-container">
@@ -557,7 +656,18 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   </button>
                 </div>
               )}
-
+              {replyingTo && (
+                <div className="replying-to-message">
+                  <p>Đang trả lời: {replyingTo.message}</p>
+                  
+                  <button
+                    onClick={handleCancelReply}
+                    className="message-options-btn x"
+                  >
+                    X
+                  </button>
+                </div>
+              )}
               <form
                 className="chat-input"
                 onSubmit={(e) => {
@@ -582,7 +692,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 >
                   <i className="bi bi-emoji-smile text-light"></i>
                 </button>
-
                 <input
                   type="file"
                   name="file"
@@ -598,11 +707,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 >
                   <i className="bi bi-file-earmark-arrow-up text-light"></i>
                 </button>
-
                 <button type="button" className="btn" onClick={handleMicClick}>
                   <i className="bi bi-mic text-light"></i>
                 </button>
-
                 <input
                   type="text"
                   placeholder="Nhập tin nhắn..."
@@ -618,7 +725,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         )}
       </div>
 
-      {/* Modal xem ảnh */}
       {showImageModal && (
         <div
           className="image-modal-overlay"
