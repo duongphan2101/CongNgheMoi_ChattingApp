@@ -656,7 +656,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                       <div className="message-info">
                         {chatRoom.isGroup && !isSentByCurrentUser && (
                           <span className="sender-name fw-bold">
-                            {senderUser?.fullName || "Ẩn danh"}
+                            {senderUser?.fulNlame || "Ẩn danh"}
                           </span>
                         )}
                         {msg.replyTo && (
