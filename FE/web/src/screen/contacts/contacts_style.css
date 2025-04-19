@@ -372,3 +372,56 @@
   font-size: 16px;
   font-weight: bold;
 }
+
+/* Lời mời kết bạn */
+.friend-requests {
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 20px;
+}
+
+.friend-requests h5 {
+  color: #ffffff;
+  margin-bottom: 15px;
+}
+
+.friend-requests .list-group-item {
+  background-color: #23272a;
+  border: none;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  padding: 10px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ffffff;
+}
+
+.friend-requests .list-group-item span {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.friend-requests .btn {
+  font-size: 14px;
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.friend-requests .btn-success {
+  background-color: #4caf50;
+  border: none;
+}
+
+.friend-requests .btn-success:hover {
+  background-color: #45a049;
+}
+
+.friend-requests .btn-danger {
+  background-color: #e53935;
+  border: none;
+}
+
+.friend-requests .btn-danger:hover {
+  background-color: #d32f2f;
+}

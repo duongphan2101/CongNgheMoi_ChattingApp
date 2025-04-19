@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState} from "react";
 import "./contacts_style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import axios from "axios";
@@ -82,25 +82,25 @@ function Contacts({
       </div>
 
       {/* Hiển thị danh sách lời mời kết bạn */}
-      <div className="friend-requests mt-4">
-        <h5 className="text-light">Lời mời kết bạn</h5>
+      <div className="friend-requests">
+        <h5>Lời mời kết bạn</h5>
         {friendRequests && friendRequests.length > 0 ? (
           <ul className="list-group">
             {friendRequests.map((request) => (
               <li
                 key={request.RequestId} // Đảm bảo RequestId là duy nhất
-                className="list-group-item d-flex justify-content-between align-items-center"
+                className="list-group-item"
               >
                 <span>{request.senderPhone}</span>
                 <div>
                   <button
-                    className="btn btn-success btn-sm me-2"
+                    className="btn btn-success me-2"
                     onClick={() => handleAcceptFriendRequest(request.RequestId)}
                   >
                     Chấp nhận
                   </button>
                   <button
-                    className="btn btn-danger btn-sm"
+                    className="btn btn-danger"
                     onClick={() => handleRejectFriendRequest(request.RequestId)}
                   >
                     Từ chối

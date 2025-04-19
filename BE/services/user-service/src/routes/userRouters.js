@@ -396,12 +396,12 @@ router.post("/acceptFriendRequest", async (req, res) => {
       dynamoDB.update(addFriendToSenderParams).promise(),
     ]);
 
-    // Gửi sự kiện realtime
-    io.emit('friendRequestAccepted', {
-      RequestId: requestId,
-      senderPhone: friendRequest.senderPhone,
-      receiverPhone: friendRequest.receiverPhone,
-    });
+    // // Gửi sự kiện realtime
+    // io.emit('friendRequestAccepted', {
+    //   RequestId: requestId,
+    //   senderPhone: friendRequest.senderPhone,
+    //   receiverPhone: friendRequest.receiverPhone,
+    // });
 
     res.status(200).json({ message: "Chấp nhận yêu cầu kết bạn thành công!" });
   } catch (error) {

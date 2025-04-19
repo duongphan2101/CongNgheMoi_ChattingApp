@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList, TouchableWithoutFeedback, Keyboard, Alert } from 'react-native';
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import { useTheme } from "../contexts/themeContext";
 import colors from "../themeColors";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,10 +8,10 @@ import { useSearch } from '../contexts/searchContext';
 import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import io from "socket.io-client";
+import eventEmitter from "../utils/EventEmitter";
 const BASE_URL = getIp();
 
 const socket = io(`http://${BASE_URL}:3824`);
-console.log( "Da connect :" , socket.connected)
 
 export default function App({navigation}) {
   const { theme, toggleTheme } = useTheme();
@@ -20,12 +20,14 @@ export default function App({navigation}) {
   const [thisUser, setThisUser] = useState(null);
   const [friendRequests, setFriendRequests] = useState([]);
   const { hideSearch } = useSearch();
+  const fetchFriendsIntervalRef = useRef(null);
+  const fetchFriendRequestsIntervalRef = useRef(null);
 
-  const fetchFriends = async () => {
+  const fetchFriends = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
-        console.error('Không tìm thấy token!');
+        Alert.alert("Lỗi", "Không tìm thấy token!");
         return;
       }
 
@@ -50,14 +52,15 @@ export default function App({navigation}) {
       })));
     } catch (error) {
       console.error('Lỗi khi lấy danh sách bạn bè:', error);
+      Alert.alert("Lỗi", "Không thể lấy danh sách bạn bè!");
     }
-  };
+  }, []);
 
-  const fetchFriendRequests = async () => {
+  const fetchFriendRequests = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
-        console.error('Không tìm thấy token!');
+        Alert.alert("Lỗi", "Không tìm thấy token!");
         return;
       }
 
@@ -73,11 +76,18 @@ export default function App({navigation}) {
       }
 
       const data = await response.json();
+
+      // Kiểm tra nếu có lời mời mới
+      if (data.length > friendRequests.length) {
+        Alert.alert("Thông báo", "Bạn có lời mời kết bạn mới!");
+      }
+
       setFriendRequests(data);
     } catch (error) {
       console.error('Lỗi khi lấy danh sách lời mời kết bạn:', error);
+      Alert.alert("Lỗi", "Không thể lấy danh sách lời mời kết bạn!");
     }
-  };
+  }, [friendRequests.length]);
 
   const handleAcceptFriendRequest = async (requestId) => {
     try {
@@ -168,7 +178,7 @@ export default function App({navigation}) {
         setContacts((prevContacts) =>
           prevContacts.filter((contact) => contact.phone !== friendPhone)
         );
-        Alert.alert("Thành công", "Đã hủy kết bạn!");
+        Alert.alert("Thành công", `Bạn đã hủy kết bạn với ${friendPhone}!`);
       }
     } catch (error) {
       console.error("Lỗi hủy kết bạn:", error);
@@ -197,46 +207,30 @@ export default function App({navigation}) {
   }, []);
 
   useEffect(() => {
-    if (!thisUser?.phoneNumber) return;
+    // Bắt đầu polling
+    fetchFriendsIntervalRef.current = setInterval(() => {
+      fetchFriends();
+    }, 1000); // Poll every 1 second
 
-    // Emit an event to register the user for real-time updates
-    socket.emit("register", thisUser.phoneNumber);
+    fetchFriendRequestsIntervalRef.current = setInterval(() => {
+      fetchFriendRequests();
+    }, 2000); // Poll every 2 seconds
 
-    // Handle new friend requests
-    const handleNewFriendRequest = (newRequest) => {
-      console.log("Lời mời kết bạn mới:", newRequest);
-      setFriendRequests((prev) => [...prev, newRequest]);
+    // Lắng nghe sự kiện đăng xuất
+    const handleLogout = () => {
+      clearInterval(fetchFriendsIntervalRef.current);
+      clearInterval(fetchFriendRequestsIntervalRef.current);
     };
 
-    // Handle friend request acceptance
-    const handleFriendRequestAccepted = ({ senderPhone }) => {
-      console.log("Yêu cầu kết bạn được chấp nhận:", senderPhone);
-      fetchFriends(); // Refresh the friends list
-      setFriendRequests((prev) =>
-        prev.filter((request) => request.senderPhone !== senderPhone)
-      );
-    };
+    eventEmitter.on("logout", handleLogout);
 
-    // Handle friend request rejection
-    const handleFriendRequestRejected = ({ senderPhone }) => {
-      console.log("Yêu cầu kết bạn bị từ chối:", senderPhone);
-      setFriendRequests((prev) =>
-        prev.filter((request) => request.senderPhone !== senderPhone)
-      );
-    };
-
-    // Listen for socket events
-    socket.on("newFriendRequest", handleNewFriendRequest);
-    socket.on("friendRequestAccepted", handleFriendRequestAccepted);
-    socket.on("friendRequestRejected", handleFriendRequestRejected);
-
-    // Cleanup on component unmount
+    // Cleanup khi component unmount
     return () => {
-      socket.off("newFriendRequest", handleNewFriendRequest);
-      socket.off("friendRequestAccepted", handleFriendRequestAccepted);
-      socket.off("friendRequestRejected", handleFriendRequestRejected);
+      clearInterval(fetchFriendsIntervalRef.current);
+      clearInterval(fetchFriendRequestsIntervalRef.current);
+      eventEmitter.off("logout", handleLogout);
     };
-  }, [thisUser?.phoneNumber]);
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
