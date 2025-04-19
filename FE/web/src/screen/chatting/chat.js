@@ -44,7 +44,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   const [replyingTo, setReplyingTo] = useState(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
-
+  const [revokedMessages, setRevokedMessages] = useState([]);
   const otherUserPhone = chatRoom?.participants?.find(
     (phone) => phone !== currentUserPhone
   );
@@ -300,9 +300,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       .then((res) => res.json())
       .then((data) => setMessages(data))
       .catch((err) => console.error("Error fetching messages:", err));
-  
+
     socket.emit("joinRoom", chatRoom.chatRoomId);
-  
+
     socket.on("receiveMessage", (newMessage) => {
       setMessages((prev) => [...prev, newMessage]);
 
@@ -312,13 +312,13 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         newMessage.message
       );
     });
-  
+
     socket.on("userTyping", () => setTyping(true));
     socket.on("userStopTyping", () => setTyping(false));
-    
+
     socket.on("messageRevoked", (data) => {
-      setMessages((prev) => 
-        prev.map(msg => 
+      setMessages((prev) =>
+        prev.map(msg =>
           msg.timestamp === data.timestamp ? data : msg
         )
       );
@@ -331,7 +331,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         );
       }
     });
-  
+
     return () => {
       socket.off("receiveMessage");
       socket.off("userTyping");
@@ -442,31 +442,45 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   };
 
   const handleFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
+    console.log(`Đang tải ${files.length} file lên`);
     setUploading(true);
+
     try {
       const formData = new FormData();
-      
+
       for (let i = 0; i < files.length; i++) {
         formData.append("files", files[i]);
       }
-      
+
       formData.append("chatRoomId", chatRoom.chatRoomId);
       formData.append("sender", currentUserPhone);
       formData.append("receiver", otherUserPhone);
+
+      console.log("ChatRoomId:", chatRoom.chatRoomId);
+      console.log("Sender:", currentUserPhone);
+      console.log("Receiver:", otherUserPhone);
+      console.log(`Số lượng file: ${files.length}`);
+
       const response = await fetch("http://localhost:3618/uploadFile", {
         method: "POST",
         body: formData,
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Lỗi Server:", response.status, errorData);
         throw new Error(
-          `Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`}`
+          `Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`
+          }`
         );
       }
+
+      const result = await response.json();
+      console.log(`✅ Đã tải lên thành công ${files.length} file:`, result);
+
       fileInputRef.current.value = null;
     } catch (error) {
       console.error("Error uploading files:", error);
@@ -476,11 +490,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     }
   };
 
+
   const renderMessageContent = (msg) => {
     const isRevoked = msg.isRevoked;
     const isAudio = msg.type === "audio" || msg.originalType === "audio";
     const isFile = msg.type === "file" || msg.originalType === "file";
-  
+
     if (isRevoked) {
       return (
         <p className="revoked-message">
@@ -654,19 +669,13 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                     )}
                     <div className="message-wrapper">
                       <div className="message-info">
-                        {chatRoom.isGroup && !isSentByCurrentUser && (
-                          <span className="sender-name fw-bold">
-                            {senderUser?.fulNlame || "Ẩn danh"}
-                          </span>
-                        )}
                         {msg.replyTo && (
                           <div className="reply-preview">
                             {msg.replyTo.sender === currentUserPhone ? (
                               <span>Bạn đã trả lời tin nhắn của mình</span>
                             ) : (
                               <span>
-                                Trả lời từ{" "}
-                                {senderUser?.fullName || msg.replyTo.sender}
+                                Trả lời từ {userChatting[0]?.fullName || msg.replyTo.sender}
                               </span>
                             )}
                             <p
@@ -675,7 +684,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                                 color: "#B0B3B8",
                                 fontSize: "13px",
                                 margin: "5px 0 0 0",
-                                padding: "10px",
+                                padding: "10px ",
                                 borderRadius: "20px",
                                 maxWidth: "95%",
                                 wordWrap: "break-word",
@@ -696,36 +705,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                             </p>
                           </div>
                         )}
-                        {isFile ? (
-                          renderFileMessage(msg)
-                        ) : isAudio ? (
-                          <div className="audio-message">
-                            <audio
-                              controls
-                              src={msg.fileInfo?.url || msg.message}
-                              type="audio/mpeg"
-                              style={{ marginTop: 5 }}
-                              onError={(e) => {
-                                console.error("Lỗi phát audio:", e.nativeEvent.error);
-                                alert(
-                                  "Không thể phát tin nhắn thoại: " +
-                                  e.nativeEvent.error.message
-                                );
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <p
-                            style={{
-                              borderRadius: "25px",
-                              color: "black",
-                              padding: "12px",
-                              width: "95%",
-                            }}
-                          >
-                            {msg.message}
-                          </p>
-                        )}
+                        {renderMessageContent(msg)}
                         <span
                           className="timestamp"
                           style={{
