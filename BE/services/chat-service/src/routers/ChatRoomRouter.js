@@ -31,6 +31,78 @@ router.get("/chatRoom", async (req, res) => {
   }
 });
 
+//check chatRoom = 2 sdt (single chat)
+router.get('/checkChatRoom', async (req, res) => {
+  const { myPhone, userPhone } = req.query;
+
+  if (!myPhone || !userPhone) {
+    return res.status(400).json({ error: 'Missing phone numbers' });
+  }
+
+  try {
+    const params = {
+      TableName: CHATROOM_TABLE,
+      FilterExpression: 'isGroup = :isGroup AND contains(participants, :myPhone) AND contains(participants, :userPhone)',
+      ExpressionAttributeValues: {
+        ':isGroup': { BOOL: false },
+        ':myPhone': { S: myPhone },
+        ':userPhone': { S: userPhone }
+      }
+    };
+
+    const command = new ScanCommand(params);
+    const result = await dynamoClient.send(command);
+
+    const exactMatch = result.Items.find(item => {
+      const phones = item.participants.L.map(p => p.S);
+      return phones.length === 2 &&
+        phones.includes(myPhone) &&
+        phones.includes(userPhone);
+    });
+
+    if (exactMatch) {
+      res.json({ chatRoomId: exactMatch.chatRoomId.S });
+    } else {
+      res.json({ chatRoomId: null });
+    }
+  } catch (error) {
+    console.error('Lỗi khi kiểm tra phòng chat:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/getChatIdFromRoom', async (req, res) => {
+  const { chatRoomId } = req.query;
+
+  if (!chatRoomId) {
+    return res.status(400).json({ error: 'Missing chatRoomId' });
+  }
+
+  try {
+    const params = {
+      TableName: "Conversations",
+      FilterExpression: "chatRoomId = :chatRoomId",
+      ExpressionAttributeValues: {
+        ":chatRoomId": chatRoomId 
+      }
+    };
+
+    const result = await dynamoDB.scan(params).promise();
+
+    if (result.Items && result.Items.length > 0) {
+      const chatId = result.Items[0].chatId?.S || result.Items[0].chatId;
+      res.json({ chatId });
+    } else {
+      res.status(404).json({ error: 'Không tìm thấy cuộc trò chuyện tương ứng' });
+    }
+  } catch (error) {
+    console.error('Lỗi khi lấy chatId từ chatRoomId:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+
 // Lấy tin nhắn theo chatRoomId
 router.get("/messages", async (req, res) => {
   try {
@@ -182,6 +254,7 @@ router.post("/createChatRoomForGroup", async (req, res) => {
     res.status(500).json({ message: "Lỗi server!" });
   }
 });
+
 
 //update thanh vien + nameGroup
 router.put("/updateChatRoom/:id", async (req, res) => {

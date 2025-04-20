@@ -23,22 +23,23 @@ const upload = multer({
   }),
 });
 
+const { v4: uuidv4 } = require("uuid");
+
 module.exports = (io, redisPublisher) => {
   const isUserOnline = (userId) => {
     // Thay thế bằng logic kiểm tra trạng thái đăng nhập thực tế
     return io.sockets.adapter.rooms.has(userId);
   };
 
-  router.post("/sendMessage", async (req, res) => {
+router.post("/sendMessage", async (req, res) => {
     try {
-      const { chatRoomId, sender, receiver, message } = req.body;
+      const { chatRoomId, sender, receiver, message, chatId } = req.body;
+      console.log("Chat id", chatId)
 
       if (!chatRoomId || !sender || !receiver || !message) {
         console.error("❌ Thiếu dữ liệu từ client:", req.body);
         return res.status(400).json({ error: "Thiếu trường bắt buộc!" });
       }
-
-      const chatId = [sender, receiver].sort().join("_");
 
       // Tạo tin nhắn mới
       const newMessage = new Message(
@@ -137,6 +138,7 @@ module.exports = (io, redisPublisher) => {
       res.status(500).json({ error: "Lỗi server!" });
     }
   });
+
 
   router.delete("/deleteMessage", async (req, res) => {
     try {

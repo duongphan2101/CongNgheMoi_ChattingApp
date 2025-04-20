@@ -9,6 +9,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import a3 from "../../assets/imgs/1.jpg";
 
+import fetchFriends from "../../API/api_getListFriends";
 import getUser from "../../API/api_getUser";
 import getUserbySearch from "../../API/api_searchUSer";
 import getConversations from "../../API/api_getConversation";
@@ -137,25 +138,25 @@ function View({ setIsLoggedIn }) {
     fetchFriendRequests();
   }, [fetchFriendRequests]);
 
-useEffect(() => {
-  fetchFriends();
-}, [fetchFriends]);
+  useEffect(() => {
+    fetchFriends();
+  }, [fetchFriends]);
 
-useEffect(() => {
-  const interval = setInterval(() => {
-    fetchFriendRequests();
-  }, 2000); // Poll every 3 seconds
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     fetchFriendRequests();
+  //   }, 2000);
 
-  return () => clearInterval(interval); // Cleanup interval on component unmount
-}, [fetchFriendRequests]);
+  //   return () => clearInterval(interval); // Cleanup interval on component unmount
+  // }, [fetchFriendRequests]);
 
-useEffect(() => {
-  const interval = setInterval(() => {
-    fetchFriends()
-  }, 1000); // Poll every 1 seconds
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     fetchFriends()
+  //   }, 1000);
 
-  return () => clearInterval(interval); // Cleanup interval on component unmount
-}, [fetchFriends]);
+  //   return () => clearInterval(interval); // Cleanup interval on component unmount
+  // }, [fetchFriends]);
 
   const handleEdit = () => {
     const editData = { ...userInfo };
@@ -406,17 +407,17 @@ useEffect(() => {
     };
   }, [userInfo?.phoneNumber, reloadConversations]);
 
-  const check = async (phone1, phone2) => {
+  const check = async (phone1, phone2, Id) => {
     try {
       const chatting = await getUserbySearch(phone2, "");
 
       const chatId = [phone1, phone2].sort().join("_");
-      const chatRoomId = await checkChatRoom(phone1, phone2);
-
+      const chatRoomId = Id;
+      console.log("CHat CHat ", chatRoomId)
       const chatRoomInfo = await getChatRoom(chatRoomId);
       if (chatRoomInfo.isGroup) {
         console.warn("Cảnh báo: Chat đơn nhưng trả về chatRoom nhóm!");
-        chatRoomInfo.isGroup = false; // Gán lại đúng loại
+        chatRoomInfo.isGroup = false;
       }
 
       setChatRoom(chatRoomInfo);
@@ -452,21 +453,25 @@ useEffect(() => {
   };
 
 
-  const updateLastMessage = (senderPhone, receiverPhone, lastMessage) => {
+  const updateLastMessage = (senderPhone, receiverPhones, message) => {
+    const senderName = userInfo?.fullName || userInfo?.name || senderPhone;
+    const composedMessage = `${senderName}: ${message}`;
+
     setUserChatList((prevList) =>
       prevList.map((conversation) => {
-        if (
-          (conversation.phoneNumber === receiverPhone &&
-            userInfo.phoneNumber === senderPhone) ||
-          (conversation.phoneNumber === senderPhone &&
-            userInfo.phoneNumber === receiverPhone)
-        ) {
-          return { ...conversation, lastMessage };
+        const isTargetReceiver =
+          receiverPhones.includes(conversation.phoneNumber) &&
+          conversation.phoneNumber !== senderPhone;
+
+        if (isTargetReceiver) {
+          return { ...conversation, lastMessage: composedMessage };
         }
+
         return conversation;
       })
     );
   };
+
 
   const renderLastMessage = (lastMessage) => {
     if (!lastMessage) return "Chưa Có";
@@ -557,7 +562,7 @@ useEffect(() => {
         return; // không tạo lại nữa
       }
 
-      const chatRoomId = `c${Math.floor(100 + Math.random() * 90000)}`;
+      const chatRoomId = `C${Math.floor(100 + Math.random() * 90000)}`;
 
       const chatRoomData = {
         chatRoomId,
@@ -800,7 +805,7 @@ useEffect(() => {
                   if (user.isGroup) {
                     await checkGroup(user.chatRoomId);
                   } else if (user.phoneNumber) {
-                    await check(userInfo.phoneNumber, user.phoneNumber);
+                    await check(userInfo.phoneNumber, user.phoneNumber, user.chatRoomId);
                   }
 
                   setReloadConversations((prev) => !prev);

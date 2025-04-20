@@ -13,7 +13,7 @@ import createChatRoom from "../../API/api_createChatRoomforGroup"
 import getChatRoom from "../../API/api_getMessagebyChatRoomId.js"
 import updateChatRoom from "../../API/api_updateChatRoomforGroup.js";
 import checkGroup from "../../API/api_checkGroup.js";
-
+import getChatId from "../../API/api_getChatIdbyChatRoomId.js";
 const socket = io("http://localhost:3618");
 const notificationSocket = io("http://localhost:3515");
 
@@ -259,29 +259,40 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   const handleSendMessage = async () => {
     if (!message.trim()) return;
+
+    // Lọc ra danh sách người nhận từ participants, bỏ người gửi
+    const receivers = chatRoom?.participants?.filter(phone => phone !== currentUserPhone) || [];
+    const chatId = await getChatId(chatRoom.chatRoomId);
+    console.log("Chat IDDDDDDD ", chatId)
     const newMsg = {
       chatRoomId: chatRoom?.chatRoomId || "",
       sender: currentUserPhone,
-      receiver: otherUserPhone,
+      receiver: receivers, // là mảng
       message,
       timestamp: Date.now(),
       type: "text",
+      chatId
     };
+
     setMessage("");
+
     try {
       const response = await fetch("http://localhost:3618/sendMessage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newMsg),
       });
+
       if (!response.ok) throw new Error("Gửi tin nhắn thất bại!");
 
-      // Cập nhật lastMessage trong danh sách userChatList
-      updateLastMessage(currentUserPhone, otherUserPhone, newMsg.message);
+      receivers.forEach(phone => {
+        updateLastMessage(currentUserPhone, phone, newMsg.message);
+      });
     } catch (error) {
       console.error("Lỗi gửi tin nhắn:", error);
     }
   };
+
 
   const handleDeleteMessage = async (messageId) => {
     try {
@@ -451,7 +462,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [currentChatRoom, setCurrentChatRoom] = useState(chatRoom);
-  console.log("current chat room ", currentChatRoom)
+  // console.log("current chat room ", currentChatRoom)
 
   const handleOpenFriendsModal = async () => {
     if (chatRoom.isGroup) {
