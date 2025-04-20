@@ -167,7 +167,7 @@ router.post("/createChatRoomForGroup", async (req, res) => {
   try {
     const { nameGroup, createdBy, participants, admin } = req.body;
 
-    const avatar = 'https://lab2s3aduong.s3.ap-southeast-1.amazonaws.com/uploads/1744906183412_icon-vchat.png';
+    const avatar = 'https://lab2s3aduong.s3.ap-southeast-1.amazonaws.com/icon-vchat.png';
 
     if (
       !Array.isArray(participants) ||

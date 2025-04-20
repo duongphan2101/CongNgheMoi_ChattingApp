@@ -27,7 +27,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
   const [revokedMessages, setRevokedMessages] = useState([]);
-
+  console.log(revokedMessages);
   const [listAddtoGroup, setListAddtoGroup] = useState([])
   const [nameGroup, setNameGroup] = useState("")
 
@@ -698,8 +698,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
             <div className="chat-messages">
               {messages.map((msg, index) => {
                 const isSentByCurrentUser = msg.sender === currentUserPhone;
-                const isAudio = msg.type === "audio";
-                const isFile = msg.type === "file";
+                // const isAudio = msg.type === "audio";
+                // const isFile = msg.type === "file";
+
                 const isHighlighted = highlightedMessageId === msg.timestamp;
 
                 return (
@@ -718,6 +719,21 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                     )}
                     <div className="message-wrapper">
                       <div className="message-info">
+
+                        {chatRoom.isGroup && (
+                          <span
+                            className="sender-name"
+                            style={{
+                              fontWeight: "bold",
+                              fontSize: "14px",
+                              marginBottom: "5px",
+                            }}
+                          >
+                            {msg.sender === currentUserPhone ? "Bạn" : userChatting[0]?.fullName || msg.sender}
+                          </span>
+                        )}
+
+
                         {msg.replyTo && (
                           <div className="reply-preview">
                             {msg.replyTo.sender === currentUserPhone ? (

@@ -9,11 +9,11 @@ import "react-toastify/dist/ReactToastify.css";
 
 import a3 from "../../assets/imgs/1.jpg";
 
-import fetchFriends from "../../API/api_getListFriends";
+// import fetchFriends from "../../API/api_getListFriends";
 import getUser from "../../API/api_getUser";
 import getUserbySearch from "../../API/api_searchUSer";
 import getConversations from "../../API/api_getConversation";
-import checkChatRoom from "../../API/api_checkChatRoom";
+// import checkChatRoom from "../../API/api_checkChatRoom";
 import getChatRoom from "../../API/api_getChatRoombyChatRoomId";
 import "./style.css";
 
@@ -103,6 +103,30 @@ function View({ setIsLoggedIn }) {
     fetchUser();
   }, []);
 
+  const fetchFriends = useCallback(async () => {
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+      toast.error("Vui lòng đăng nhập!");
+      return;
+  }
+
+  try {
+      const response = await fetch("http://localhost:3824/user/friends", {
+          method: "GET",
+          headers: {
+              Authorization: `Bearer ${token}`,
+          },
+      });
+
+      if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
+
+      const data = await response.json();
+      setFriends(data);
+  } catch (error) {
+      
+  }
+}, []);
+
   const fetchFriendRequests = useCallback(async () => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
@@ -138,9 +162,9 @@ function View({ setIsLoggedIn }) {
     fetchFriendRequests();
   }, [fetchFriendRequests]);
 
-  useEffect(() => {
-    fetchFriends();
-  }, [fetchFriends]);
+useEffect(() => {
+  fetchFriends();
+}, [fetchFriends]);
 
   // useEffect(() => {
   //   const interval = setInterval(() => {
@@ -494,10 +518,6 @@ function View({ setIsLoggedIn }) {
       return updated ? [updated, ...others] : updatedList;
     });
   };
-
-  console.log("🔍 userChatList:", userChatList);
-
-
 
   const renderLastMessage = (lastMessage) => {
     if (!lastMessage) return "Chưa Có";
