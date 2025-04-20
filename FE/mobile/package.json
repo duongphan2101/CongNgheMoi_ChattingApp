@@ -25,6 +25,8 @@
     "expo-av": "~15.0.2",
     "expo-constants": "^17.0.8",
     "expo-device": "^7.0.3",
+    "expo-document-picker": "~11.5.4",
+    "expo-file-system": "~18.0.12",
     "expo-image-picker": "~16.0.6",
     "expo-localization": "^16.0.1",
     "expo-notifications": "~0.29.14",
@@ -50,7 +52,9 @@
     "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-network-info": "^5.2.1",
     "react-native-web": "~0.19.13",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "expo-sharing": "~13.0.1",
+    "expo-media-library": "~17.0.6"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
