@@ -201,7 +201,7 @@ function View({ setIsLoggedIn }) {
             if (newInfo.day > currentDate.day) {
               newInfo.day = currentDate.day;
             }
-          } else if(newInfo.month === currentDate.month && newInfo.day > currentDate.day) {
+          } else if (newInfo.month === currentDate.month && newInfo.day > currentDate.day) {
             if (newInfo.day > currentDate.day) {
               newInfo.day = currentDate.day;
             }
@@ -364,6 +364,7 @@ function View({ setIsLoggedIn }) {
 
   const [userChatList, setUserChatList] = useState([]);
   const [reloadConversations, setReloadConversations] = useState(false);
+
   useEffect(() => {
     if (!userInfo?.phoneNumber) return;
 
@@ -375,7 +376,6 @@ function View({ setIsLoggedIn }) {
       const myPhone = userInfo.phoneNumber;
       const userData = await Promise.all(
         data.map(async (convo) => {
-          // Trường hợp nhóm
           if (convo.isGroup) {
             return {
               name: convo.fullName,
@@ -384,11 +384,12 @@ function View({ setIsLoggedIn }) {
                 Array.isArray(convo.isUnreadBy) &&
                 convo.isUnreadBy.includes(myPhone),
               lastMessage: convo.lastMessage,
+              lastMessageAt: convo.lastMessageAt, // ⚠️ bạn cần đảm bảo trường này tồn tại
               isGroup: true,
               chatRoomId: convo.chatRoomId,
             };
           }
-          // Trường hợp chat đơn
+
           const partnerPhone = convo.participants.find((p) => p !== myPhone);
           if (!partnerPhone) return null;
           const userArray = await getUserbySearch(partnerPhone, "");
@@ -397,6 +398,7 @@ function View({ setIsLoggedIn }) {
             ? {
               ...user,
               lastMessage: convo.lastMessage,
+              lastMessageAt: convo.lastMessageAt, // ⚠️ cần trường này
               isUnreadBy:
                 Array.isArray(convo.isUnreadBy) &&
                 convo.isUnreadBy.includes(myPhone),
@@ -406,13 +408,29 @@ function View({ setIsLoggedIn }) {
             : null;
         })
       );
-      setUserChatList(userData.filter((u) => u !== null));
+
+      const filteredList = userData.filter((u) => u !== null);
+
+      const sortedList = filteredList.sort((a, b) => {
+        const parseTime = (str) => {
+          if (!str) return new Date(0); // fallback cho item không có thời gian
+          const [time, date] = str.split(" ");
+          const [h, m, s] = time.split(":").map(Number);
+          const [d, mo, y] = date.split("/").map(Number);
+          return new Date(y, mo - 1, d, h, m, s);
+        };
+
+        return parseTime(b.lastMessageAt) - parseTime(a.lastMessageAt);
+      });
+
+      setUserChatList(sortedList);
     })();
 
     return () => {
       isMounted = false;
     };
   }, [userInfo?.phoneNumber, reloadConversations]);
+
 
   const check = async (phone1, phone2, Id) => {
     try {
@@ -460,24 +478,25 @@ function View({ setIsLoggedIn }) {
   };
 
 
-  const updateLastMessage = (senderPhone, receiverPhones, message) => {
-    const senderName = userInfo?.fullName || userInfo?.name || senderPhone;
-    const composedMessage = `${senderName}: ${message}`;
+  const updateLastMessage = (chatRoomId, message) => {
+    setUserChatList((prevList) => {
+      const updatedList = prevList.map((conversation) => {
+        if (!conversation || !conversation.chatRoomId) return conversation;
 
-    setUserChatList((prevList) =>
-      prevList.map((conversation) => {
-        const isTargetReceiver =
-          receiverPhones.includes(conversation.phoneNumber) &&
-          conversation.phoneNumber !== senderPhone;
-
-        if (isTargetReceiver) {
-          return { ...conversation, lastMessage: composedMessage };
+        if (conversation.chatRoomId === chatRoomId) {
+          return { ...conversation, lastMessage: message };
         }
-
         return conversation;
-      })
-    );
+      });
+
+      const updated = updatedList.find((c) => c?.chatRoomId === chatRoomId);
+      const others = updatedList.filter((c) => c?.chatRoomId !== chatRoomId);
+      return updated ? [updated, ...others] : updatedList;
+    });
   };
+
+  console.log("🔍 userChatList:", userChatList);
+
 
 
   const renderLastMessage = (lastMessage) => {

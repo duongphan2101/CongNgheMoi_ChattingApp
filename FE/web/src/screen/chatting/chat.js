@@ -241,12 +241,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         return [...prev, newMessage];
       });
 
-      updateLastMessage(
-        newMessage.sender,
-        newMessage.receiver,
-        newMessage.message
-      );
+      updateLastMessage(newMessage.chatRoomId, newMessage.message);
     });
+
 
     socket.on("userTyping", () => setTyping(true));
     socket.on("userStopTyping", () => setTyping(false));

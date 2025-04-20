@@ -437,11 +437,19 @@ module.exports = (io, redisPublisher) => {
         UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnreadBy = :updatedUnreadList",
         ExpressionAttributeValues: {
           ":lastMessage": "Tin Nhắn Thoại",
-          ":lastMessageAt": new Date(audioMessage.timestamp).toISOString(),
+          ":lastMessageAt": new Date(audioMessage.timestamp).toLocaleString("vi-VN", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
           ":updatedUnreadList": updatedUnreadList,
         },
         ReturnValues: "UPDATED_NEW",
       };
+
 
       await dynamoDB.update(updateParams).promise();
 
