@@ -72,6 +72,20 @@ io.on("connection", (socket) => {
     socket.on("disconnect", () => {
         console.log("Client disconnected:", socket.id);
     });
+
+    // Trong phần xử lý tạo conversation mới trên server
+    socket.on('newConversation', (data) => {
+    const { participants, chatRoomId } = data;
+    console.log('Tạo conversation mới:', participants, 'với ID:', chatRoomId);
+
+    // Emit sự kiện 'newConversation' đến tất cả các thành viên trong conversation
+    participants.forEach(phone => {
+      io.to(phone).emit('newConversation', {
+        participants: participants,
+        chatRoomId: chatRoomId
+      });
+    });
+  });
 });
 
 // Start server
