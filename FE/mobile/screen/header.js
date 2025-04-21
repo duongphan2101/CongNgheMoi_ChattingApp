@@ -35,13 +35,37 @@ const Header = ({}) => {
     setSearchResults,
     hideSearch,
   } = useSearch();
+  const [currentUser, setCurrentUser] = useState(null);
 
   const handleSearch = async () => {
     if (searchText.length > 0) {
       try {
+        const token = await AsyncStorage.getItem("accessToken");
+        const userJson = await AsyncStorage.getItem("user");
+        const currentUser = JSON.parse(userJson);
+        
+        if (!token || !currentUser) {
+          Alert.alert("Lỗi", "Vui lòng đăng nhập để tìm kiếm!");
+          return;
+        }
+
         const result = await getUserbySearch(searchText, searchText);
-        setSearchResults(result || []);
-        setIsSearchVisible(true);
+        if (result && result.length > 0) {
+          // Sử dụng hàm checkFriendshipStatus thay vì gọi API trực tiếp
+          const resultsWithFriendStatus = await Promise.all(
+            result.map(async (user) => {
+              const isFriend = await checkFriendshipStatus(user.phoneNumber);
+              console.log('Friendship status for', user.fullName, ':', isFriend);
+              return { ...user, isFriend };
+            })
+          );
+
+          console.log('Search results with friendship status:', resultsWithFriendStatus);
+          setSearchResults(resultsWithFriendStatus);
+          setIsSearchVisible(true);
+        } else {
+          setSearchResults([]);
+        }
       } catch (error) {
         console.error("Lỗi khi tìm kiếm:", error);
         setSearchResults([]);
@@ -112,12 +136,16 @@ const Header = ({}) => {
         participants: sortedPhones,
       };
 
+      // Gọi API tạo conversation và emit sự kiện
       await fetch(`http://${BASE_URL}:3618/createConversation`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(conversationData),
+        body: JSON.stringify({
+          ...conversationData,
+          shouldEmit: true // Thêm flag để server biết cần emit sự kiện
+        }),
       });
 
       return chatRoomId;
@@ -157,6 +185,94 @@ const Header = ({}) => {
     }
   };
 
+  // Thêm hàm kiểm tra trạng thái bạn bè
+  const checkFriendshipStatus = async (targetPhone) => {
+    try {
+      const token = await AsyncStorage.getItem("accessToken");
+      const userJson = await AsyncStorage.getItem("user");
+      const currentUser = JSON.parse(userJson);
+
+      if (!token || !currentUser) return false;
+
+      const response = await fetch(
+        `http://${BASE_URL}:3824/user/checkFriendship`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            currentPhone: currentUser.phoneNumber,
+            targetPhone: targetPhone 
+          }),
+        }
+      );
+
+      if (!response.ok) return false;
+      const data = await response.json();
+      return data.isFriend;
+    } catch (error) {
+      console.error("Lỗi kiểm tra trạng thái bạn bè:", error);
+      return false;
+    }
+  };
+
+  const handleChatNavigation = async (selectedUser) => {
+    try {
+      const userJson = await AsyncStorage.getItem("user");
+      const currentUser = JSON.parse(userJson);
+
+      if (!currentUser) {
+        Alert.alert("Lỗi", "Vui lòng đăng nhập lại!");
+        return;
+      }
+
+      // Kiểm tra conversation đã tồn tại
+      const sortedPhones = [currentUser.phoneNumber, selectedUser.phoneNumber].sort();
+      const chatId = `${sortedPhones[0]}_${sortedPhones[1]}`;
+
+      const checkRes = await fetch(
+        `http://${BASE_URL}:3618/checkConversationExist`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ chatId }),
+        }
+      );
+
+      const checkData = await checkRes.json();
+      let chatRoomId;
+
+      if (checkData.exists) {
+        // Nếu conversation đã tồn tại, sử dụng chatRoomId hiện có
+        chatRoomId = checkData.chatRoomId;
+        console.log('Sử dụng conversation có sẵn:', chatRoomId);
+      } else {
+        // Nếu chưa tồn tại, tạo mới
+        chatRoomId = await createChatRoomAndConversation(
+          currentUser.phoneNumber,
+          selectedUser.phoneNumber
+        );
+        console.log('Đã tạo conversation mới:', chatRoomId);
+      }
+
+      if (chatRoomId) {
+        navigation.navigate("chatting", {
+          otherUser: selectedUser,
+          chatRoom: chatRoomId,
+          thisUser: currentUser,
+        });
+        hideSearch();
+      }
+    } catch (error) {
+      console.error("Lỗi khi xử lý conversation:", error);
+      Alert.alert("Lỗi", "Không thể truy cập cuộc trò chuyện");
+    }
+  };
+
   const styles = getStyles(themeColors);
 
   return (
@@ -182,53 +298,36 @@ const Header = ({}) => {
             <FlatList
               data={searchResults}
               keyExtractor={(item) => item.phoneNumber}
-              renderItem={({ item }) => (
-                <View style={styles.searchResultItem}>
-                  <TouchableOpacity
-                    style={styles.userInfo}
-                    onPress={async () => {
-                      try {
-                        const userJson = await AsyncStorage.getItem("user");
-                        const currentUser = JSON.parse(userJson);
-
-                        if (!currentUser) {
-                          Alert.alert("Lỗi", "Vui lòng đăng nhập lại!");
-                          return;
-                        }
-
-                        const chatRoomId = await createChatRoomAndConversation(
-                          currentUser.phoneNumber,
-                          item.phoneNumber
-                        );
-
-                        if (chatRoomId) {
-                          navigation.navigate("chatting", {
-                            otherUser: item,
-                            chatRoom: chatRoomId,
-                            thisUser: currentUser,
-                          });
-                          hideSearch();
-                        }
-                      } catch (error) {
-                        console.error("Lỗi khi tạo cuộc trò chuyện:", error);
-                        Alert.alert("Lỗi", "Không thể tạo cuộc trò chuyện");
-                      }
-                    }}
-                  >
-                    <Image
-                      source={{ uri: item.avatar }}
-                      style={styles.avatar}
-                    />
-                    <Text style={styles.text}>{item.fullName}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.addFriendButton}
-                    onPress={() => handleSendFriendRequest(item.phoneNumber)}
-                  >
-                    <Text style={styles.addFriendText}>Thêm bạn</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+              renderItem={({ item }) => {
+                console.log('Rendering item details:', {
+                  name: item.fullName,
+                  isFriend: item.isFriend,
+                  type: typeof item.isFriend
+                });
+                
+                return (
+                  <View style={styles.searchResultItem}>
+                    <TouchableOpacity
+                      style={styles.userInfo}
+                      onPress={() => handleChatNavigation(item)}
+                    >
+                      <Image
+                        source={{ uri: item.avatar }}
+                        style={styles.avatar}
+                      />
+                      <Text style={styles.text}>{item.fullName}</Text>
+                    </TouchableOpacity>
+                    {typeof item.isFriend === 'boolean' && !item.isFriend && (
+                      <TouchableOpacity
+                        style={styles.addFriendButton}
+                        onPress={() => handleSendFriendRequest(item.phoneNumber)}
+                      >
+                        <Text style={styles.addFriendText}>Thêm bạn</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              }}
             />
           </View>
         )}

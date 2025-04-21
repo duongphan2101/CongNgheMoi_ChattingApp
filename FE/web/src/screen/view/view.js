@@ -17,8 +17,10 @@ import getChatRoom from "../../API/api_getChatRoombyChatRoomId";
 import "./style.css";
 import createChatRoom from "../../API/api_createChatRoomforGroup";
 import useFetchUserChatList from "../../hooks/refetch_Conversation.js";
+
 const socket = io("http://localhost:3618");
 const notificationSocket = io("http://localhost:3515");
+
 
 function View({ setIsLoggedIn }) {
   const [currentView, setCurrentView] = useState("chat");
@@ -938,6 +940,49 @@ function View({ setIsLoggedIn }) {
       toast.error("Không thể từ chối lời mời kết bạn!");
     }
   };
+
+  // Thêm useEffect để lắng nghe sự kiện newConversation
+  useEffect(() => {
+    if (!userInfo?.phoneNumber) return;
+
+    // Join socket với số điện thoại của user
+    socket.emit('joinUser', userInfo.phoneNumber);
+
+    // Lắng nghe khi có conversation mới được tạo
+    socket.on('newConversation', async (data) => {
+      // Kiểm tra xem user hiện tại có trong conversation không
+      if (data.participants.includes(userInfo.phoneNumber)) {
+        try {
+          // Lấy số điện thoại của người còn lại
+          const otherUserPhone = data.participants.find(phone => phone !== userInfo.phoneNumber);
+          
+          // Fetch thông tin user
+          const userResult = await getUserbySearch(otherUserPhone, otherUserPhone);
+          const otherUserInfo = userResult[0];
+
+          // Lấy danh sách conversation mới
+          const conversations = await getConversations();
+          
+          // Cập nhật state conversations và userInfo
+          setUserChatList(conversations);
+          
+          // Cập nhật thông tin user vào state quản lý thông tin user
+          if (otherUserInfo) {
+            setUserInfo(prev => ({
+              ...prev,
+              [otherUserPhone]: otherUserInfo
+            }));
+          }
+        } catch (error) {
+          console.error("Lỗi khi cập nhật conversation mới:", error);
+        }
+      }
+    });
+
+    return () => {
+      socket.off('newConversation');
+    };
+  }, [userInfo?.phoneNumber]);
 
   return (
     <div className="wrapper">
