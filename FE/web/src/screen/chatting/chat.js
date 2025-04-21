@@ -82,7 +82,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
-        const supportedMimeTypes = ["audio/webm", "audio/mp4"];
+        const supportedMimeTypes = ["audio/webm", "audio/mp3"];
         const mimeType =
           supportedMimeTypes.find((type) =>
             MediaRecorder.isTypeSupported(type)
@@ -607,7 +607,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                           })}
                         </span>
                       </div>
-                    </div>
+                    </div>``
                     <div className="message-options-container">
                       <button
                         className="message-options-btn reply-btn"
