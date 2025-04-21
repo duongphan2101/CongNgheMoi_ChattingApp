@@ -692,3 +692,15 @@ audio {
 .li-mem-group:hover {
     background-color: rgba(52, 73, 94, 0.5);
 }
+
+.modal_avt {
+    height: 100px;
+    width: 100px;
+    border: none;
+}
+
+.btn-edit {
+    position: absolute;
+    top: 65px;
+    left: 190px;
+}

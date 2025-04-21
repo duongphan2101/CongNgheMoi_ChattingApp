@@ -216,6 +216,7 @@ router.post("/createChatRoomForGroup", async (req, res) => {
       avatar,
       admin,
       createdAt: new Date().toISOString().split("T")[0],
+      status: "ACTIVE"
     };
 
     await dynamoDB.put({
@@ -254,7 +255,6 @@ router.post("/createChatRoomForGroup", async (req, res) => {
     res.status(500).json({ message: "Lỗi server!" });
   }
 });
-
 
 //update thanh vien + nameGroup
 router.put("/updateChatRoom/:id", async (req, res) => {
@@ -322,47 +322,109 @@ router.put("/updateChatRoom/:id", async (req, res) => {
   }
 });
 
-// 3. Xóa thành viên khỏi nhóm
-// router.put("/:id/remove-members", async (req, res) => {
-//   const { removeMembers } = req.body;
+// Giải tán nhóm (chuyển status thành DISBANDED)
+router.put("/disbandGroup/:id", async (req, res) => {
+  const roomId = req.params.id;
+  console.log("roomId ", roomId);
 
-//   if (!Array.isArray(removeMembers)) {
-//     return res.status(400).json({ message: "Danh sách cần xoá không hợp lệ." });
-//   }
+  try {
+    const updateParams = {
+      TableName: CHATROOM_TABLE,
+      Key: { chatRoomId: roomId },
+      UpdateExpression: "set #status = :status",
+      ExpressionAttributeNames: {
+        "#status": "status",
+      },
+      ExpressionAttributeValues: {
+        ":status": "DISBANDED",
+      },
+      ReturnValues: "UPDATED_NEW",
+    };
 
-//   try {
-//     const updated = await ChatRoom.findByIdAndUpdate(
-//       req.params.id,
-//       { $pull: { participants: { $in: removeMembers } } },
-//       { new: true }
-//     );
-//     if (!updated) return res.status(404).json({ message: "Không tìm thấy nhóm." });
-//     res.json(updated);
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
+    await dynamoDB.update(updateParams).promise();
 
-// 4. Cập nhật avatar nhóm
-// router.put("/:id/avatar", async (req, res) => {
-//   const { avatar } = req.body;
+    res.json({ message: "Nhóm đã được giải tán." });
+  } catch (error) {
+    console.error("Lỗi giải tán nhóm:", error);
+    res.status(500).json({ message: "Lỗi server khi giải tán nhóm." });
+  }
+});
 
-//   if (!avatar || typeof avatar !== "string") {
-//     return res.status(400).json({ message: "Ảnh đại diện không hợp lệ." });
-//   }
+// Xóa thành viên khỏi nhóm
+router.put("/removeMember", async (req, res) => {
+  const { chatRoomId, phoneNumber } = req.body;
 
-//   try {
-//     const updated = await ChatRoom.findByIdAndUpdate(
-//       req.params.id,
-//       { avatar },
-//       { new: true }
-//     );
-//     if (!updated) return res.status(404).json({ message: "Không tìm thấy nhóm." });
-//     res.json(updated);
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
+  if (!chatRoomId || !phoneNumber) {
+    return res.status(400).json({ message: "Thiếu chatRoomId hoặc phoneNumber." });
+  }
+
+  try {
+    // Lấy thông tin phòng chat
+    const getParams = {
+      TableName: CHATROOM_TABLE,
+      Key: { chatRoomId },
+    };
+
+    const result = await dynamoDB.get(getParams).promise();
+
+    if (!result.Item) {
+      return res.status(404).json({ message: "Không tìm thấy phòng chat." });
+    }
+
+    const chatRoom = result.Item;
+    const updatedParticipants = chatRoom.participants.filter(p => p !== phoneNumber);
+
+
+    // Cập nhật lại danh sách thành viên
+    const updateParams = {
+      TableName: CHATROOM_TABLE,
+      Key: { chatRoomId },
+      UpdateExpression: "set participants = :participants",
+      ExpressionAttributeValues: {
+        ":participants": updatedParticipants,
+      },
+      ReturnValues: "ALL_NEW",
+    };
+
+    const updateResult = await dynamoDB.update(updateParams).promise();
+
+    // Đồng bộ với Conversations nếu tồn tại
+    const scanParams = {
+      TableName: "Conversations",
+      FilterExpression: "chatRoomId = :chatRoomId",
+      ExpressionAttributeValues: {
+        ":chatRoomId": chatRoomId,
+      },
+    };
+
+    const convScanResult = await dynamoDB.scan(scanParams).promise();
+
+    if (convScanResult.Items.length > 0) {
+      const conversation = convScanResult.Items[0];
+
+      const updateConvParams = {
+        TableName: "Conversations",
+        Key: { chatId: conversation.chatId },
+        UpdateExpression: "set participants = :participants",
+        ExpressionAttributeValues: {
+          ":participants": updatedParticipants,
+        },
+      };
+
+      await dynamoDB.update(updateConvParams).promise();
+    }
+
+    res.json({
+      message: "Đã xóa thành viên khỏi nhóm thành công!",
+      updatedParticipants,
+    });
+  } catch (error) {
+    console.error("Lỗi khi xóa thành viên khỏi nhóm:", error);
+    res.status(500).json({ message: "Lỗi server!" });
+  }
+});
+
+
 
 
 module.exports = router;
