@@ -173,21 +173,17 @@ function View({ setIsLoggedIn }) {
     fetchFriends();
   }, [fetchFriends]);
 
+  // Chỉ polling khi đang ở tab contacts
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchFriendRequests();
-    }, 2000); // Poll every 3 seconds
+    if (currentView === 'contacts') {
+      const interval = setInterval(() => {
+        fetchFriendRequests();
+        fetchFriends();
+      }, 2000);
 
-    return () => clearInterval(interval); // Cleanup interval on component unmount
-  }, [fetchFriendRequests]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchFriends();
-    }, 1000); // Poll every 1 seconds
-
-    return () => clearInterval(interval); // Cleanup interval on component unmount
-  }, [fetchFriends]);
+      return () => clearInterval(interval);
+    }
+  }, [currentView]);
 
   const handleEdit = () => {
     const editData = { ...userInfo };
