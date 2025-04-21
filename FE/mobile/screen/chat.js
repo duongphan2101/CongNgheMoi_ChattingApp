@@ -5,10 +5,19 @@ import colors from "../themeColors";
 import getConversations from "../api/api_getConversation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import getUserbySearch from "../api/api_searchUSer";
+<<<<<<< HEAD
+=======
+import { useSearch } from '../contexts/searchContext';
+import { useFocusEffect } from '@react-navigation/native';
+>>>>>>> 65481cd4 (done create Conversation on mobile and fix the realtime create conversation)
 import io from "socket.io-client";
 import getIp from "../utils/getIp_notPORT";
 
-export default function App({ navigation }) {
+
+const BASE_URL = getIp();
+const socket = io(`http://${BASE_URL}:3618`);
+
+export default function App({ navigation, route }) {
   const { theme } = useTheme();
   const themeColors = colors[theme];
   const [conversations, setConversations] = useState([]);
@@ -18,6 +27,7 @@ export default function App({ navigation }) {
   const [socket, setSocket] = useState(null);
   const BASE_URL = getIp();
 
+<<<<<<< HEAD
   useEffect(() => {
     const newSocket = io(`http://${BASE_URL}:3618`);
     setSocket(newSocket);
@@ -120,6 +130,84 @@ export default function App({ navigation }) {
 
     fetchData();
   }, [socket]);
+=======
+  const fetchData = async () => {
+    try {
+      const userJson = await AsyncStorage.getItem("user");
+      const user = userJson ? JSON.parse(userJson) : null;
+      setThisUser(user);
+      if (!user || !user.phoneNumber) {
+        console.error("Không tìm thấy thông tin user hoặc số điện thoại!");
+        return;
+      }
+
+      setCurrentUserPhone(user.phoneNumber);
+      const data = await getConversations();
+      if (data) {
+        setConversations(data);
+
+        const phonesToFetch = data.map(c => c.participants.find(p => p !== user.phoneNumber));
+        const uniquePhones = [...new Set(phonesToFetch)];
+        const fetchedUsers = {};
+
+        for (const phone of uniquePhones) {
+          const result = await getUserbySearch(phone, phone);
+          if (result && result.length > 0) {
+            fetchedUsers[phone] = result[0];
+          }
+        }
+
+        setUsersInfo(fetchedUsers);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy dữ liệu:", error);
+    }
+  };
+
+  // Lắng nghe socket cho conversation mới
+  useEffect(() => {
+    if (!thisUser?.phoneNumber) return;
+
+    // Join socket với số điện thoại của user
+    socket.emit('joinUser', thisUser.phoneNumber);
+
+    // Lắng nghe khi có conversation mới được tạo
+    socket.on('newConversation', async (data) => {
+      // Kiểm tra xem user hiện tại có trong conversation không
+      if (data.participants.includes(thisUser.phoneNumber)) {
+        await fetchData(); // Load lại toàn bộ danh sách
+      }
+    });
+
+    return () => {
+      socket.off('newConversation');
+    };
+  }, [thisUser?.phoneNumber]);
+
+  // Vẫn giữ useFocusEffect để load lại khi focus vào màn hình
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchData();
+      hideSearch();
+    }, [])
+  );
+
+  useEffect(() => {
+    if (route.params?.refresh) {
+      fetchData();
+    }
+  }, [route.params?.refresh, route.params?.timestamp]);
+
+  const handlePress = (otherUser, chatRoom) => {
+    hideSearch();
+    navigation.navigate('chatting', { otherUser, chatRoom, thisUser });
+  };
+
+  const handleScreenPress = () => {
+    hideSearch();
+    Keyboard.dismiss();
+  };
+>>>>>>> 65481cd4 (done create Conversation on mobile and fix the realtime create conversation)
 
   const styles = getStyles(themeColors);
 
