@@ -6,7 +6,7 @@ import Contacts from "../contacts/contacts";
 
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+import io from "socket.io-client";
 import a3 from "../../assets/imgs/1.jpg";
 
 // import fetchFriends from "../../API/api_getListFriends";
@@ -16,6 +16,8 @@ import getConversations from "../../API/api_getConversation";
 // import checkChatRoom from "../../API/api_checkChatRoom";
 import getChatRoom from "../../API/api_getChatRoombyChatRoomId";
 import "./style.css";
+
+const socket = io("http://localhost:3618");
 
 function View({ setIsLoggedIn }) {
   const [currentView, setCurrentView] = useState("chat");
@@ -760,6 +762,49 @@ function View({ setIsLoggedIn }) {
       toast.error("Không thể từ chối lời mời kết bạn!");
     }
   };
+
+  // Thêm useEffect để lắng nghe sự kiện newConversation
+  useEffect(() => {
+    if (!userInfo?.phoneNumber) return;
+
+    // Join socket với số điện thoại của user
+    socket.emit('joinUser', userInfo.phoneNumber);
+
+    // Lắng nghe khi có conversation mới được tạo
+    socket.on('newConversation', async (data) => {
+      // Kiểm tra xem user hiện tại có trong conversation không
+      if (data.participants.includes(userInfo.phoneNumber)) {
+        try {
+          // Lấy số điện thoại của người còn lại
+          const otherUserPhone = data.participants.find(phone => phone !== userInfo.phoneNumber);
+          
+          // Fetch thông tin user
+          const userResult = await getUserbySearch(otherUserPhone, otherUserPhone);
+          const otherUserInfo = userResult[0];
+
+          // Lấy danh sách conversation mới
+          const conversations = await getConversations();
+          
+          // Cập nhật state conversations và userInfo
+          setUserChatList(conversations);
+          
+          // Cập nhật thông tin user vào state quản lý thông tin user
+          if (otherUserInfo) {
+            setUserInfo(prev => ({
+              ...prev,
+              [otherUserPhone]: otherUserInfo
+            }));
+          }
+        } catch (error) {
+          console.error("Lỗi khi cập nhật conversation mới:", error);
+        }
+      }
+    });
+
+    return () => {
+      socket.off('newConversation');
+    };
+  }, [userInfo?.phoneNumber]);
 
   return (
     <div className="wrapper">

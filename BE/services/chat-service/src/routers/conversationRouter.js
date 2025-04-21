@@ -8,6 +8,8 @@ const TABLE_NAME = "Conversations";
 const CHATROOM_TABLE = "ChatRooms";
 const MESSAGE_TABLE = "Message";
 
+module.exports = (io) => {
+
 router.get("/conversations", verifyToken, async (req, res) => {
     try {
         const phoneNumber = req.user.phoneNumber;
@@ -141,28 +143,40 @@ router.get("/messages", async (req, res) => {
 
 router.post("/createConversation", async (req, res) => {
     try {
-      const { chatId, chatRoomId, participants } = req.body;
+      const { chatId, chatRoomId, participants, shouldEmit } = req.body;
   
-      // Dữ liệu cho bảng Conversations
       const conversationData = {
         chatId,
         chatRoomId,
         isGroup: false,
         participants,
-        isUnreadBy: [], // Khởi tạo rỗng - chưa ai cần đọc
+        isUnreadBy: [], 
         lastMessage: "",
         lastMessageAt: null,
       };
   
-      // Lưu vào bảng Conversations
-      const conversationParams = {
-        TableName: TABLE_NAME,
-        Item: conversationData,
-      };
-  
       await dynamoDB.put(conversationParams).promise();
+
+      if (shouldEmit) {
+        // Lấy thông tin của cả 2 user trước khi emit
+        const usersInfo = await Promise.all(
+          participants.map(async (phone) => {
+            const userResult = await getUserbySearch(phone, phone);
+            return userResult[0];
+          })
+        );
+
+        // Emit sự kiện newConversation với đầy đủ thông tin
+        participants.forEach(phone => {
+          const otherUser = usersInfo.find(u => u.phoneNumber !== phone);
+          io.to(phone).emit('newConversation', {
+            participants,
+            chatRoomId,
+            otherUser // Thêm thông tin user
+          });
+        });
+      }
   
-      // Phản hồi thành công
       res.status(201).json({
         message: "Conversation và ChatRoom đã được tạo thành công!",
         chatRoomId,
@@ -171,7 +185,7 @@ router.post("/createConversation", async (req, res) => {
       console.error("❌ Lỗi khi tạo Conversation và ChatRoom:", error);
       res.status(500).json({ message: "Lỗi server!" });
     }
-  });
+});
   
 
 router.post("/checkConversationExist", async (req, res) => {
@@ -199,6 +213,6 @@ router.post("/checkConversationExist", async (req, res) => {
     }
   });
   
-
-module.exports = router;
+    return router;
+};
 
