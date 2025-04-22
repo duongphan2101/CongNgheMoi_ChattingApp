@@ -1,4 +1,4 @@
-import React, { useState} from "react";
+import React, { useState } from "react";
 import "./contacts_style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import axios from "axios";
@@ -11,6 +11,7 @@ function Contacts({
   handleAcceptFriendRequest,
   handleRejectFriendRequest,
   setFriends,
+  fetchFriends,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -19,17 +20,14 @@ function Contacts({
   const filteredContacts = contacts.filter((contact) =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
+  
   const handleUnfriend = async (friendPhone) => {
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem("accessToken");
       if (!token) {
         alert("Vui lòng đăng nhập!");
         return;
       }
-
-      console.log("Đang gửi yêu cầu hủy kết bạn với:", friendPhone);
-      console.log("Token:", token);
 
       const response = await axios.post(
         `http://${BASE_URL}:3824/user/unfriend`,
@@ -37,25 +35,27 @@ function Contacts({
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
 
-      console.log("Response từ server:", response.data);
-
       if (response.data.message === "Đã hủy kết bạn thành công!") {
-        // Cập nhật UI bằng cách reload trang
-    
+        // Cập nhật danh sách bạn bè
+        const updatedFriends = friends.filter(
+          (friend) => friend.phoneNumber !== friendPhone
+        );
+        setFriends([...updatedFriends]); // Đảm bảo tạo một mảng mới
+
+        // Gọi lại fetchFriends để đồng bộ hóa
+        if (updatedFriends.length === 0) {
+          await fetchFriends(); // Đồng bộ lại từ server nếu danh sách rỗng
+        }
+
         alert("Đã hủy kết bạn!");
       }
     } catch (error) {
       console.error("Lỗi hủy kết bạn:", error);
-      if (error.response) {
-        console.error("Response data:", error.response.data);
-        console.error("Response status:", error.response.status);
-        console.error("Response headers:", error.response.headers);
-      }
       alert("Không thể hủy kết bạn! Vui lòng thử lại sau.");
     }
   };
@@ -133,7 +133,7 @@ function Contacts({
                   <small>{friend.phoneNumber}</small>
                 </div>
               </div>
-              <button 
+              <button
                 className="unfriend-button"
                 onClick={() => handleUnfriend(friend.phoneNumber)}
               >
@@ -149,7 +149,9 @@ function Contacts({
       {/* Hiển thị danh sách liên hệ */}
       <div className="contacts-list mt-4">
         {filteredContacts.map((contact, index) => (
-          <div key={index} className="contact-item"> {/* Sử dụng index làm key */}
+          <div key={index} className="contact-item">
+            {" "}
+            {/* Sử dụng index làm key */}
             <div className="d-flex align-items-center">
               <div className="contact-avatar">
                 <img

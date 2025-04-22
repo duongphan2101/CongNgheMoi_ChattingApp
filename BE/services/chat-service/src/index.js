@@ -49,7 +49,7 @@ app.use(express.json());
 app.use(cors());
 
 // Routers
-const conversationRoutes = require("./routers/conversationRouter");
+const conversationRoutes = require("./routers/conversationRouter")(io);
 const chatRoomRoutes = require("./routers/ChatRoomRouter");
 const messageRoutes = require("./routers/messageRouter")(io, pubClient);
 const uploadFileRouter = require("./routers/uploadFileRouter")(io, pubClient);
@@ -63,6 +63,10 @@ app.use("/", downloadRouter);
 
 // WebSocket handlers
 io.on("connection", (socket) => {
+    socket.on("joinUser", (phoneNumber) => {
+        socket.join(phoneNumber);
+        console.log(`User ${phoneNumber} joined their room`);
+    });
 
     socket.on("joinRoom", (chatRoomId) => {
         socket.join(chatRoomId);
@@ -72,6 +76,20 @@ io.on("connection", (socket) => {
     socket.on("disconnect", () => {
         console.log("Client disconnected:", socket.id);
     });
+
+    // Trong phần xử lý tạo conversation mới trên server
+    socket.on('newConversation', (data) => {
+    const { participants, chatRoomId } = data;
+    console.log('Tạo conversation mới:', participants, 'với ID:', chatRoomId);
+
+    // Emit sự kiện 'newConversation' đến tất cả các thành viên trong conversation
+    participants.forEach(phone => {
+      io.to(phone).emit('newConversation', {
+        participants: participants,
+        chatRoomId: chatRoomId
+      });
+    });
+  });
 });
 
 // Start server

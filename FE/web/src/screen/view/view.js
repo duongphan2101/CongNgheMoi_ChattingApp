@@ -6,7 +6,7 @@ import Contacts from "../contacts/contacts";
 
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+import io from "socket.io-client";
 import a3 from "../../assets/imgs/1.jpg";
 
 // import fetchFriends from "../../API/api_getListFriends";
@@ -16,6 +16,8 @@ import getConversations from "../../API/api_getConversation";
 // import checkChatRoom from "../../API/api_checkChatRoom";
 import getChatRoom from "../../API/api_getChatRoombyChatRoomId";
 import "./style.css";
+
+const socket = io("http://localhost:3618");
 
 function View({ setIsLoggedIn }) {
   const [currentView, setCurrentView] = useState("chat");
@@ -63,6 +65,8 @@ function View({ setIsLoggedIn }) {
             friends={friends} // Truyền danh sách bạn bè
             handleAcceptFriendRequest={handleAcceptFriendRequest} // Truyền hàm chấp nhận
             handleRejectFriendRequest={handleRejectFriendRequest} // Truyền hàm từ chối
+            setFriends={setFriends} // Truyền hàm cập nhật danh sách bạn bè
+            fetchFriends={fetchFriends}
           />
         );
       default:
@@ -73,7 +77,7 @@ function View({ setIsLoggedIn }) {
   const [currentDate] = useState({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
-    day: new Date().getDate()
+    day: new Date().getDate(),
   });
 
   const getDaysInMonth = (year, month) => {
@@ -103,30 +107,6 @@ function View({ setIsLoggedIn }) {
     fetchUser();
   }, []);
 
-  const fetchFriends = useCallback(async () => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) {
-      toast.error("Vui lòng đăng nhập!");
-      return;
-  }
-
-  try {
-      const response = await fetch("http://localhost:3824/user/friends", {
-          method: "GET",
-          headers: {
-              Authorization: `Bearer ${token}`,
-          },
-      });
-
-      if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
-
-      const data = await response.json();
-      setFriends(data);
-  } catch (error) {
-      
-  }
-}, []);
-
   const fetchFriendRequests = useCallback(async () => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
@@ -135,14 +115,18 @@ function View({ setIsLoggedIn }) {
     }
 
     try {
-      const response = await fetch("http://localhost:3824/user/friendRequests", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        "http://localhost:3824/user/friendRequests",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-      if (!response.ok) throw new Error("Lỗi khi lấy danh sách lời mời kết bạn!");
+      if (!response.ok)
+        throw new Error("Lỗi khi lấy danh sách lời mời kết bạn!");
 
       const data = await response.json();
 
@@ -158,40 +142,60 @@ function View({ setIsLoggedIn }) {
     }
   }, [friendRequests.length]); // Thêm dependency nếu cần
 
+  const fetchFriends = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      toast.error("Vui lòng đăng nhập!");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:3824/user/friends", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
+
+      const data = await response.json();
+      setFriends(data); // Cập nhật danh sách bạn bè
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách bạn bè:", error);
+      setFriends([]); // Đảm bảo danh sách bạn bè được làm mới thành mảng rỗng nếu có lỗi
+    }
+  }, [setFriends]);
+
   useEffect(() => {
     fetchFriendRequests();
   }, [fetchFriendRequests]);
 
-useEffect(() => {
-  fetchFriends();
-}, [fetchFriends]);
+  useEffect(() => {
+    fetchFriends();
+  }, [fetchFriends]);
 
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     fetchFriendRequests();
-  //   }, 2000);
+  // Chỉ polling khi đang ở tab contacts
+  useEffect(() => {
+    if (currentView === 'contacts') {
+      const interval = setInterval(() => {
+        fetchFriendRequests();
+        fetchFriends();
+      }, 2000);
 
-  //   return () => clearInterval(interval); // Cleanup interval on component unmount
-  // }, [fetchFriendRequests]);
-
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     fetchFriends()
-  //   }, 1000);
-
-  //   return () => clearInterval(interval); // Cleanup interval on component unmount
-  // }, [fetchFriends]);
+      return () => clearInterval(interval);
+    }
+  }, [currentView]);
 
   const handleEdit = () => {
     const editData = { ...userInfo };
     // Xử lý ngày sinh
     if (userInfo?.dob) {
-      const [year, month, day] = userInfo.dob.split('-');
+      const [year, month, day] = userInfo.dob.split("-");
       editData.year = parseInt(year, 10);
       editData.month = parseInt(month, 10);
       editData.day = parseInt(day, 10);
     } else {
-
       const defaultDate = new Date();
       defaultDate.setMonth(defaultDate.getMonth() - 1);
       editData.year = defaultDate.getFullYear();
@@ -242,7 +246,10 @@ useEffect(() => {
       }
 
       if (name === "day") {
-        if (newInfo.year === currentDate.year && newInfo.month === currentDate.month) {
+        if (
+          newInfo.year === currentDate.year &&
+          newInfo.month === currentDate.month
+        ) {
           //nếu ngày lớn hơn ngày hiện tại, đặt lại thành ngày hiện tại
           if (newInfo.day > currentDate.day) {
             newInfo.day = currentDate.day;
@@ -586,10 +593,10 @@ useEffect(() => {
     targetUserPhone
   ) => {
     try {
-      // Tạo chatRoomId ngẫu nhiên bắt đầu bằng chữ 'c' và 3-5 số ngẫu nhiên
       const sortedPhones = [currentUserPhone, targetUserPhone].sort();
       const chatId = `${sortedPhones[0]}_${sortedPhones[1]}`;
-
+  
+      // Kiểm tra Conversation đã tồn tại
       const checkRes = await fetch(
         "http://localhost:3618/checkConversationExist",
         {
@@ -600,49 +607,60 @@ useEffect(() => {
           body: JSON.stringify({ chatId }),
         }
       );
-
+  
       const checkData = await checkRes.json();
-
+  
       if (checkData.exists) {
         console.log("Conversation đã tồn tại với chatId:", checkData.chatId);
         return; // không tạo lại nữa
       }
-
+  
+      // Tạo ChatRoom
       const chatRoomId = `C${Math.floor(100 + Math.random() * 90000)}`;
-
       const chatRoomData = {
         chatRoomId,
         isGroup: false,
         participants: [currentUserPhone, targetUserPhone],
       };
-
-      console.log(chatRoomData);
-
-      // Gửi dữ liệu lên bảng ChatRooms
-      await fetch("http://localhost:3618/createChatRoom", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(chatRoomData),
-      });
-
-      // Dữ liệu cho bảng Conservations
+  
+      const chatRoomRes = await fetch(
+        "http://localhost:3618/createChatRoom",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(chatRoomData),
+        }
+      );
+  
+      if (!chatRoomRes.ok) {
+        throw new Error("Tạo ChatRoom thất bại!");
+      }
+  
+      // Tạo Conversation
       const conversationData = {
         chatId,
         chatRoomId,
         participants: sortedPhones,
       };
+      console.log("Conversation data:", conversationData);
 
-      // Gửi dữ liệu lên bảng Conservations
-      await fetch("http://localhost:3618/createConversation", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(conversationData),
-      });
-
+      const conversationRes = await fetch(
+        "http://localhost:3618/createConversation",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(conversationData),
+        }
+      );
+  
+      if (!conversationRes.ok) {
+        throw new Error("Tạo Conversation thất bại!");
+      }
+  
       console.log("ChatRoom và Conversation đã được tạo thành công!");
     } catch (error) {
       console.error("Lỗi khi tạo ChatRoom và Conversation:", error);
@@ -677,14 +695,17 @@ useEffect(() => {
         return;
       }
 
-      const response = await fetch("http://localhost:3824/user/sendFriendRequest", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ receiverPhone }),
-      });
+      const response = await fetch(
+        "http://localhost:3824/user/sendFriendRequest",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ receiverPhone }),
+        }
+      );
 
       if (!response.ok) throw new Error("Gửi yêu cầu kết bạn thất bại!");
 
@@ -703,14 +724,17 @@ useEffect(() => {
     }
 
     try {
-      const response = await fetch("http://localhost:3824/user/acceptFriendRequest", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ requestId }),
-      });
+      const response = await fetch(
+        "http://localhost:3824/user/acceptFriendRequest",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ requestId }),
+        }
+      );
 
       if (!response.ok) throw new Error("Chấp nhận lời mời kết bạn thất bại!");
 
@@ -730,24 +754,68 @@ useEffect(() => {
     }
 
     try {
-      const response = await fetch("http://localhost:3824/user/rejectFriendRequest", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ requestId }),
-      });
+      const response = await fetch(
+        "http://localhost:3824/user/rejectFriendRequest",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ requestId }),
+        }
+      );
 
       if (!response.ok) throw new Error("Từ chối lời mời kết bạn thất bại!");
-
       toast.success("Đã từ chối lời mời kết bạn!");
-      fetchFriendRequests(); // Cập nhật lại danh sách lời mời
     } catch (error) {
       console.error("Lỗi khi từ chối lời mời kết bạn:", error);
       toast.error("Không thể từ chối lời mời kết bạn!");
     }
   };
+
+  // Thêm useEffect để lắng nghe sự kiện newConversation
+  useEffect(() => {
+    if (!userInfo?.phoneNumber) return;
+
+    // Join socket với số điện thoại của user
+    socket.emit('joinUser', userInfo.phoneNumber);
+
+    // Lắng nghe khi có conversation mới được tạo
+    socket.on('newConversation', async (data) => {
+      // Kiểm tra xem user hiện tại có trong conversation không
+      if (data.participants.includes(userInfo.phoneNumber)) {
+        try {
+          // Lấy số điện thoại của người còn lại
+          const otherUserPhone = data.participants.find(phone => phone !== userInfo.phoneNumber);
+          
+          // Fetch thông tin user
+          const userResult = await getUserbySearch(otherUserPhone, otherUserPhone);
+          const otherUserInfo = userResult[0];
+
+          // Lấy danh sách conversation mới
+          const conversations = await getConversations();
+          
+          // Cập nhật state conversations và userInfo
+          setUserChatList(conversations);
+          
+          // Cập nhật thông tin user vào state quản lý thông tin user
+          if (otherUserInfo) {
+            setUserInfo(prev => ({
+              ...prev,
+              [otherUserPhone]: otherUserInfo
+            }));
+          }
+        } catch (error) {
+          console.error("Lỗi khi cập nhật conversation mới:", error);
+        }
+      }
+    });
+
+    return () => {
+      socket.off('newConversation');
+    };
+  }, [userInfo?.phoneNumber]);
 
   return (
     <div className="wrapper">
@@ -771,7 +839,9 @@ useEffect(() => {
             <div className="search_theme" ref={searchRef}>
               <ul className="m-0 p-0" style={{ flex: 1 }}>
                 {userSearch.map((user, index) => {
-                  const isFriend = friends.some((friend) => friend.phoneNumber === user.phoneNumber);
+                  const isFriend = friends.some(
+                    (friend) => friend.phoneNumber === user.phoneNumber
+                  );
 
                   return (
                     <li
@@ -800,7 +870,10 @@ useEffect(() => {
                           alignItems: "center",
                         }}
                         onClick={() =>
-                          handleUserClick(userInfo.phoneNumber, user.phoneNumber)
+                          handleUserClick(
+                            userInfo.phoneNumber,
+                            user.phoneNumber
+                          )
                         }
                       >
                         <img
@@ -872,7 +945,11 @@ useEffect(() => {
               </div>
             ))
           ) : (
-            <p style={{ padding: "0 50px" }}>
+            <p
+              style={{
+                padding: "0 50px",
+              }}
+            >
               Hãy tìm bạn bè bằng số điện thoại và trò chuyện với họ ngay nào!
             </p>
           )}
@@ -910,10 +987,12 @@ useEffect(() => {
             )}
           </div>
           <button
-            className={`sidebar-bottom-btn btn ${hasNewFriendRequest ? "active" : ""}`}
+            className={`sidebar-bottom-btn btn ${
+              hasNewFriendRequest ? "active" : ""
+            }`}
             onClick={() => {
               setCurrentView("contacts");
-              setHasNewFriendRequest(false);
+              setHasNewFriendRequest(false); // Xóa trạng thái lời mời mới khi người dùng vào trang "Contacts"
             }}
             style={{ position: "relative" }}
           >
@@ -1113,7 +1192,10 @@ useEffect(() => {
                           checked={editInfo?.gender === "Male"}
                           onChange={handleEditChange}
                         />
-                        <label className="form-check-label" htmlFor="genderMale">
+                        <label
+                          className="form-check-label"
+                          htmlFor="genderMale"
+                        >
                           Nam
                         </label>
                       </div>
@@ -1127,7 +1209,10 @@ useEffect(() => {
                           checked={editInfo?.gender === "Female"}
                           onChange={handleEditChange}
                         />
-                        <label className="form-check-label" htmlFor="genderFemale">
+                        <label
+                          className="form-check-label"
+                          htmlFor="genderFemale"
+                        >
                           Nữ
                         </label>
                       </div>
@@ -1142,33 +1227,51 @@ useEffect(() => {
                         value={editInfo.day || ""}
                         onChange={handleEditChange}
                       >
-                        <option value="" disabled>Ngày</option>
-                        {editInfo.year && editInfo.month ?
-                          Array.from({ length: getDaysInMonth(editInfo.year, editInfo.month) }, (_, i) => {
-                            const day = i + 1;
-                            const isDisabled = editInfo.year === currentDate.year &&
-                              editInfo.month === currentDate.month &&
-                              day > currentDate.day;
-                            return (
-                              <option key={day} value={day} disabled={isDisabled}>
-                                {day}
-                              </option>
-                            );
-                          })
-                          :
-                          // Mặc định hiển thị 31 ngày nếu chưa chọn tháng hoặc năm
-                          Array.from({ length: 31 }, (_, i) => {
-                            const day = i + 1;
-                            const isDisabled = editInfo.year === currentDate.year &&
-                              editInfo.month === currentDate.month &&
-                              day > currentDate.day;
-                            return (
-                              <option key={day} value={day} disabled={isDisabled}>
-                                {day}
-                              </option>
-                            );
-                          })
-                        }
+                        <option value="" disabled>
+                          Ngày
+                        </option>
+                        {editInfo.year && editInfo.month
+                          ? Array.from(
+                              {
+                                length: getDaysInMonth(
+                                  editInfo.year,
+                                  editInfo.month
+                                ),
+                              },
+                              (_, i) => {
+                                const day = i + 1;
+                                const isDisabled =
+                                  editInfo.year === currentDate.year &&
+                                  editInfo.month === currentDate.month &&
+                                  day > currentDate.day;
+                                return (
+                                  <option
+                                    key={day}
+                                    value={day}
+                                    disabled={isDisabled}
+                                  >
+                                    {day}
+                                  </option>
+                                );
+                              }
+                            )
+                          : // Mặc định hiển thị 31 ngày nếu chưa chọn tháng hoặc năm
+                            Array.from({ length: 31 }, (_, i) => {
+                              const day = i + 1;
+                              const isDisabled =
+                                editInfo.year === currentDate.year &&
+                                editInfo.month === currentDate.month &&
+                                day > currentDate.day;
+                              return (
+                                <option
+                                  key={day}
+                                  value={day}
+                                  disabled={isDisabled}
+                                >
+                                  {day}
+                                </option>
+                              );
+                            })}
                       </select>
                       <select
                         className="form-select me-2"
@@ -1176,12 +1279,20 @@ useEffect(() => {
                         value={editInfo.month || ""}
                         onChange={handleEditChange}
                       >
-                        <option value="" disabled>Tháng</option>
+                        <option value="" disabled>
+                          Tháng
+                        </option>
                         {Array.from({ length: 12 }, (_, i) => {
                           const month = i + 1;
-                          const isDisabled = editInfo.year === currentDate.year && month > currentDate.month;
+                          const isDisabled =
+                            editInfo.year === currentDate.year &&
+                            month > currentDate.month;
                           return (
-                            <option key={month} value={month} disabled={isDisabled}>
+                            <option
+                              key={month}
+                              value={month}
+                              disabled={isDisabled}
+                            >
                               Tháng {month}
                             </option>
                           );
@@ -1193,7 +1304,9 @@ useEffect(() => {
                         value={editInfo.year || ""}
                         onChange={handleEditChange}
                       >
-                        <option value="" disabled>Năm</option>
+                        <option value="" disabled>
+                          Năm
+                        </option>
                         {Array.from({ length: 100 }, (_, i) => {
                           const year = new Date().getFullYear() - i;
                           return (

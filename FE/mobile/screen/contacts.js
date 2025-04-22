@@ -30,29 +30,31 @@ export default function App({navigation}) {
         Alert.alert("Lỗi", "Không tìm thấy token!");
         return;
       }
-
+  
       const response = await fetch(`http://${BASE_URL}:3824/user/friends`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-
-      if (!response.ok) {
-        throw new Error('Lỗi khi lấy danh sách bạn bè!');
-      }
-
+  
+      // if (!response.ok) {
+      //   throw new Error('Lỗi khi lấy danh sách bạn bè!');
+      // }
+  
       const data = await response.json();
-      setContacts(data.map(friend => ({
+      const updatedContacts = data.map(friend => ({
         id: friend.phoneNumber,
         name: friend.fullName || 'Không rõ',
         avatar: friend.avatar || 'https://imgur.com/RLtzJy5.jpg',
         phone: friend.phoneNumber,
         status: 'offline'
-      })));
+      }));
+  
+      // Cập nhật danh sách bạn bè
+      setContacts(updatedContacts);
     } catch (error) {
-      console.error('Lỗi khi lấy danh sách bạn bè:', error);
-      Alert.alert("Lỗi", "Không thể lấy danh sách bạn bè!");
+      setContacts([]); // Đảm bảo danh sách được làm mới thành mảng rỗng nếu có lỗi
     }
   }, []);
 
@@ -78,14 +80,12 @@ export default function App({navigation}) {
       const data = await response.json();
 
       // Kiểm tra nếu có lời mời mới
-      if (data.length > friendRequests.length) {
-        Alert.alert("Thông báo", "Bạn có lời mời kết bạn mới!");
-      }
+      // if (data.length > friendRequests.length) {
+      //   Alert.alert("Thông báo", "Bạn có lời mời kết bạn mới!");
+      // }
 
       setFriendRequests(data);
     } catch (error) {
-      console.error('Lỗi khi lấy danh sách lời mời kết bạn:', error);
-      Alert.alert("Lỗi", "Không thể lấy danh sách lời mời kết bạn!");
     }
   }, [friendRequests.length]);
 
@@ -114,11 +114,9 @@ export default function App({navigation}) {
           prevRequests.filter((request) => request.RequestId !== requestId)
         );
         fetchFriends(); // Load lại danh sách bạn bè
-        Alert.alert("Thành công", "Đã chấp nhận lời mời kết bạn!");
       }
     } catch (error) {
       console.error("Lỗi chấp nhận lời mời kết bạn:", error);
-      Alert.alert("Lỗi", "Không thể chấp nhận lời mời kết bạn!");
     }
   };
 
@@ -161,7 +159,7 @@ export default function App({navigation}) {
         Alert.alert("Lỗi", "Vui lòng đăng nhập!");
         return;
       }
-
+  
       const response = await axios.post(
         `http://${BASE_URL}:3824/user/unfriend`,
         { friendPhone },
@@ -172,13 +170,18 @@ export default function App({navigation}) {
           },
         }
       );
-
+  
       if (response.data.message === "Đã hủy kết bạn thành công!") {
-        // Cập nhật UI
-        setContacts((prevContacts) =>
-          prevContacts.filter((contact) => contact.phone !== friendPhone)
-        );
-        Alert.alert("Thành công", `Bạn đã hủy kết bạn với ${friendPhone}!`);
+        // Cập nhật danh sách bạn bè
+        const updatedContacts = contacts.filter((contact) => contact.phone !== friendPhone);
+        setContacts(updatedContacts);
+  
+        // Nếu danh sách bạn bè rỗng, đồng bộ lại từ server
+        if (updatedContacts.length === 0) {
+          await fetchFriends();
+        }
+  
+        Alert.alert("Thành công", "Đã hủy kết bạn!");
       }
     } catch (error) {
       console.error("Lỗi hủy kết bạn:", error);
@@ -186,7 +189,7 @@ export default function App({navigation}) {
         console.error("Response data:", error.response.data);
         console.error("Response status:", error.response.status);
       }
-      Alert.alert("Lỗi", "Không thể hủy kết bạn!");
+      Alert.alert("Lỗi", "Không thể hủy kết bạn! Vui lòng thử lại sau.");
     }
   };
 
@@ -197,7 +200,6 @@ export default function App({navigation}) {
         const user = userJson ? JSON.parse(userJson) : null;
         setThisUser(user);
       } catch (error) {
-        console.error('Lỗi khi lấy thông tin người dùng:', error);
       }
     };
 
