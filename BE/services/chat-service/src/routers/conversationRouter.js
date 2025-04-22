@@ -154,7 +154,14 @@ router.post("/createConversation", async (req, res) => {
         lastMessage: "",
         lastMessageAt: null,
       };
+
+      // Định nghĩa tham số cho DynamoDB
+      const conversationParams = {
+        TableName: TABLE_NAME,
+        Item: conversationData,
+      };
   
+      // Lưu dữ liệu vào DynamoDB
       await dynamoDB.put(conversationParams).promise();
 
       if (shouldEmit) {

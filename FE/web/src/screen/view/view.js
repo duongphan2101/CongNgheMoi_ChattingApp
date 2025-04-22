@@ -593,10 +593,10 @@ function View({ setIsLoggedIn }) {
     targetUserPhone
   ) => {
     try {
-      // Tạo chatRoomId ngẫu nhiên bắt đầu bằng chữ 'c' và 3-5 số ngẫu nhiên
       const sortedPhones = [currentUserPhone, targetUserPhone].sort();
       const chatId = `${sortedPhones[0]}_${sortedPhones[1]}`;
-
+  
+      // Kiểm tra Conversation đã tồn tại
       const checkRes = await fetch(
         "http://localhost:3618/checkConversationExist",
         {
@@ -607,49 +607,60 @@ function View({ setIsLoggedIn }) {
           body: JSON.stringify({ chatId }),
         }
       );
-
+  
       const checkData = await checkRes.json();
-
+  
       if (checkData.exists) {
         console.log("Conversation đã tồn tại với chatId:", checkData.chatId);
         return; // không tạo lại nữa
       }
-
+  
+      // Tạo ChatRoom
       const chatRoomId = `C${Math.floor(100 + Math.random() * 90000)}`;
-
       const chatRoomData = {
         chatRoomId,
         isGroup: false,
         participants: [currentUserPhone, targetUserPhone],
       };
-
-      console.log(chatRoomData);
-
-      // Gửi dữ liệu lên bảng ChatRooms
-      await fetch("http://localhost:3618/createChatRoom", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(chatRoomData),
-      });
-
-      // Dữ liệu cho bảng Conservations
+  
+      const chatRoomRes = await fetch(
+        "http://localhost:3618/createChatRoom",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(chatRoomData),
+        }
+      );
+  
+      if (!chatRoomRes.ok) {
+        throw new Error("Tạo ChatRoom thất bại!");
+      }
+  
+      // Tạo Conversation
       const conversationData = {
         chatId,
         chatRoomId,
         participants: sortedPhones,
       };
+      console.log("Conversation data:", conversationData);
 
-      // Gửi dữ liệu lên bảng Conservations
-      await fetch("http://localhost:3618/createConversation", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(conversationData),
-      });
-
+      const conversationRes = await fetch(
+        "http://localhost:3618/createConversation",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(conversationData),
+        }
+      );
+  
+      if (!conversationRes.ok) {
+        throw new Error("Tạo Conversation thất bại!");
+      }
+  
       console.log("ChatRoom và Conversation đã được tạo thành công!");
     } catch (error) {
       console.error("Lỗi khi tạo ChatRoom và Conversation:", error);
