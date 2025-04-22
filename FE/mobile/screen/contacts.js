@@ -206,31 +206,31 @@ export default function App({navigation}) {
     fetchFriendRequests();
   }, []);
 
-  useEffect(() => {
-    // Bắt đầu polling
-    fetchFriendsIntervalRef.current = setInterval(() => {
-      fetchFriends();
-    }, 1000); // Poll every 1 second
+  // useEffect(() => {
+  //   // Bắt đầu polling
+  //   fetchFriendsIntervalRef.current = setInterval(() => {
+  //     fetchFriends();
+  //   }, 1000); // Poll every 1 second
 
-    fetchFriendRequestsIntervalRef.current = setInterval(() => {
-      fetchFriendRequests();
-    }, 2000); // Poll every 2 seconds
+  //   fetchFriendRequestsIntervalRef.current = setInterval(() => {
+  //     fetchFriendRequests();
+  //   }, 2000); // Poll every 2 seconds
 
-    // Lắng nghe sự kiện đăng xuất
-    const handleLogout = () => {
-      clearInterval(fetchFriendsIntervalRef.current);
-      clearInterval(fetchFriendRequestsIntervalRef.current);
-    };
+  //   // Lắng nghe sự kiện đăng xuất
+  //   const handleLogout = () => {
+  //     clearInterval(fetchFriendsIntervalRef.current);
+  //     clearInterval(fetchFriendRequestsIntervalRef.current);
+  //   };
 
-    eventEmitter.on("logout", handleLogout);
+  //   eventEmitter.on("logout", handleLogout);
 
-    // Cleanup khi component unmount
-    return () => {
-      clearInterval(fetchFriendsIntervalRef.current);
-      clearInterval(fetchFriendRequestsIntervalRef.current);
-      eventEmitter.off("logout", handleLogout);
-    };
-  }, []);
+  //   // Cleanup khi component unmount
+  //   return () => {
+  //     clearInterval(fetchFriendsIntervalRef.current);
+  //     clearInterval(fetchFriendRequestsIntervalRef.current);
+  //     eventEmitter.off("logout", handleLogout);
+  //   };
+  // }, []);
 
   useFocusEffect(
     React.useCallback(() => {

@@ -9,7 +9,7 @@ class Message {
         this.receiver = receiver; 
         this.message = message;   
         this.type = type;
-        
+        this.reactions = {};
     }
 }
 
