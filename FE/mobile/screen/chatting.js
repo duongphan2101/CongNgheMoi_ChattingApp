@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Clipboard,
 } from "react-native";
 import { useTheme } from "../contexts/themeContext";
 import colors from "../themeColors";
@@ -23,6 +24,7 @@ import moment from "moment";
 import getUserbySearch from "../api/api_searchUSer";
 import { showLocalNotification } from "../utils/notifications";
 import deleteMessage from "../api/api_deleteMessage";
+import addReaction from "../api/api_addReaction";
 import { Audio } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -34,6 +36,9 @@ import * as MediaLibrary from "expo-media-library";
 const BASE_URL = getIp();
 const socket = io(`http://${BASE_URL}:3618`);
 const notificationSocket = io(`http://${BASE_URL}:3515`);
+
+// Danh sách emoji reaction, đồng bộ với web
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡"];
 
 export default function App({ navigation, route }) {
   const { theme } = useTheme();
@@ -57,9 +62,14 @@ export default function App({ navigation, route }) {
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [showReactionUsers, setShowReactionUsers] = useState(false);
+  const [selectedReaction, setSelectedReaction] = useState({ emoji: "", users: [] });
+  const [reactionUsersInfo, setReactionUsersInfo] = useState([]);
 
-  const [replyingTo, setReplyingTo] = useState(null); // Tin nhắn đang được trả lời
-  const [highlightedMessageId, setHighlightedMessageId] = useState(null); // Tin nhắn được đánh dấu khi cuộn
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+
   const handleReplyMessage = (msg) => {
     setReplyingTo({
       ...msg,
@@ -71,7 +81,6 @@ export default function App({ navigation, route }) {
           : msg.message,
     });
     setHighlightedMessageId(msg.timestamp);
-    // Cuộn đến tin nhắn được trả lời
     const index = messages.findIndex((m) => m.timestamp === msg.timestamp);
     if (index !== -1) {
       flatListRef.current?.scrollToIndex({
@@ -81,10 +90,35 @@ export default function App({ navigation, route }) {
       });
     }
   };
+
+  const fetchReactionUsersInfo = async (users) => {
+    try {
+      const userInfoPromises = users.map(async (phoneNumber) => {
+        const userInfo = await getUserbySearch(phoneNumber, phoneNumber);
+        return userInfo?.[0] || { phoneNumber, fullName: phoneNumber, avatar: null };
+      });
+      const userInfos = await Promise.all(userInfoPromises);
+      setReactionUsersInfo(userInfos);
+    } catch (error) {
+      console.error("Lỗi khi lấy thông tin người dùng:", error);
+      setReactionUsersInfo(users.map(phoneNumber => ({ phoneNumber, fullName: phoneNumber, avatar: null })));
+    }
+  };
+
+  const handleCopyMessage = () => {
+    if (selectedMessage?.type === "text" && !selectedMessage.isRevoked) {
+      Clipboard.setString(selectedMessage.message);
+      Alert.alert("Thành công", "Đã sao chép tin nhắn!");
+      setShowMessageOptions(false);
+      setSelectedMessage(null);
+    }
+  };
+
   const handleCancelReply = () => {
     setReplyingTo(null);
     setHighlightedMessageId(null);
   };
+
   useEffect(() => {
     if (!chatRoomId || !thisUser?.phoneNumber) return;
 
@@ -137,16 +171,28 @@ export default function App({ navigation, route }) {
       );
     };
 
+    const handleMessageReacted = (data) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.timestamp === data.messageId
+            ? { ...msg, reactions: data.reactions }
+            : msg
+        )
+      );
+    };
+
     socket.on("receiveMessage", handleReceiveMessage);
     socket.on("userTyping", handleTyping);
     socket.on("userStopTyping", handleStopTyping);
     socket.on("messageRevoked", handleMessageRevoked);
+    socket.on("messageReacted", handleMessageReacted);
 
     return () => {
       socket.off("receiveMessage", handleReceiveMessage);
       socket.off("userTyping", handleTyping);
       socket.off("userStopTyping", handleStopTyping);
       socket.off("messageRevoked", handleMessageRevoked);
+      socket.off("messageReacted", handleMessageReacted);
     };
   }, [chatRoomId, thisUser?.phoneNumber]);
 
@@ -160,7 +206,6 @@ export default function App({ navigation, route }) {
 
   const handleSend = async () => {
     if (isRecording && recording) {
-      // Đang ghi âm, dừng và gửi tin nhắn thoại
       try {
         await recording.stopAndUnloadAsync();
         const uri = recording.getURI();
@@ -213,7 +258,6 @@ export default function App({ navigation, route }) {
     }
   };
 
-  // Hàm xử lý thu hồi tin nhắn
   const handleDeleteMessagePress = async () => {
     if (!selectedMessage) return;
 
@@ -228,8 +272,28 @@ export default function App({ navigation, route }) {
   };
 
   const handleLongPressMessage = (item) => {
+    if (item.isRevoked) return; // Không mở modal nếu tin nhắn đã thu hồi
     setSelectedMessage(item);
     setShowMessageOptions(true);
+  };
+
+  const handleAddReaction = async (emoji) => {
+    if (!selectedMessage) return;
+
+    try {
+      await addReaction(
+        chatRoomId,
+        selectedMessage.timestamp,
+        currentUserPhone,
+        emoji // Gửi trực tiếp emoji
+      );
+      setShowReactionPicker(false);
+      setShowMessageOptions(false);
+      setSelectedMessage(null);
+    } catch (error) {
+      console.error("Lỗi khi thêm reaction:", error);
+      Alert.alert("Lỗi", "Không thể thêm reaction. Vui lòng thử lại sau.");
+    }
   };
 
   const startRecording = async () => {
@@ -441,7 +505,7 @@ export default function App({ navigation, route }) {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         allowsMultipleSelection: true,
-        selectionLimit: 5, // gioi han 5 anh
+        selectionLimit: 5,
         quality: 0.8,
       });
 
@@ -475,7 +539,6 @@ export default function App({ navigation, route }) {
         }
 
         if (totalSize > 30 * 1024 * 1024) {
-          // 30MB
           Alert.alert(
             "Files quá lớn",
             "Tổng kích thước các file không được vượt quá 30MB"
@@ -483,7 +546,6 @@ export default function App({ navigation, route }) {
           return;
         }
 
-        // gui nhieu file
         if (fileObjects.length > 0) {
           try {
             console.log(`Sending ${fileObjects.length} files`);
@@ -528,17 +590,14 @@ export default function App({ navigation, route }) {
         const fileObjects = [];
 
         for (const doc of selectedDocs) {
-          // Kiểm tra kích thước file
           const fileInfo = await FileSystem.getInfoAsync(doc.uri);
           totalSize += fileInfo.size;
 
           if (fileInfo.size > 10 * 1024 * 1024) {
-            // 10MB
             Alert.alert("File quá lớn", `File ${doc.name} vượt quá 10MB`);
             return;
           }
 
-          // Kiểm tra extension file
           const fileExt = doc.name.split(".").pop().toLowerCase();
           const allowedExts = [
             "jpeg",
@@ -575,9 +634,7 @@ export default function App({ navigation, route }) {
           });
         }
 
-        //
         if (totalSize > 30 * 1024 * 1024) {
-          // tong kich co 30MB
           Alert.alert(
             "Files quá lớn",
             "Tổng kích thước các file không được vượt quá 30MB"
@@ -585,7 +642,6 @@ export default function App({ navigation, route }) {
           return;
         }
 
-        // gui nhieu file
         if (fileObjects.length > 0) {
           try {
             console.log(`Sending ${fileObjects.length} documents`);
@@ -611,43 +667,86 @@ export default function App({ navigation, route }) {
     }
   };
 
-  const handleSendFile = async (fileObjs) => {
-    setIsUploading(true);
+  const downloadFile = async (fileUrl, fileName) => {
+    setIsDownloading(true);
     try {
-      console.log(
-        `Starting to send ${
-          Array.isArray(fileObjs) ? fileObjs.length : 1
-        } file(s):`,
-        {
-          chatRoomId,
-          from: currentUserPhone,
-          to: otherUser.phoneNumber,
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        setIsDownloading(false);
+        Alert.alert(
+          "Cần quyền truy cập",
+          "Ứng dụng cần quyền truy cập bộ nhớ để tải xuống file."
+        );
+        return;
+      }
+
+      const tempFileUri = FileSystem.cacheDirectory + fileName;
+      const downloadResumable = FileSystem.createDownloadResumable(
+        fileUrl,
+        tempFileUri,
+        {},
+        (downloadProgress) => {
+          const progress =
+            downloadProgress.totalBytesWritten /
+            downloadProgress.totalBytesExpectedToWrite;
+          console.log(`Tiến độ tải: ${progress * 100}%`);
         }
       );
 
-      const BASE_URL = getIp();
-      console.log("Using BASE_URL:", BASE_URL);
+      const { uri } = await downloadResumable.downloadAsync();
+      console.log("File đã tải xuống tại:", uri);
 
-      const result = await sendFile(
-        chatRoomId,
-        currentUserPhone,
-        otherUser.phoneNumber,
-        fileObjs
-      );
+      if (uri) {
+        const fileExt = fileName.split(".").pop().toLowerCase();
+        const mediaExts = [
+          "jpg",
+          "jpeg",
+          "png",
+          "gif",
+          "mp4",
+          "mov",
+          "avi",
+          "mp3",
+          "wav",
+          "m4a",
+        ];
 
-      console.log("Kết quả gửi file:", result);
-      setIsUploading(false);
-    } catch (error) {
-      setIsUploading(false);
-      console.error("Lỗi gửi file:", error);
-      if (error.message && error.message.includes("Network request failed")) {
-        Alert.alert(
-          "Lỗi kết nối",
-          "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và địa chỉ IP máy chủ."
-        );
-      } else {
-        Alert.alert("Lỗi", "Không thể gửi file. Vui lòng thử lại sau.");
+        if (mediaExts.includes(fileExt)) {
+          const asset = await MediaLibrary.createAssetAsync(uri);
+          console.log("Asset created:", asset);
+          setIsDownloading(false);
+          Alert.alert("Thành công", "File media đã được lưu vào thư viện.");
+        } else {
+          const downloadsDir = `${FileSystem.documentDirectory}Downloads/`;
+          await FileSystem.makeDirectoryAsync(downloadsDir, {
+            intermediates: true,
+          });
+          const finalUri = downloadsDir + fileName;
+          await FileSystem.moveAsync({
+            from: uri,
+            to: finalUri,
+          });
+          console.log("File đã được lưu tại:", finalUri);
+          setIsDownloading(false);
+
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(finalUri);
+          }
+        }
+
+        try {
+          await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
+        } catch (deleteError) {
+          console.log("Lỗi khi xóa file tạm:", deleteError);
+        }
       }
+    } catch (error) {
+      setIsDownloading(false);
+      console.error("Lỗi chi tiết khi tải file:", error);
+      Alert.alert(
+        "Lỗi",
+        `Không thể tải xuống file: ${error.message}. Vui lòng thử lại sau.`
+      );
     }
   };
 
@@ -750,14 +849,44 @@ export default function App({ navigation, route }) {
       }
     };
 
+    const renderReactions = () => {
+      if (!item.reactions || Object.keys(item.reactions).length === 0) {
+        return null;
+      }
+
+      return (
+        <View style={styles.reactionContainer}>
+          {Object.entries(item.reactions).map(([emoji, users]) => (
+            users.length > 0 && (
+              <TouchableOpacity
+                key={emoji}
+                onPress={() => {
+                  setSelectedReaction({ emoji, users });
+                  fetchReactionUsersInfo(users);
+                  setShowReactionUsers(true);
+                }}
+                style={styles.reactionTouchable}
+              >
+                <Text style={styles.reactionIcon}>
+                  {emoji} {users.length}
+                </Text>
+              </TouchableOpacity>
+            )
+          ))}
+        </View>
+      );
+    };
+
     return (
       <TouchableOpacity
         style={[
           styles.userChatting,
           { justifyContent: isCurrentUser ? "flex-end" : "flex-start" },
+          isHighlighted && styles.highlightedMessage,
         ]}
         onLongPress={() => handleLongPressMessage(item)}
         delayLongPress={500}
+        activeOpacity={0.8}
       >
         {!isCurrentUser && (
           <Image
@@ -788,7 +917,7 @@ export default function App({ navigation, route }) {
               },
             ]}
           >
-            {item.replyTo && (
+            {item.replyTo && !item.isRevoked && (
               <TouchableOpacity
                 onPress={() => {
                   const index = messages.findIndex(
@@ -814,6 +943,7 @@ export default function App({ navigation, route }) {
             )}
             {renderMessageContent()}
           </View>
+          {!item.isRevoked && renderReactions()}
         </View>
         {isCurrentUser && (
           <Image
@@ -833,100 +963,6 @@ export default function App({ navigation, route }) {
   const handleViewFile = (fileInfo) => {
     setSelectedFile(fileInfo);
     setShowFileOptions(true);
-  };
-
-  const downloadFile = async (fileUrl, fileName) => {
-    setIsDownloading(true); // Bật trạng thái tải
-    try {
-      // Kiểm tra quyền truy cập
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== "granted") {
-        setIsDownloading(false); // Tắt trạng thái tải nếu không có quyền
-        Alert.alert(
-          "Cần quyền truy cập",
-          "Ứng dụng cần quyền truy cập bộ nhớ để tải xuống file."
-        );
-        return;
-      }
-
-      // Tạo đường dẫn lưu file tạm thời
-      const tempFileUri = FileSystem.cacheDirectory + fileName;
-
-      // Tải file xuống
-      const downloadResumable = FileSystem.createDownloadResumable(
-        fileUrl,
-        tempFileUri,
-        {},
-        (downloadProgress) => {
-          const progress =
-            downloadProgress.totalBytesWritten /
-            downloadProgress.totalBytesExpectedToWrite;
-          console.log(`Tiến độ tải: ${progress * 100}%`);
-        }
-      );
-
-      const { uri } = await downloadResumable.downloadAsync();
-      console.log("File đã tải xuống tại:", uri);
-
-      if (uri) {
-        // Kiểm tra loại file dựa trên phần mở rộng
-        const fileExt = fileName.split(".").pop().toLowerCase();
-        const mediaExts = [
-          "jpg",
-          "jpeg",
-          "png",
-          "gif",
-          "mp4",
-          "mov",
-          "avi",
-          "mp3",
-          "wav",
-          "m4a",
-        ];
-
-        if (mediaExts.includes(fileExt)) {
-          // Nếu là file media, lưu vào MediaLibrary
-          const asset = await MediaLibrary.createAssetAsync(uri);
-          console.log("Asset created:", asset);
-          setIsDownloading(false); // Tắt trạng thái tải
-          Alert.alert("Thành công", "File media đã được lưu vào thư viện.");
-        } else {
-          // Nếu không phải file media, lưu vào thư mục Downloads
-          const downloadsDir = `${FileSystem.documentDirectory}Downloads/`;
-          await FileSystem.makeDirectoryAsync(downloadsDir, {
-            intermediates: true,
-          });
-          const finalUri = downloadsDir + fileName;
-          await FileSystem.moveAsync({
-            from: uri,
-            to: finalUri,
-          });
-          console.log("File đã được lưu tại:", finalUri);
-          setIsDownloading(false); // Tắt trạng thái tải
-          // Nếu muốn thông báo thành công, bạn có thể bật lại dòng này:
-          // Alert.alert('Thành công', `File đã được lưu tại: ${finalUri}`);
-
-          // Nếu có thể chia sẻ, cung cấp tùy chọn chia sẻ file
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(finalUri);
-          }
-        }
-
-        // Xóa file tạm nếu cần
-        try {
-          await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
-        } catch (deleteError) {
-          console.log("Lỗi khi xóa file tạm:", deleteError);
-        }
-      }
-    } catch (error) {
-      setIsDownloading(false); // Tắt trạng thái tải nếu có lỗi
-      console.error("Lỗi chi tiết khi tải file:", error);
-      Alert.alert(
-        "Lỗi",
-        `Không thể tải xuống file: ${error.message}. Vui lòng thử lại sau.`
-      );
-    }
   };
 
   const styles = getStyles(themeColors);
@@ -1019,13 +1055,15 @@ export default function App({ navigation, route }) {
             onPress={() => setShowMessageOptions(false)}
           >
             <View style={styles.modalContent}>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={handleDeleteMessagePress}
-              >
-                <MaterialIcons name="delete" size={24} color="red" />
-                <Text style={styles.modalOptionText}>Thu hồi tin nhắn</Text>
-              </TouchableOpacity>
+              {selectedMessage?.sender === currentUserPhone && (
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={handleDeleteMessagePress}
+                >
+                  <MaterialIcons name="delete" size={24} color="red" />
+                  <Text style={styles.modalOptionText}>Thu hồi tin nhắn</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.modalOption}
                 onPress={() => {
@@ -1042,6 +1080,24 @@ export default function App({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalOption}
+                onPress={() => {
+                  setShowReactionPicker(true);
+                }}
+              >
+                <Ionicons name="heart" size={24} color={themeColors.text} />
+                <Text style={styles.modalOptionText}>Thêm reaction</Text>
+              </TouchableOpacity>
+              {selectedMessage?.type === "text" && !selectedMessage?.isRevoked && (
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={handleCopyMessage}
+                >
+                  <Ionicons name="copy" size={24} color={themeColors.text} />
+                  <Text style={styles.modalOptionText}>Sao chép</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.modalOption}
                 onPress={() => setShowMessageOptions(false)}
               >
                 <MaterialIcons
@@ -1051,6 +1107,32 @@ export default function App({ navigation, route }) {
                 />
                 <Text style={styles.modalOptionText}>Hủy</Text>
               </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Modal chọn reaction */}
+        <Modal
+          transparent={true}
+          visible={showReactionPicker}
+          animationType="slide"
+          onRequestClose={() => setShowReactionPicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowReactionPicker(false)}
+          >
+            <View style={styles.reactionPicker}>
+              {REACTION_EMOJIS.map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  style={styles.reactionOption}
+                  onPress={() => handleAddReaction(emoji)}
+                >
+                  <Text style={styles.reactionEmoji}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </TouchableOpacity>
         </Modal>
@@ -1147,6 +1229,51 @@ export default function App({ navigation, route }) {
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Modal hiển thị danh sách người thả reaction */}
+        <Modal
+          transparent={true}
+          visible={showReactionUsers}
+          animationType="fade"
+          onRequestClose={() => setShowReactionUsers(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowReactionUsers(false)}
+          >
+            <View style={styles.reactionUsersModal}>
+              <View style={styles.reactionUsersHeader}>
+                <Text style={styles.reactionUsersTitle}>
+                  Người đã thả {selectedReaction.emoji}
+                </Text>
+                <TouchableOpacity onPress={() => setShowReactionUsers(false)}>
+                  <Ionicons name="close" size={24} color={themeColors.text} />
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={reactionUsersInfo}
+                keyExtractor={(item) => item.phoneNumber}
+                renderItem={({ item }) => (
+                  <View style={styles.reactionUserItem}>
+                    <Image
+                      source={{ uri: item.avatar || 'https://via.placeholder.com/40' }}
+                      style={styles.reactionUserAvatar}
+                    />
+                    <Text style={styles.reactionUserName}>
+                      {item.fullName}
+                    </Text>
+                  </View>
+                )}
+                ListEmptyComponent={
+                  <Text style={styles.reactionUserEmpty}>
+                    Không có người dùng nào
+                  </Text>
+                }
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -1216,7 +1343,6 @@ const getStyles = (themeColors) =>
     blockChat: {
       backgroundColor: "#7399C3",
       padding: 15,
-      
       borderRadius: 20,
     },
     touch: {
@@ -1237,7 +1363,6 @@ const getStyles = (themeColors) =>
       height: 20,
       borderRadius: 5,
     },
-    // Style cho modal
     modalOverlay: {
       flex: 1,
       backgroundColor: "rgba(0,0,0,0.5)",
@@ -1263,7 +1388,32 @@ const getStyles = (themeColors) =>
       marginLeft: 10,
       color: themeColors.text,
     },
-    // Style mới cho xem ảnh toàn màn hình
+    reactionPicker: {
+      flexDirection: "row",
+      backgroundColor: themeColors.background,
+      borderRadius: 20,
+      padding: 10,
+      elevation: 5,
+      justifyContent: "center",
+    },
+    reactionOption: {
+      padding: 6,
+      marginHorizontal: 5,
+    },
+    reactionEmoji: {
+      fontSize: 20,
+    },
+    reactionContainer: {
+      flexDirection: "row",
+      marginTop: 5,
+      backgroundColor: "rgba(0,0,0,0.1)",
+      borderRadius: 10,
+      padding: 5,
+    },
+    reactionIcon: {
+      fontSize: 12,
+      marginHorizontal: 3,
+    },
     imageViewerContainer: {
       flex: 1,
       backgroundColor: "rgba(0,0,0,0.95)",
@@ -1305,7 +1455,6 @@ const getStyles = (themeColors) =>
       color: "#fff",
       fontSize: 16,
     },
-    // Style cho modal tùy chọn file
     fileOptionsContainer: {
       backgroundColor: themeColors.background,
       borderTopLeftRadius: 20,
@@ -1375,65 +1524,87 @@ const getStyles = (themeColors) =>
       color: themeColors.text,
       fontSize: 16,
     },
-    loadingOverlay: {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      justifyContent: "center",
-      alignItems: "center",
-      backgroundColor: "rgba(0, 0, 0, 0.5)", // Nền mờ
-      zIndex: 1000,
-    },
-   
-    revokedMessage: {
-      color: '#a0a0a0',
-      fontStyle: 'italic',
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: '#a0a0a0',
-      borderStyle: 'dashed',
-    },
     highlightedMessage: {
-      backgroundColor: 'rgba(255, 255, 0, 0.3)', 
+      backgroundColor: "rgba(255, 255, 0, 0.3)",
     },
     replyPreview: {
-      backgroundColor: '#A6AEBF', 
+      backgroundColor: "#A6AEBF",
       padding: 8,
       borderRadius: 10,
       marginBottom: 5,
-      width: 'auto',
+      width: "auto",
     },
     replyText: {
       fontSize: 13,
-      color: '#fff',
-      fontWeight: 'bold',
+      color: "#fff",
+      fontWeight: "bold",
     },
     replyMessage: {
       fontSize: 13,
-      color: '#fff',
+      color: "#fff",
       opacity: 0.9,
     },
     replyingTo: {
-      position: 'absolute',
+      position: "absolute",
       bottom: 76,
       left: 130,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      backgroundColor: 'rgb(64, 59, 71)', 
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: "rgb(64, 59, 71)",
       padding: 10,
-      width: '50%',
+      width: "50%",
       borderRadius: 9,
       marginBottom: 10,
       marginHorizontal: 10,
     },
     replyingToText: {
       fontSize: 14,
-      color: '#fff',
+      color: "#fff",
       flex: 1,
+    },
+    reactionTouchable: {
+      padding: 2,
+      marginHorizontal: 3,
+    },
+    reactionUsersModal: {
+      width: '80%',
+      maxHeight: '50%',
+      backgroundColor: themeColors.background,
+      borderRadius: 10,
+      padding: 15,
+      elevation: 5,
+    },
+    reactionUsersHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    reactionUsersTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: themeColors.text,
+    },
+    reactionUserItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    reactionUserAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      marginRight: 10,
+    },
+    reactionUserName: {
+      fontSize: 16,
+      color: themeColors.text,
+    },
+    reactionUserEmpty: {
+      fontSize: 14,
+      color: themeColors.text,
+      textAlign: 'center',
+      padding: 20,
     },
   });

@@ -145,7 +145,6 @@ module.exports = (io, redisPublisher) => {
     }
   });
 
-
   router.delete("/deleteMessage", async (req, res) => {
     try {
       const { chatRoomId, messageId } = req.body;
@@ -200,16 +199,18 @@ module.exports = (io, redisPublisher) => {
           chatRoomId: chatRoomId,
           timestamp: messageId,
         },
-        UpdateExpression: "SET #msg = :newMsg, #isRevoked = :isRevoked, #originalType = :originalType",
+        UpdateExpression: "SET #msg = :newMsg, #isRevoked = :isRevoked, #originalType = :originalType, #reactions = :emptyReactions",
         ExpressionAttributeNames: {
           "#msg": "message",
           "#isRevoked": "isRevoked",
-          "#originalType": "originalType"
+          "#originalType": "originalType",
+          "#reactions": "reactions"
         },
         ExpressionAttributeValues: {
           ":newMsg": "Tin nhắn đã được thu hồi",
           ":isRevoked": true,
-          ":originalType": message.type
+          ":originalType": message.type,
+          ":emptyReactions": {}
         },
         ReturnValues: "ALL_NEW"
       };
@@ -450,7 +451,6 @@ module.exports = (io, redisPublisher) => {
         ReturnValues: "UPDATED_NEW",
       };
 
-
       await dynamoDB.update(updateParams).promise();
 
       console.log("✅ Đã cập nhật thông tin cuộc trò chuyện:", chatId);
@@ -474,6 +474,72 @@ module.exports = (io, redisPublisher) => {
       res.status(500).json({ error: `Lỗi server: ${err.message}` });
     }
   });
+
+  router.post('/addReaction', async (req, res) => {
+    try {
+        const { chatRoomId, messageId, user, reaction } = req.body;
+        if (!chatRoomId || !messageId || !user || !reaction) {
+            return res.status(400).json({ error: "Thiếu dữ liệu!" });
+        }
+
+        const getParams = {
+            TableName: TABLE_MESSAGE_NAME,
+            Key: {
+                chatRoomId: chatRoomId,
+                timestamp: messageId,
+            },
+        };
+
+        const messageData = await dynamoDB.get(getParams).promise();
+        if (!messageData.Item) {
+            return res.status(404).json({ error: "Không tìm thấy tin nhắn!" });
+        }
+
+        const message = messageData.Item;
+        if (!message.reactions) {
+            message.reactions = {};
+        }
+
+        if (!message.reactions[reaction]) {
+            message.reactions[reaction] = [];
+        }
+
+        const userIndex = message.reactions[reaction].indexOf(user);
+        if (userIndex !== -1) {
+            message.reactions[reaction].splice(userIndex, 1);
+            if (message.reactions[reaction].length === 0) {
+                delete message.reactions[reaction];
+            }
+        } else {
+            message.reactions[reaction].push(user);
+        }
+
+        const updateParams = {
+            TableName: TABLE_MESSAGE_NAME,
+            Key: {
+                chatRoomId: chatRoomId,
+                timestamp: messageId,
+            },
+            UpdateExpression: "SET reactions = :reactions",
+            ExpressionAttributeValues: {
+                ":reactions": message.reactions,
+            },
+            ReturnValues: "ALL_NEW",
+        };
+
+        const updatedMessage = await dynamoDB.update(updateParams).promise();
+
+        io.to(chatRoomId).emit('messageReacted', {
+            messageId: messageId,
+            reactions: message.reactions,
+        });
+
+        res.status(200).json({ success: true, reactions: message.reactions });
+    } catch (error) {
+        console.error('Lỗi khi thêm reaction:', error);
+        res.status(500).json({ error: 'Lỗi server!' });
+    }
+});
 
   return router;
 };

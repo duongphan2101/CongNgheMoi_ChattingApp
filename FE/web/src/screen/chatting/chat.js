@@ -30,6 +30,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
   const [revokedMessages, setRevokedMessages] = useState([]);
+  const [, setHoveredMessageId] = useState(null);
+  const [showReactions, setShowReactions] = useState(null);
+  const [messageReactions, setMessageReactions] = useState({});
+  const [activeReactionTooltip, setActiveReactionTooltip] = useState(null);
   console.log(revokedMessages);
   const [listAddtoGroup, setListAddtoGroup] = useState([]);
   const [nameGroup, setNameGroup] = useState("");
@@ -109,6 +113,32 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const handleCancelReply = () => {
     setReplyingTo(null);
     setHighlightedMessageId(null);
+  };
+
+  const handleAddReaction = async (messageId, reaction) => {
+    if (chatRoom.status === "DISBANDED") {
+        toast.error("Nhóm đã bị giải tán. Không thể thêm reaction.");
+        return;
+    }
+
+    try {
+        const response = await fetch("http://localhost:3618/addReaction", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                chatRoomId: chatRoom.chatRoomId,
+                messageId: messageId,
+                user: currentUserPhone,
+                reaction: reaction,
+            }),
+        });
+
+        if (!response.ok) throw new Error("Không thể thêm reaction!");
+        setShowReactions(null);
+    } catch (error) {
+        console.error("Lỗi khi thêm reaction:", error);
+        toast.error("Không thể thêm reaction!");
+    }
   };
 
   const otherUserPhone = chatRoom?.participants?.find(
@@ -291,16 +321,31 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   useEffect(() => {
     if (!chatRoom?.chatRoomId) return;
     setCurrentUserPhone(user.phoneNumber);
-    fetch(`http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}`)
-      .then((res) => res.json())
-      .then((data) => {
+    fetch(`http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}`, {
+      method: "GET",
+      headers: {
+          "Content-Type": "application/json",
+      },
+    })
+    .then((res) => res.json())
+    .then((data) => {
         setMessages(data);
+        const reactionsData = {};
+        data.forEach((msg) => {
+            if (msg.reactions) {
+                reactionsData[msg.timestamp] = msg.reactions;
+            }
+        });
+        setMessageReactions(reactionsData);
         const revoked = data.filter((msg) => msg.isRevoked);
         if (revoked.length > 0) {
-          setRevokedMessages(revoked.map((msg) => msg.timestamp));
+            setRevokedMessages(revoked.map((msg) => msg.timestamp));
         }
-      })
-      .catch((err) => console.error("Error fetching messages:", err));
+    })
+    .catch((err) => {
+        console.error("Lỗi khi lấy tin nhắn:", err);
+        toast.error("Không thể lấy tin nhắn!");
+    });
 
     socket.emit("joinRoom", chatRoom.chatRoomId);
 
@@ -323,9 +368,21 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         prev.map((msg) => (msg.timestamp === data.timestamp ? data : msg))
       );
       setRevokedMessages((prev) => [...prev, data.timestamp]);
+      setMessageReactions((prev) => {
+        const updatedReactions = { ...prev };
+        delete updatedReactions[data.timestamp];
+        return updatedReactions;
+      });
       if (data.lastMessage) {
         updateLastMessage(data.sender, data.receiver, data.lastMessage);
       }
+    });
+
+    socket.on("messageReacted", (data) => {
+      setMessageReactions((prev) => ({
+          ...prev,
+          [data.messageId]: data.reactions,
+      }));
     });
 
     return () => {
@@ -333,6 +390,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       socket.off("userTyping");
       socket.off("userStopTyping");
       socket.off("messageRevoked");
+      socket.off("messageReacted");
     };
   }, [chatRoom?.chatRoomId, user.phoneNumber, updateLastMessage]);
 
@@ -552,6 +610,23 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       });
     } catch (error) {
       console.error("Lỗi gửi tin nhắn:", error);
+    }
+  };
+
+  const handleCopyMessage = (message) => {
+    if (message.isRevoked) return;
+    if (message.type === "text") {
+      navigator.clipboard.writeText(message.message)
+        .then(() => {
+          toast.success("Đã sao chép tin nhắn");
+          setActiveMessageId(null);
+        })
+        .catch(err => {
+          console.error("Không thể sao chép tin nhắn:", err);
+          toast.error("Không thể sao chép tin nhắn");
+        });
+    } else {
+      toast.error("Chỉ có thể sao chép nội dung văn bản!");
     }
   };
 
@@ -800,6 +875,45 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     }
   };
 
+  const renderReactions = (reactions, isRevoked) => {
+    if (isRevoked || !reactions || Object.keys(reactions).length === 0) return null;
+  
+    return (
+      <div className="message-reactions">
+        {Object.entries(reactions).map(([reaction, users]) => (
+          <div
+            key={reaction}
+            className={`reaction-badge ${
+              activeReactionTooltip === `${reaction}-${users.join(",")}` ? "active" : ""
+            }`}
+            // onClick={() =>
+            //   setActiveReactionTooltip(
+            //     activeReactionTooltip === `${reaction}-${users.join(",")}`
+            //       ? null
+            //       : `${reaction}-${users.join(",")}`
+            //   )
+            // }
+          >
+            {reaction} {users.length}
+            <div className="reaction-tooltip">
+              <ul>
+                {users.map((phone) => {
+                  const user = userMap[phone] || { fullName: phone, avatar: a1 };
+                  return (
+                    <li key={phone}>
+                      <img src={user.avatar} alt={user.fullName} />
+                      <span>{user.fullName}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const handleTogglePhoneNumber = (phoneNumber) => {
     setListAddtoGroup((prev) => {
       const mustHave = [user.phoneNumber, userChatting[0].phoneNumber];
@@ -905,12 +1019,23 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       for (const msg of messages) {
         if (!map[msg.sender]) {
           const result = await getUserbySearch(msg.sender, msg.sender);
-          map[msg.sender] = result[0]; // hoặc {} nếu không có
+          map[msg.sender] = result[0] || { fullName: msg.sender, avatar: a1 };
+        }
+        //thông tin người thả reaction
+        if (msg.reactions) {
+          for (const users of Object.values(msg.reactions)) {
+            for (const phone of users) {
+              if (!map[phone]) {
+                const result = await getUserbySearch(phone, phone);
+                map[phone] = result[0] || { fullName: phone, avatar: a1 };
+              }
+            }
+          }
         }
       }
       setUserMap(map);
     };
-
+  
     if (messages.length > 0) {
       fetchUsers();
     }
@@ -1036,9 +1161,14 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   <div
                     key={index}
                     id={`message-${msg.timestamp}`}
-                    className={`message ${
-                      isSentByCurrentUser ? "sent" : "received"
-                    } ${isHighlighted ? "highlighted" : ""}`}
+                    className={`message ${isSentByCurrentUser ? "sent" : "received"} ${
+                      isHighlighted ? "highlighted" : ""
+                    }`}
+                    onMouseEnter={() => setHoveredMessageId(msg.timestamp)}
+                    onMouseLeave={() => {
+                      setHoveredMessageId(null);
+                      setShowReactions(null);
+                    }}
                   >
                     {!isSentByCurrentUser && (
                       <img
@@ -1049,7 +1179,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                     )}
 
                     <div className="message-wrapper">
-                      <div className="message-info">
+                      <div className="message-info" style={{ position: "relative" }}>
                         {chatRoom.isGroup && (
                           <span
                             className="sender-name"
@@ -1071,8 +1201,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                               {msg.replyTo.sender === currentUserPhone
                                 ? "Bạn đã trả lời tin nhắn của mình"
                                 : `Đã trả lời tin nhắn của ${
-                                    userMap[msg.replyTo.sender]?.fullName ||
-                                    "người khác"
+                                    userMap[msg.replyTo.sender]?.fullName || "người khác"
                                   }`}
                             </span>
                             <p
@@ -1089,10 +1218,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                                 cursor: "pointer",
                               }}
                               onClick={() => {
-                                const repliedMessageElement =
-                                  document.getElementById(
-                                    `message-${msg.replyTo.timestamp}`
-                                  );
+                                const repliedMessageElement = document.getElementById(
+                                  `message-${msg.replyTo.timestamp}`
+                                );
                                 repliedMessageElement?.scrollIntoView({
                                   behavior: "smooth",
                                   block: "start",
@@ -1105,16 +1233,14 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                           </div>
                         )}
 
-                        {/* Hiển thị nội dung tin nhắn */}
                         {renderMessageContent(msg)}
 
+                        <div className="message-footer" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
                         <span
                           className="timestamp"
                           style={{
                             color: "lightgrey",
                             fontSize: "12px",
-                            marginLeft: "8px",
-                            display: "block",
                           }}
                         >
                           {new Date(msg.timestamp).toLocaleString("vi-VN", {
@@ -1125,41 +1251,73 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                           })}
                         </span>
                       </div>
-                    </div>
 
-                    {/* Nút reply */}
-                    <div className="message-options-container">
-                      <button
-                        className="message-options-btn reply-btn"
-                        title="Trả lời"
-                        onClick={() => handleReplyMessage(msg)}
-                      >
-                        <i className="bi bi-reply"></i>
-                      </button>
-                    </div>
+                      {renderReactions(messageReactions[msg.timestamp], msg.isRevoked)}
 
-                    {/* Nút thu hồi (nếu là của mình gửi) */}
-                    {isSentByCurrentUser && (
-                      <div className="message-options-container">
-                        <button
-                          className="message-options-btn"
-                          onClick={() => toggleMessageOptions(msg.timestamp)}
+                      {showReactions === msg.timestamp && (
+                        <div
+                          className="reaction-picker"
+                          onMouseEnter={() => setShowReactions(msg.timestamp)}
+                          onMouseLeave={() => setShowReactions(null)}
                         >
-                          <i className="bi bi-three-dots-vertical"></i>
-                        </button>
-                        {activeMessageId === msg.timestamp && (
-                          <div className="message-options-menu">
+                          {["👍", "❤️", "😂", "😮", "😢", "😡"].map((emoji) => (
                             <button
-                              className="message-option-item"
-                              onClick={() => handleRevokeMessage(msg.timestamp)}
+                              key={emoji}
+                              onClick={() => handleAddReaction(msg.timestamp, emoji)}
+                              className="reaction-option"
                             >
-                              <i className="bi bi-arrow-counterclockwise"></i>{" "}
-                              Thu hồi tin nhắn
+                              {emoji}
                             </button>
-                          </div>
-                        )}
+                          ))}
+                        </div>
+                      )}
                       </div>
-                    )}
+                    </div>
+
+                    <div className="message-options-container">
+                      {!msg.isRevoked && (
+                        <>
+                          <button
+                            className="message-options-btn reaction-btn"
+                            title="Thêm reaction"
+                            onMouseEnter={() => setShowReactions(msg.timestamp)}
+                          >
+                            <i className="bi bi-emoji-smile"></i>
+                          </button>
+                          <button
+                            className="message-options-btn reply-btn"
+                            title="Trả lời"
+                            onClick={() => handleReplyMessage(msg)}
+                          >
+                            <i className="bi bi-reply"></i>
+                          </button>
+                          <button
+                            className="message-options-btn"
+                            onClick={() => toggleMessageOptions(msg.timestamp)}
+                          >
+                            <i className="bi bi-three-dots-vertical"></i>
+                          </button>
+                          {activeMessageId === msg.timestamp && (
+                            <div className="message-options-menu">
+                              <button
+                                className="message-option-item"
+                                onClick={() => handleCopyMessage(msg)}
+                              >
+                                <i className="bi bi-clipboard"></i> Sao chép tin nhắn
+                              </button>
+                              {isSentByCurrentUser && (
+                                <button
+                                  className="message-option-item"
+                                  onClick={() => handleRevokeMessage(msg.timestamp)}
+                                >
+                                  <i className="bi bi-arrow-counterclockwise"></i> Thu hồi tin nhắn
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
 
                     {isSentByCurrentUser && (
                       <img
@@ -1172,7 +1330,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 );
               })}
 
-              {/* Trạng thái đang nhập / upload */}
               {typing && <p className="typing-indicator">Đang nhập...</p>}
               {uploading && (
                 <p className="typing-indicator">Đang tải file lên...</p>

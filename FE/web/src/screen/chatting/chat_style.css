@@ -98,7 +98,6 @@
     justify-content: center;
 }
 
-/* CSS cho menu tùy chọn tin nhắn */
 .message-options-container {
     position: relative;
     display: none;
@@ -735,3 +734,169 @@ audio {
   }
 
   
+.message-info {
+    position: relative;
+    width: fit-content;
+    /* min-width: 80px; */
+    max-width: 100%;
+}
+
+.message-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.reaction-button {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.reaction-button:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.reaction-button i {
+    color: #e0e0e0;
+    font-size: 14px;
+}
+
+.revoked-message ~ .message-footer .reaction-button {
+    display: none;
+}
+
+.reaction-picker {
+    position: absolute;
+    bottom: 40px;
+    background: linear-gradient(135deg, #2a3b5e 0%, #1f2a44 100%);
+    border-radius: 30px;
+    padding: 6px 8px;
+    display: flex;
+    gap: 6px;
+    z-index: 1000;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    width: fit-content;
+}
+
+.message.received .reaction-picker {
+    left: 10px;
+    transform: none;
+}
+
+.message.sent .reaction-picker {
+    right: 10px;
+    left: auto;
+    transform: none;
+}
+
+.reaction-option {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    padding: 4px 6px;
+    border-radius: 50%;
+}
+
+.reaction-option:hover {
+    transform: scale(1.2);
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.message-reactions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 5px;
+}
+
+.reaction-badge {
+    background: linear-gradient(135deg, #3a4b6e 0%, #2c3a5a 100%);
+    border-radius: 14px;
+    padding: 3px 8px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+
+.reaction-badge:hover {
+    transform: scale(1.05);
+}
+
+/* Tooltip cho danh sách người thả cảm xúc */
+.reaction-badge {
+    background: linear-gradient(135deg, #3a4b6e 0%, #2c3a5a 100%);
+    border-radius: 14px;
+    padding: 3px 8px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+    position: relative;
+    cursor: pointer;
+}
+
+.reaction-badge:hover {
+    transform: scale(1.05);
+    z-index: 1000;
+}
+
+.reaction-tooltip {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2a3b5e;
+    border-radius: 8px;
+    padding: 8px 12px;
+    /* box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); */
+    z-index: 9999;
+    min-width: 120px;
+    color: #fff;
+    font-size: 13px;
+    display: none;
+    text-align: left;
+}
+
+.reaction-badge:hover .reaction-tooltip,
+.reaction-badge.active .reaction-tooltip {
+    display: block;
+}
+
+.reaction-tooltip ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.reaction-tooltip li {
+    padding: 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.reaction-tooltip li img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+}
