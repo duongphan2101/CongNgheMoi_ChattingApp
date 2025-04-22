@@ -21,8 +21,7 @@ export default function App({ navigation, route }) {
   const [currentUserPhone, setCurrentUserPhone] = useState(null);
   const [usersInfo, setUsersInfo] = useState({}); // lưu user theo số điện thoại
   const [thisUser, setThisUser] = useState();
-  const [socket, setSocket] = useState(null);
-  const BASE_URL = getIp();
+  const { hideSearch } = useSearch(); // Lấy hàm hideSearch từ đối tượng trả về
 
   const fetchData = async () => {
     try {
