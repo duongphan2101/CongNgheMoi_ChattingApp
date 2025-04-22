@@ -623,22 +623,100 @@ function View({ setIsLoggedIn }) {
     }
   };
 
+  useEffect(() => {
+    if (!userInfo?.phoneNumber) return;
+  
+    let isMounted = true;
+    (async () => {
+      const data = await getConversations();
+      if (!isMounted || !data?.length) return;
+  
+      const myPhone = userInfo.phoneNumber;
+      const userData = await Promise.all(
+        data.map(async (convo) => {
+          if (convo.isGroup) {
+            return {
+              name: convo.fullName,
+              avatar: convo.avatar,
+              isUnreadBy:
+                Array.isArray(convo.isUnreadBy) &&
+                convo.isUnreadBy.includes(myPhone),
+              lastMessage: convo.lastMessage,
+              lastMessageAt: convo.lastMessageAt,
+              isGroup: true,
+              chatRoomId: convo.chatRoomId || null, // Đảm bảo chatRoomId tồn tại
+            };
+          }
+  
+          const partnerPhone = convo.participants.find((p) => p !== myPhone);
+          if (!partnerPhone) return null;
+          const userArray = await getUserbySearch(partnerPhone, "");
+          const user = Array.isArray(userArray) ? userArray[0] : userArray;
+          return user
+            ? {
+                ...user,
+                lastMessage: convo.lastMessage,
+                lastMessageAt: convo.lastMessageAt,
+                isUnreadBy:
+                  Array.isArray(convo.isUnreadBy) &&
+                  convo.isUnreadBy.includes(myPhone),
+                isGroup: false,
+                chatRoomId: convo.chatRoomId || null, // Đảm bảo chatRoomId tồn tại
+              }
+            : null;
+        })
+      );
+  
+      const filteredList = userData.filter((u) => u !== null);
+  
+      const sortedList = filteredList.sort((a, b) => {
+        const parseTime = (str) => {
+          if (!str) return new Date(0); // fallback cho item không có thời gian
+          const [time, date] = str.split(" ");
+          const [h, m, s] = time.split(":").map(Number);
+          const [d, mo, y] = date.split("/").map(Number);
+          return new Date(y, mo - 1, d, h, m, s);
+        };
+  
+        return parseTime(b.lastMessageAt) - parseTime(a.lastMessageAt);
+      });
+  
+      setUserChatList(sortedList);
+    })();
+  
+    return () => {
+      isMounted = false;
+    };
+  }, [userInfo?.phoneNumber, reloadConversations]);
+
 
   const check = async (phone1, phone2, Id) => {
     try {
+      if (!Id) {
+        console.error("chatRoomId bị thiếu!");
+        return;
+      }
+  
       const chatting = await getUserbySearch(phone2, "");
-
       const chatId = [phone1, phone2].sort().join("_");
       const chatRoomId = Id;
+  
+      console.log("CHat CHat ", chatRoomId);
       const chatRoomInfo = await getChatRoom(chatRoomId);
+  
+      if (!chatRoomInfo) {
+        console.error("Không tìm thấy thông tin chatRoom với ID:", chatRoomId);
+        return;
+      }
+  
       if (chatRoomInfo.isGroup) {
         console.warn("Cảnh báo: Chat đơn nhưng trả về chatRoom nhóm!");
         chatRoomInfo.isGroup = false;
       }
-
+  
       setChatRoom(chatRoomInfo);
       setUserChatting(Array.isArray(chatting) ? [chatting[0]] : []);
-
+  
       await markAsRead(chatId);
     } catch (error) {
       console.error("Lỗi trong check():", error.message);
@@ -748,10 +826,7 @@ function View({ setIsLoggedIn }) {
 
   const unreadCount = userChatList.filter((user) => user.isUnreadBy).length;
 
-  const createChatRoomAndConversation = async (
-    currentUserPhone,
-    targetUserPhone
-  ) => {
+  const createChatRoomAndConversation = async (currentUserPhone, targetUserPhone) => {
     try {
       const sortedPhones = [currentUserPhone, targetUserPhone].sort();
       const chatId = `${sortedPhones[0]}_${sortedPhones[1]}`;
@@ -772,7 +847,7 @@ function View({ setIsLoggedIn }) {
   
       if (checkData.exists) {
         console.log("Conversation đã tồn tại với chatId:", checkData.chatId);
-        return; // không tạo lại nữa
+        return checkData.chatRoomId; // Trả về chatRoomId nếu đã tồn tại
       }
   
       // Tạo ChatRoom
@@ -804,8 +879,7 @@ function View({ setIsLoggedIn }) {
         chatRoomId,
         participants: sortedPhones,
       };
-      console.log("Conversation data:", conversationData);
-
+  
       const conversationRes = await fetch(
         "http://localhost:3618/createConversation",
         {
@@ -822,32 +896,17 @@ function View({ setIsLoggedIn }) {
       }
   
       console.log("ChatRoom và Conversation đã được tạo thành công!");
+      return chatRoomId; // Trả về chatRoomId sau khi tạo thành công
     } catch (error) {
       console.error("Lỗi khi tạo ChatRoom và Conversation:", error);
+      return null; // Trả về null nếu có lỗi
     }
   };
 
   const handleUserClick = async (currentUserPhone, targetUserPhone) => {
-    try {
-      // Bước 1: kiểm tra xem đã có phòng chưa
-      const existingRoomId = await checkChatRoom(currentUserPhone, targetUserPhone);
-
-      let chatRoomId = existingRoomId;
-
-      // Bước 2: nếu chưa có thì tạo mới
-      if (!chatRoomId) {
-        chatRoomId = await createChatRoomAndConversation(currentUserPhone, targetUserPhone);
-      }
-
-      // Bước 3: nếu đã có chatRoomId thì cập nhật giao diện
-      if (chatRoomId) {
-        check(currentUserPhone, targetUserPhone, chatRoomId);
-      } else {
-        toast.error("Cần kết bạn để bắt đầu trò chuyện");
-      }
-    } catch (error) {
-      console.error("Lỗi khi xử lý click người dùng:", error);
-      toast.error("Có lỗi xảy ra.");
+    const chatRoomId = await createChatRoomAndConversation(currentUserPhone, targetUserPhone);
+    if (chatRoomId) {
+      await check(currentUserPhone, targetUserPhone, chatRoomId); // Truyền chatRoomId vào hàm check
     }
   };
 
@@ -1036,12 +1095,17 @@ function View({ setIsLoggedIn }) {
                           transition: "background 0.2s ease-in-out",
                           justifyContent: "space-between", // Thêm để căn nút sang phải
                         }}
-                        onClick={() =>
-                          handleUserClick(
-                            userInfo.phoneNumber,
-                            user.phoneNumber
-                          )
-                        }
+                        onClick={() => {
+                          if (!userInfo?.phoneNumber) {
+                            console.error("userInfo.phoneNumber bị thiếu!");
+                            return;
+                          }
+                          if (!user?.phoneNumber) {
+                            console.error("user.phoneNumber bị thiếu!");
+                            return;
+                          }
+                          handleUserClick(userInfo.phoneNumber, user.phoneNumber);
+                        }}
                       >
                         <div
                           style={{
@@ -1104,14 +1168,42 @@ function View({ setIsLoggedIn }) {
                 className="user"
                 key={user.chatRoomId}
                 onClick={async () => {
-
-                  if (user.isGroup) {
-                    await checkGroup(user.chatRoomId);
-                  } else if (user.phoneNumber) {
-                    await check(userInfo.phoneNumber, user.phoneNumber, user.chatRoomId);
+                  try {
+                    if (!user) {
+                      console.error("User không tồn tại!");
+                      return;
+                    }
+                
+                    if (user.isGroup) {
+                      if (!user.chatRoomId) {
+                        console.error("chatRoomId không tồn tại cho nhóm!");
+                        return;
+                      }
+                      await checkGroup(user.chatRoomId);
+                    } else if (user.phoneNumber) {
+                      let chatRoomId = user.chatRoomId;
+                
+                      if (!chatRoomId) {
+                        console.warn("chatRoomId bị thiếu! Đang tạo lại...");
+                        chatRoomId = await createChatRoomAndConversation(
+                          userInfo.phoneNumber,
+                          user.phoneNumber
+                        );
+                        if (!chatRoomId) {
+                          console.error("Không thể tạo lại chatRoomId!");
+                          return;
+                        }
+                      }
+                
+                      await check(userInfo.phoneNumber, user.phoneNumber, chatRoomId);
+                    } else {
+                      console.error("Không thể xác định loại user!");
+                    }
+                
+                    setReloadConversations((prev) => !prev);
+                  } catch (error) {
+                    console.error("Lỗi trong onClick:", error);
                   }
-
-                  setReloadConversations((prev) => !prev);
                 }}
               >
                 <img className="user-avt" src={user.avatar || a3} alt="User" />
