@@ -5,11 +5,8 @@ import colors from "../themeColors";
 import getConversations from "../api/api_getConversation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import getUserbySearch from "../api/api_searchUSer";
-<<<<<<< HEAD
-=======
 import { useSearch } from '../contexts/searchContext';
 import { useFocusEffect } from '@react-navigation/native';
->>>>>>> 65481cd4 (done create Conversation on mobile and fix the realtime create conversation)
 import io from "socket.io-client";
 import getIp from "../utils/getIp_notPORT";
 
@@ -27,7 +24,6 @@ export default function App({ navigation, route }) {
   const [socket, setSocket] = useState(null);
   const BASE_URL = getIp();
 
-<<<<<<< HEAD
   useEffect(() => {
     const newSocket = io(`http://${BASE_URL}:3618`);
     setSocket(newSocket);
@@ -130,7 +126,7 @@ export default function App({ navigation, route }) {
 
     fetchData();
   }, [socket]);
-=======
+
   const fetchData = async () => {
     try {
       const userJson = await AsyncStorage.getItem("user");
@@ -207,7 +203,6 @@ export default function App({ navigation, route }) {
     hideSearch();
     Keyboard.dismiss();
   };
->>>>>>> 65481cd4 (done create Conversation on mobile and fix the realtime create conversation)
 
   const styles = getStyles(themeColors);
 
