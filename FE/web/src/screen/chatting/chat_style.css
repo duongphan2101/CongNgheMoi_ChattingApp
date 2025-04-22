@@ -704,3 +704,34 @@ audio {
     top: 65px;
     left: 190px;
 }
+
+.suggestions-dropdown {
+    position: absolute;
+    background: #ffffff;
+    border-radius: 8px; 
+    max-height: 200px; 
+    overflow-y: auto; 
+    z-index: 1000; 
+    width: 250px; 
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); 
+    border: none; 
+  }
+
+  .suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex; 
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    transition: background 0.2s ease; 
+  }
+
+  .suggestion-item:hover {
+    background: #f5f5f5; 
+  }
+
+  .suggestion-item:last-child {
+    border-bottom: none; 
+  }
+
+  

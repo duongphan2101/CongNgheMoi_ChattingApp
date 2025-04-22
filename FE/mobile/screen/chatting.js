@@ -2,8 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform, Modal, ScrollView } from 'react-native';
 import { useTheme } from "../contexts/themeContext";
 import colors from "../themeColors";
-import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import io from "socket.io-client";
 import getIp from "../utils/getIp_notPORT";
 import Entypo from "@expo/vector-icons/Entypo";
@@ -12,7 +12,7 @@ import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import moment from "moment";
 import getUserbySearch from "../api/api_searchUSer";
 import { showLocalNotification } from "../utils/notifications";
-import deleteMessage from '../api/api_deleteMessage';
+import deleteMessage from "../api/api_deleteMessage";
 import { Audio } from "expo-av";
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -56,6 +56,33 @@ export default function App({ navigation, route }) {
 
   const [phongChat, setPhongChat] = useState(chatRoom);
 
+  const [replyingTo, setReplyingTo] = useState(null); // Tin nhắn đang được trả lời
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null); // Tin nhắn được đánh dấu khi cuộn
+  const handleReplyMessage = (msg) => {
+    setReplyingTo({
+      ...msg,
+      message:
+        msg.type === "audio"
+          ? "Tin nhắn thoại"
+          : msg.type === "file"
+            ? "File đính kèm"
+            : msg.message,
+    });
+    setHighlightedMessageId(msg.timestamp);
+    // Cuộn đến tin nhắn được trả lời
+    const index = messages.findIndex((m) => m.timestamp === msg.timestamp);
+    if (index !== -1) {
+      flatListRef.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0,
+      });
+    }
+  };
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+    setHighlightedMessageId(null);
+  };
 
   useEffect(() => {
 
@@ -194,10 +221,18 @@ export default function App({ navigation, route }) {
       timestamp: Date.now(),
       type: "text",
       chatId,
-      replyTo: null
+      replyTo: replyingTo
+        ? {
+          timestamp: replyingTo.timestamp,
+          message: replyingTo.message,
+          sender: replyingTo.sender,
+        }
+        : null,
     };
 
-
+    setMessage("");
+    setReplyingTo(null);
+    setHighlightedMessageId(null);
 
     try {
       const response = await fetch(`http://${BASE_URL}:3618/sendMessage`, {
@@ -230,10 +265,8 @@ export default function App({ navigation, route }) {
   };
 
   const handleLongPressMessage = (item) => {
-    if (item.sender === thisUser.phoneNumber) {
-      setSelectedMessage(item);
-      setShowMessageOptions(true);
-    }
+    setSelectedMessage(item);
+    setShowMessageOptions(true);
   };
 
   const startRecording = async () => {
@@ -330,7 +363,11 @@ export default function App({ navigation, route }) {
       const audioMessageFromServer = await response.json();
       if (audioMessageFromServer.success && audioMessageFromServer.data) {
         setMessages((prev) => {
-          if (prev.some((msg) => msg.timestamp === audioMessageFromServer.data.timestamp)) {
+          if (
+            prev.some(
+              (msg) => msg.timestamp === audioMessageFromServer.data.timestamp
+            )
+          ) {
             return prev;
           }
           return [...prev, audioMessageFromServer.data];
@@ -434,10 +471,14 @@ export default function App({ navigation, route }) {
       return;
     }
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permissionResult.granted) {
-        Alert.alert("Cần quyền truy cập", "Ứng dụng cần quyền truy cập thư viện ảnh để gửi ảnh.");
+        Alert.alert(
+          "Cần quyền truy cập",
+          "Ứng dụng cần quyền truy cập thư viện ảnh để gửi ảnh."
+        );
         return;
       }
 
@@ -460,7 +501,10 @@ export default function App({ navigation, route }) {
           totalSize += fileInfo.size;
 
           if (fileInfo.size > 10 * 1024 * 1024) {
-            Alert.alert("File quá lớn", `File ${image.fileName || 'ảnh'} vượt quá 10MB`);
+            Alert.alert(
+              "File quá lớn",
+              `File ${image.fileName || "ảnh"} vượt quá 10MB`
+            );
             return;
           }
 
@@ -470,7 +514,7 @@ export default function App({ navigation, route }) {
           fileObjects.push({
             uri: image.uri,
             type: fileType,
-            name: fileName
+            name: fileName,
           });
         }
 
@@ -482,7 +526,6 @@ export default function App({ navigation, route }) {
         // gui nhieu file
         if (fileObjects.length > 0) {
           try {
-
             console.log(`Sending ${fileObjects.length} files`);
             const result = await sendFile(
               chatRoom.chatRoomId,
@@ -495,7 +538,10 @@ export default function App({ navigation, route }) {
           } catch (uploadError) {
 
             console.error("Upload error details:", uploadError);
-            Alert.alert("Lỗi Upload", "Không thể gửi ảnh. Lỗi kết nối đến server.");
+            Alert.alert(
+              "Lỗi Upload",
+              "Không thể gửi ảnh. Lỗi kết nối đến server."
+            );
           }
         }
       }
@@ -512,9 +558,9 @@ export default function App({ navigation, route }) {
     }
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
+        type: "*/*",
         copyToCacheDirectory: true,
-        multiple: true
+        multiple: true,
       });
 
       if (result.canceled === false && result.assets && result.assets.length > 0) {
@@ -539,14 +585,17 @@ export default function App({ navigation, route }) {
             'xlsx', 'ppt', 'pptx', 'zip', 'rar', 'txt', 'mp3', 'mp4', 'm4a'];
 
           if (!allowedExts.includes(fileExt)) {
-            Alert.alert("Định dạng không hỗ trợ", `File ${doc.name} có định dạng không được hỗ trợ.`);
+            Alert.alert(
+              "Định dạng không hỗ trợ",
+              `File ${doc.name} có định dạng không được hỗ trợ.`
+            );
             return;
           }
 
           fileObjects.push({
             uri: doc.uri,
             type: doc.mimeType || `application/${fileExt}`,
-            name: doc.name
+            name: doc.name,
           });
         }
 
@@ -559,7 +608,6 @@ export default function App({ navigation, route }) {
         // gui nhieu file
         if (fileObjects.length > 0) {
           try {
-
             console.log(`Sending ${fileObjects.length} documents`);
             const result = await sendFile(
               chatRoom.chatRoomId,
@@ -572,7 +620,10 @@ export default function App({ navigation, route }) {
           } catch (uploadError) {
 
             console.error("Upload error details:", uploadError);
-            Alert.alert("Lỗi Upload", "Không thể gửi tài liệu. Lỗi kết nối đến server.");
+            Alert.alert(
+              "Lỗi Upload",
+              "Không thể gửi tài liệu. Lỗi kết nối đến server."
+            );
           }
         }
       }
@@ -612,7 +663,10 @@ export default function App({ navigation, route }) {
       setIsUploading(false);
       console.error("Lỗi gửi file:", error);
       if (error.message && error.message.includes("Network request failed")) {
-        Alert.alert("Lỗi kết nối", "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và địa chỉ IP máy chủ.");
+        Alert.alert(
+          "Lỗi kết nối",
+          "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và địa chỉ IP máy chủ."
+        );
       } else {
         Alert.alert("Lỗi", "Không thể gửi file. Vui lòng thử lại sau.");
       }
@@ -621,57 +675,71 @@ export default function App({ navigation, route }) {
 
   const renderItem = async ({ item }) => {
     const isCurrentUser = item.sender === thisUser.phoneNumber;
+    const isHighlighted = highlightedMessageId === item.timestamp;
+
     const renderMessageContent = () => {
       if (item.isRevoked) {
         return (
-          <Text style={{
-            color: '#a0a0a0',
-            fontStyle: 'italic',
-            maxWidth: '90%',
-            flexWrap: 'wrap',
-            backgroundColor: isCurrentUser ? 'rgba(111, 211, 159, 0.2)' : 'rgba(139, 185, 242, 0.2)',
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: '#a0a0a0',
-            borderStyle: 'dashed',
-          }}>
+          <Text
+            style={{
+              color: "#a0a0a0",
+              fontStyle: "italic",
+              maxWidth: "90%",
+              flexWrap: "wrap",
+              backgroundColor: isCurrentUser
+                ? "rgba(111, 211, 159, 0.2)"
+                : "rgba(139, 185, 242, 0.2)",
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: "#a0a0a0",
+              borderStyle: "dashed",
+            }}
+          >
             Tin nhắn đã được thu hồi
           </Text>
         );
       } else if (item.type === "text") {
         return (
-          <Text style={{
-            color: '#fff',
-            maxWidth: '90%',
-            flexWrap: 'wrap'
-          }}>
+          <Text
+            style={{
+              color: "#fff",
+              maxWidth: "90%",
+              flexWrap: "wrap",
+            }}
+          >
             {item.message}
           </Text>
         );
       } else if (item.type === "audio") {
         return (
-          <TouchableOpacity onPress={() => handlePlayAudio(item.fileInfo?.url || item.message)}>
+          <TouchableOpacity
+            onPress={() => handlePlayAudio(item.fileInfo?.url || item.message)}
+          >
             <Ionicons name="play-circle" size={30} color="#fff" />
           </TouchableOpacity>
         );
       } else if (item.type === "file") {
         try {
           const fileInfo = JSON.parse(item.message);
-          const fileExt = fileInfo.name.split('.').pop().toLowerCase();
-          const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(fileExt);
+          const fileExt = fileInfo.name.split(".").pop().toLowerCase();
+          const isImage = ["jpg", "jpeg", "png", "gif"].includes(fileExt);
 
           if (isImage) {
             return (
-              <TouchableOpacity onPress={() => handleViewImage(fileInfo.url, fileInfo.name)}>
+              <TouchableOpacity
+                onPress={() => handleViewImage(fileInfo.url, fileInfo.name)}
+              >
                 <Image
                   source={{ uri: fileInfo.url }}
                   style={{ width: 150, height: 150, borderRadius: 10 }}
                   resizeMode="cover"
                 />
-                <Text style={{ color: '#fff', fontSize: 12, marginTop: 5 }}>
-                  {fileInfo.name.length > 20 ? fileInfo.name.substring(0, 20) + '...' : fileInfo.name}
+                <Text style={{ color: "#fff", fontSize: 12, marginTop: 5 }}>
+                  {fileInfo.name.length > 20
+                    ? fileInfo.name.substring(0, 20) + "..."
+                    : fileInfo.name}
                 </Text>
               </TouchableOpacity>
             );
@@ -683,10 +751,12 @@ export default function App({ navigation, route }) {
               >
                 <Ionicons name="document-attach" size={30} color="#fff" />
                 <View style={{ marginLeft: 10 }}>
-                  <Text style={{ color: '#fff' }}>
-                    {fileInfo.name.length > 20 ? fileInfo.name.substring(0, 20) + '...' : fileInfo.name}
+                  <Text style={{ color: "#fff" }}>
+                    {fileInfo.name.length > 20
+                      ? fileInfo.name.substring(0, 20) + "..."
+                      : fileInfo.name}
                   </Text>
-                  <Text style={{ color: '#fff', fontSize: 12 }}>
+                  <Text style={{ color: "#fff", fontSize: 12 }}>
                     {Math.round(fileInfo.size / 1024)} KB
                   </Text>
                 </View>
@@ -695,10 +765,10 @@ export default function App({ navigation, route }) {
           }
         } catch (error) {
           console.log("Lỗi parse JSON:", error, "message:", item.message);
-          return <Text style={{ color: '#fff' }}>[Tin nhắn file lỗi]</Text>;
+          return <Text style={{ color: "#fff" }}>[Tin nhắn file lỗi]</Text>;
         }
       } else {
-        return <Text style={{ color: '#fff' }}>[Tin nhắn không hỗ trợ]</Text>;
+        return <Text style={{ color: "#fff" }}>[Tin nhắn không hỗ trợ]</Text>;
       }
     };
     const users = await getUserbySearch(item.sender, "");
@@ -707,7 +777,7 @@ export default function App({ navigation, route }) {
       <TouchableOpacity
         style={[
           styles.userChatting,
-          { justifyContent: isCurrentUser ? 'flex-end' : 'flex-start' }
+          { justifyContent: isCurrentUser ? "flex-end" : "flex-start" },
         ]}
         onLongPress={() => handleLongPressMessage(item)}
         delayLongPress={500}
@@ -727,11 +797,12 @@ export default function App({ navigation, route }) {
                 borderRadius: 15,
                 padding: item.isRevoked ? 0 : 10,
                 borderWidth: item.isRevoked ? 1 : 0,
-                borderColor: item.isRevoked ? '#a0a0a0' : 'transparent',
-                borderStyle: item.isRevoked ? 'dashed' : 'solid',
+                borderColor: item.isRevoked ? "#a0a0a0" : "transparent",
+                borderStyle: item.isRevoked ? "dashed" : "solid",
               },
             ]}
           >
+
             {
               chatRoom.isGroup && !isCurrentUser && user?.fullName && (
                 <Text style={{ color: '#000', fontSize: 8, fontWeight: 'bold', marginBottom: 3 }}>
@@ -739,6 +810,32 @@ export default function App({ navigation, route }) {
                 </Text>
               )
             }
+
+            {item.replyTo && (
+              <TouchableOpacity
+                onPress={() => {
+                  const index = messages.findIndex(
+                    (m) => m.timestamp === item.replyTo.timestamp
+                  );
+                  if (index !== -1) {
+                    flatListRef.current.scrollToIndex({
+                      index,
+                      animated: true,
+                    });
+                    setHighlightedMessageId(item.replyTo.timestamp);
+                  }
+                }}
+                style={styles.replyPreview}
+              >
+                <Text style={styles.replyText}>
+                  {item.replyTo.sender === currentUserPhone
+                    ? "Bạn"
+                    : otherUser.fullName}
+                </Text>
+                <Text style={styles.replyMessage}>{item.replyTo.message}</Text>
+              </TouchableOpacity>
+            )}
+
             {renderMessageContent()}
           </View>
           <Text style={{ color: themeColors.text, fontSize: 10 }}>
@@ -746,7 +843,10 @@ export default function App({ navigation, route }) {
           </Text>
         </View>
         {isCurrentUser && (
-          <Image source={{ uri: thisUser.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
+          <Image
+            source={{ uri: thisUser.avatar }}
+            style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }}
+          />
         )}
       </TouchableOpacity>
     );
@@ -767,9 +867,12 @@ export default function App({ navigation, route }) {
     try {
       // Kiểm tra quyền truy cập
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
+      if (status !== "granted") {
         setIsDownloading(false); // Tắt trạng thái tải nếu không có quyền
-        Alert.alert('Cần quyền truy cập', 'Ứng dụng cần quyền truy cập bộ nhớ để tải xuống file.');
+        Alert.alert(
+          "Cần quyền truy cập",
+          "Ứng dụng cần quyền truy cập bộ nhớ để tải xuống file."
+        );
         return;
       }
 
@@ -782,7 +885,9 @@ export default function App({ navigation, route }) {
         tempFileUri,
         {},
         (downloadProgress) => {
-          const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+          const progress =
+            downloadProgress.totalBytesWritten /
+            downloadProgress.totalBytesExpectedToWrite;
           console.log(`Tiến độ tải: ${progress * 100}%`);
         }
       );
@@ -798,19 +903,21 @@ export default function App({ navigation, route }) {
         if (mediaExts.includes(fileExt)) {
           // Nếu là file media, lưu vào MediaLibrary
           const asset = await MediaLibrary.createAssetAsync(uri);
-          console.log('Asset created:', asset);
+          console.log("Asset created:", asset);
           setIsDownloading(false); // Tắt trạng thái tải
-          Alert.alert('Thành công', 'File media đã được lưu vào thư viện.');
+          Alert.alert("Thành công", "File media đã được lưu vào thư viện.");
         } else {
           // Nếu không phải file media, lưu vào thư mục Downloads
           const downloadsDir = `${FileSystem.documentDirectory}Downloads/`;
-          await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
+          await FileSystem.makeDirectoryAsync(downloadsDir, {
+            intermediates: true,
+          });
           const finalUri = downloadsDir + fileName;
           await FileSystem.moveAsync({
             from: uri,
             to: finalUri,
           });
-          console.log('File đã được lưu tại:', finalUri);
+          console.log("File đã được lưu tại:", finalUri);
           setIsDownloading(false); // Tắt trạng thái tải
           // Nếu muốn thông báo thành công, bạn có thể bật lại dòng này:
           // Alert.alert('Thành công', `File đã được lưu tại: ${finalUri}`);
@@ -825,13 +932,16 @@ export default function App({ navigation, route }) {
         try {
           await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
         } catch (deleteError) {
-          console.log('Lỗi khi xóa file tạm:', deleteError);
+          console.log("Lỗi khi xóa file tạm:", deleteError);
         }
       }
     } catch (error) {
       setIsDownloading(false); // Tắt trạng thái tải nếu có lỗi
-      console.error('Lỗi chi tiết khi tải file:', error);
-      Alert.alert('Lỗi', `Không thể tải xuống file: ${error.message}. Vui lòng thử lại sau.`);
+      console.error("Lỗi chi tiết khi tải file:", error);
+      Alert.alert(
+        "Lỗi",
+        `Không thể tải xuống file: ${error.message}. Vui lòng thử lại sau.`
+      );
     }
   };
 
@@ -1066,21 +1176,35 @@ export default function App({ navigation, route }) {
 
 
         <View style={styles.bottomtab}>
+          {replyingTo && (
+            <View style={styles.replyingTo}>
+              <Text style={styles.replyingToText}>
+                Đang trả lời: {replyingTo.message}
+              </Text>
+              <TouchableOpacity onPress={handleCancelReply}>
+                <Ionicons name="close" size={20} color="#ff4d4f" />
+              </TouchableOpacity>
+            </View>
+          )}
           <TouchableOpacity style={styles.touch} onPress={pickImage}>
             <Ionicons name="image" size={30} color={themeColors.icon} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.touch} onPress={pickDocument}>
             <Ionicons name="document-attach" size={30} color={themeColors.icon} />
-          </TouchableOpacity>
+          </TouchableOpacity >
           {!isRecording ? (
             <TouchableOpacity style={styles.touch} onPress={startRecording}>
               <Ionicons name="mic" size={30} color={themeColors.icon} />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.recordingControl} onPress={stopRecording}>
+            <TouchableOpacity
+              style={styles.recordingControl}
+              onPress={stopRecording}
+            >
               <View style={styles.stopIcon} />
             </TouchableOpacity>
-          )}
+          )
+          }
           <TextInput
             style={styles.textInput}
             placeholder="Nhập nội dung ..."
@@ -1092,13 +1216,13 @@ export default function App({ navigation, route }) {
           <TouchableOpacity style={styles.touch} onPress={handleSend}>
             <Ionicons name="send" size={30} color={themeColors.icon} />
           </TouchableOpacity>
-        </View>
+        </View >
 
 
 
 
         {/* Modal tùy chọn tin nhắn */}
-        <Modal
+        < Modal
           transparent={true}
           visible={showMessageOptions}
           animationType="fade"
@@ -1119,17 +1243,36 @@ export default function App({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalOption}
+                onPress={() => {
+                  handleReplyMessage(selectedMessage);
+                  setShowMessageOptions(false);
+                }}
+              >
+                <Ionicons
+                  name="arrow-undo"
+                  size={24}
+                  color={themeColors.text}
+                />
+                <Text style={styles.modalOptionText}>Trả lời</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalOption}
                 onPress={() => setShowMessageOptions(false)}
               >
-                <MaterialIcons name="cancel" size={24} color={themeColors.text} />
+                <MaterialIcons
+                  name="cancel"
+                  size={24}
+                  color={themeColors.text}
+                />
                 <Text style={styles.modalOptionText}>Hủy</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
-        </Modal>
+        </Modal >
 
         {/* Modal xem ảnh toàn màn hình */}
-        <Modal
+        < Modal
           transparent={true}
           visible={showImageViewer}
           animationType="fade"
@@ -1145,7 +1288,9 @@ export default function App({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.downloadButton}
-                onPress={() => downloadFile(selectedImage?.url, selectedImage?.name)}
+                onPress={() =>
+                  downloadFile(selectedImage?.url, selectedImage?.name)
+                }
               >
                 <Ionicons name="download-outline" size={28} color="#fff" />
               </TouchableOpacity>
@@ -1163,10 +1308,10 @@ export default function App({ navigation, route }) {
               <Text style={styles.imageName}>{selectedImage?.name}</Text>
             </View>
           </View>
-        </Modal>
+        </Modal >
 
         {/* Modal tùy chọn tải xuống file */}
-        <Modal
+        < Modal
           transparent={true}
           visible={showFileOptions}
           animationType="slide"
@@ -1185,7 +1330,11 @@ export default function App({ navigation, route }) {
                 </TouchableOpacity>
               </View>
               <View style={styles.fileDetailsContainer}>
-                <Ionicons name="document-outline" size={40} color={themeColors.text} />
+                <Ionicons
+                  name="document-outline"
+                  size={40}
+                  color={themeColors.text}
+                />
                 <View style={styles.fileDetails}>
                   <Text style={[styles.fileName, { color: themeColors.text }]}>
                     {selectedFile?.name}
@@ -1213,10 +1362,10 @@ export default function App({ navigation, route }) {
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
-        </Modal>
+        </Modal >
 
         {/* Modal add member */}
-        <Modal
+        < Modal
           visible={showModalAdd}
           transparent={true}
           animationType="slide"
@@ -1398,11 +1547,11 @@ export default function App({ navigation, route }) {
               </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </Modal >
 
 
-      </View>
-    </KeyboardAvoidingView>
+      </View >
+    </KeyboardAvoidingView >
   );
 }
 
@@ -1661,5 +1810,44 @@ const getStyles = (themeColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: '#a0a0a0',
     borderStyle: 'dashed',
+  },
+  highlightedMessage: {
+    backgroundColor: 'rgba(255, 255, 0, 0.3)',
+  },
+  replyPreview: {
+    backgroundColor: '#A6AEBF',
+    padding: 8,
+    borderRadius: 10,
+    marginBottom: 5,
+    width: 'auto',
+  },
+  replyText: {
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  replyMessage: {
+    fontSize: 13,
+    color: '#fff',
+    opacity: 0.9,
+  },
+  replyingTo: {
+    position: 'absolute',
+    bottom: 76,
+    left: 130,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgb(64, 59, 71)',
+    padding: 10,
+    width: '50%',
+    borderRadius: 9,
+    marginBottom: 10,
+    marginHorizontal: 10,
+  },
+  replyingToText: {
+    fontSize: 14,
+    color: '#fff',
+    flex: 1,
   },
 });
