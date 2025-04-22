@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform, Modal, ScrollView } from 'react-native';
 import { useTheme } from "../contexts/themeContext";
 import colors from "../themeColors";
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,6 +7,8 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import io from "socket.io-client";
 import getIp from "../utils/getIp_notPORT";
 import Entypo from "@expo/vector-icons/Entypo";
+import Feather from '@expo/vector-icons/Feather';
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import moment from "moment";
 import getUserbySearch from "../api/api_searchUSer";
 import { showLocalNotification } from "../utils/notifications";
@@ -18,17 +20,23 @@ import * as FileSystem from 'expo-file-system';
 import sendFile from '../api/api_sendFile';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
-
+import getChatIdFromRoom from '../api/api_getChatIdbyChatRoomId';
+import getChatRoom from '../api/api_getChatRoombyChatRoomId.js';
 const BASE_URL = getIp();
 const socket = io(`http://${BASE_URL}:3618`);
 const notificationSocket = io(`http://${BASE_URL}:3515`);
+import createGroupChatRoom from '../api/api_createChatRoomforGroup.js';
+import useFriends from '../api/api_getListFriends.js'
+import updateChatRoom from '../api/api_updateChatRoomforGroup.js';
+import deleteMember from "../api/api_deleteMember.js"
+import disbandGroup from '../api/api_disbandGroup.js';
 
 export default function App({ navigation, route }) {
   const { theme } = useTheme();
   const themeColors = colors[theme];
-
+  const { contacts, fetchFriends } = useFriends();
   const otherUser = route.params.otherUser;
-  const chatRoomId = route.params.chatRoom;
+  const chatRoom = route.params.chatRoom;
   const thisUser = route.params.thisUser;
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
@@ -46,15 +54,51 @@ export default function App({ navigation, route }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const [phongChat, setPhongChat] = useState(chatRoom);
+
+
   useEffect(() => {
-    if (!chatRoomId || !thisUser?.phoneNumber) return;
+
+    const fetchData = async () => {
+      try {
+        const data = await getChatRoom(chatRoom.chatRoomId);
+        setPhongChat(data);
+      } catch (err) {
+        console.error("Lỗi fetch phòng chat:", err);
+        Alert.alert("Lỗi", "Không thể tải thông tin phòng chat");
+      }
+    };
+
+    if (chatRoom?.chatRoomId) {
+      fetchData();
+    }
+  }, [chatRoom?.chatRoomId]);
+
+  useEffect(() => {
+    fetchFriends();
+  }, []);
+
+  useEffect(() => {
+    setListFriends(contacts)
+  }, [contacts]);
+
+  useEffect(() => {
+    if (messages?.length) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (!chatRoom.chatRoomId || !thisUser?.phoneNumber) return;
 
     setCurrentUserPhone(thisUser.phoneNumber);
 
     const fetchMessages = async () => {
       try {
         const res = await fetch(
-          `http://${BASE_URL}:3618/messages?chatRoomId=${chatRoomId}`
+          `http://${BASE_URL}:3618/messages?chatRoomId=${chatRoom.chatRoomId}`
         );
         const data = await res.json();
 
@@ -71,7 +115,7 @@ export default function App({ navigation, route }) {
 
     fetchMessages();
 
-    socket.emit("joinRoom", chatRoomId);
+    socket.emit("joinRoom", chatRoom.chatRoomId);
 
     const handleReceiveMessage = (newMessage) => {
       console.log("Tin nhắn mới:", newMessage);
@@ -80,7 +124,7 @@ export default function App({ navigation, route }) {
           return prev;
         }
         socket.emit("updateLastMessage", {
-          chatRoomId: chatRoomId,
+          chatRoomId: chatRoom.chatRoomId,
           message: newMessage
         });
         return [...prev, newMessage];
@@ -109,7 +153,7 @@ export default function App({ navigation, route }) {
       socket.off("userStopTyping", handleStopTyping);
       socket.off("messageRevoked", handleMessageRevoked);
     };
-  }, [chatRoomId, thisUser?.phoneNumber]);
+  }, [chatRoom.chatRoomId, thisUser?.phoneNumber]);
 
   useEffect(() => {
     return () => {
@@ -120,6 +164,10 @@ export default function App({ navigation, route }) {
   }, [soundObject]);
 
   const handleSend = async () => {
+    if (phongChat.status === 'DISBANDED') {
+      Alert.alert("Nhóm đã bị giải tán, không thể gửi tin nhắn");
+      return;
+    }
     if (isRecording && recording) {
       // Đang ghi âm, dừng và gửi tin nhắn thoại
       try {
@@ -134,19 +182,22 @@ export default function App({ navigation, route }) {
       }
       return;
     }
+    const chatId = await getChatIdFromRoom(chatRoom.chatRoomId);
 
     if (!message.trim()) return;
 
     const newMsg = {
-      chatRoomId: chatRoomId,
+      chatRoomId: chatRoom.chatRoomId,
       sender: currentUserPhone,
       receiver: otherUser.phoneNumber,
       message: message,
       timestamp: Date.now(),
       type: "text",
+      chatId,
+      replyTo: null
     };
 
-    setMessage("");
+
 
     try {
       const response = await fetch(`http://${BASE_URL}:3618/sendMessage`, {
@@ -157,6 +208,7 @@ export default function App({ navigation, route }) {
 
       if (!response.ok) throw new Error("Gửi tin nhắn thất bại!");
       console.log("Tin nhắn gửi thành công:", newMsg);
+      setMessage("");
     } catch (error) {
       console.error("Lỗi gửi tin nhắn:", error);
       Alert.alert("Lỗi", "Không thể gửi tin nhắn. Vui lòng thử lại sau.");
@@ -166,9 +218,9 @@ export default function App({ navigation, route }) {
   // Hàm xử lý thu hồi tin nhắn
   const handleDeleteMessagePress = async () => {
     if (!selectedMessage) return;
-    
+
     try {
-      await deleteMessage(chatRoomId, selectedMessage.timestamp);
+      await deleteMessage(chatRoom.chatRoomId, selectedMessage.timestamp);
       setShowMessageOptions(false);
       setSelectedMessage(null);
     } catch (error) {
@@ -248,6 +300,10 @@ export default function App({ navigation, route }) {
   };
 
   const handleSendAudio = async (uri) => {
+    if (phongChat.status === 'DISBANDED') {
+      Alert.alert("Nhóm đã bị giải tán, không thể gửi tin nhắn");
+      return;
+    }
     if (!uri) {
       Alert.alert("Lỗi", "Không có bản ghi âm để gửi.");
       return;
@@ -258,7 +314,7 @@ export default function App({ navigation, route }) {
       name: `voice-${Date.now()}.mp3`,
       type: "audio/mp3",
     });
-    formData.append("chatRoomId", chatRoomId);
+    formData.append("chatRoomId", chatRoom.chatRoomId);
     formData.append("sender", currentUserPhone);
     formData.append("receiver", otherUser.phoneNumber);
 
@@ -373,14 +429,18 @@ export default function App({ navigation, route }) {
   };
 
   const pickImage = async () => {
+    if (phongChat.status === 'DISBANDED') {
+      Alert.alert("Nhóm đã bị giải tán, không thể gửi tin nhắn");
+      return;
+    }
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
+
       if (!permissionResult.granted) {
         Alert.alert("Cần quyền truy cập", "Ứng dụng cần quyền truy cập thư viện ảnh để gửi ảnh.");
         return;
       }
-      
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
@@ -388,52 +448,52 @@ export default function App({ navigation, route }) {
         selectionLimit: 5, // gioi han 5 anh
         quality: 0.8,
       });
-      
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedImages = result.assets;
-        
+
         let totalSize = 0;
         const fileObjects = [];
-        
+
         for (const image of selectedImages) {
           const fileInfo = await FileSystem.getInfoAsync(image.uri);
           totalSize += fileInfo.size;
-          
+
           if (fileInfo.size > 10 * 1024 * 1024) {
             Alert.alert("File quá lớn", `File ${image.fileName || 'ảnh'} vượt quá 10MB`);
             return;
           }
-          
+
           const fileType = image.mimeType || 'image/jpeg';
           const fileName = image.fileName || `image-${Date.now()}-${fileObjects.length}.jpg`;
-          
+
           fileObjects.push({
             uri: image.uri,
             type: fileType,
             name: fileName
           });
         }
-        
+
         if (totalSize > 30 * 1024 * 1024) { // 30MB
           Alert.alert("Files quá lớn", "Tổng kích thước các file không được vượt quá 30MB");
           return;
         }
-        
+
         // gui nhieu file
         if (fileObjects.length > 0) {
           try {
-            
+
             console.log(`Sending ${fileObjects.length} files`);
             const result = await sendFile(
-              chatRoomId,
+              chatRoom.chatRoomId,
               currentUserPhone,
               otherUser.phoneNumber,
               fileObjects
             );
             console.log("Files sent successfully:", result);
-            
+
           } catch (uploadError) {
-            
+
             console.error("Upload error details:", uploadError);
             Alert.alert("Lỗi Upload", "Không thể gửi ảnh. Lỗi kết nối đến server.");
           }
@@ -444,69 +504,73 @@ export default function App({ navigation, route }) {
       Alert.alert("Lỗi", "Không thể chọn ảnh. Vui lòng thử lại sau.");
     }
   };
-  
+
   const pickDocument = async () => {
+    if (phongChat.status === 'DISBANDED') {
+      Alert.alert("Nhóm đã bị giải tán, không thể gửi tin nhắn");
+      return;
+    }
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
         multiple: true
       });
-      
+
       if (result.canceled === false && result.assets && result.assets.length > 0) {
         const selectedDocs = result.assets;
-        
+
         let totalSize = 0;
         const fileObjects = [];
-        
+
         for (const doc of selectedDocs) {
           // Kiểm tra kích thước file
           const fileInfo = await FileSystem.getInfoAsync(doc.uri);
           totalSize += fileInfo.size;
-          
+
           if (fileInfo.size > 10 * 1024 * 1024) { // 10MB
             Alert.alert("File quá lớn", `File ${doc.name} vượt quá 10MB`);
             return;
           }
-          
+
           // Kiểm tra extension file
           const fileExt = doc.name.split('.').pop().toLowerCase();
-          const allowedExts = ['jpeg', 'jpg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 
-                              'xlsx', 'ppt', 'pptx', 'zip', 'rar', 'txt', 'mp3', 'mp4', 'm4a'];
-          
+          const allowedExts = ['jpeg', 'jpg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls',
+            'xlsx', 'ppt', 'pptx', 'zip', 'rar', 'txt', 'mp3', 'mp4', 'm4a'];
+
           if (!allowedExts.includes(fileExt)) {
             Alert.alert("Định dạng không hỗ trợ", `File ${doc.name} có định dạng không được hỗ trợ.`);
             return;
           }
-          
+
           fileObjects.push({
             uri: doc.uri,
             type: doc.mimeType || `application/${fileExt}`,
             name: doc.name
           });
         }
-        
+
         // 
         if (totalSize > 30 * 1024 * 1024) { // tong kich co 30MB
           Alert.alert("Files quá lớn", "Tổng kích thước các file không được vượt quá 30MB");
           return;
         }
-        
+
         // gui nhieu file
         if (fileObjects.length > 0) {
           try {
-            
+
             console.log(`Sending ${fileObjects.length} documents`);
             const result = await sendFile(
-              chatRoomId,
+              chatRoom.chatRoomId,
               currentUserPhone,
               otherUser.phoneNumber,
               fileObjects
             );
             console.log("Documents sent successfully:", result);
-            
+
           } catch (uploadError) {
-            
+
             console.error("Upload error details:", uploadError);
             Alert.alert("Lỗi Upload", "Không thể gửi tài liệu. Lỗi kết nối đến server.");
           }
@@ -517,26 +581,31 @@ export default function App({ navigation, route }) {
       Alert.alert("Lỗi", "Không thể chọn file. Vui lòng thử lại sau.");
     }
   };
-  
+
   const handleSendFile = async (fileObjs) => {
+    if (phongChat.status === 'DISBANDED') {
+      Alert.alert("Nhóm đã bị giải tán, không thể gửi tin nhắn");
+      return;
+    }
     setIsUploading(true);
     try {
+      let chatRoomId = chatRoom.chatRoomId
       console.log(`Starting to send ${Array.isArray(fileObjs) ? fileObjs.length : 1} file(s):`, {
         chatRoomId,
         from: currentUserPhone,
         to: otherUser.phoneNumber
       });
-      
+
       const BASE_URL = getIp();
       console.log("Using BASE_URL:", BASE_URL);
-      
+
       const result = await sendFile(
-        chatRoomId,
+        chatRoom.chatRoomId,
         currentUserPhone,
         otherUser.phoneNumber,
         fileObjs
       );
-      
+
       console.log("Kết quả gửi file:", result);
       setIsUploading(false);
     } catch (error) {
@@ -550,9 +619,8 @@ export default function App({ navigation, route }) {
     }
   };
 
-  const renderItem = ({ item }) => {
+  const renderItem = async ({ item }) => {
     const isCurrentUser = item.sender === thisUser.phoneNumber;
-    
     const renderMessageContent = () => {
       if (item.isRevoked) {
         return (
@@ -593,12 +661,12 @@ export default function App({ navigation, route }) {
           const fileInfo = JSON.parse(item.message);
           const fileExt = fileInfo.name.split('.').pop().toLowerCase();
           const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(fileExt);
-          
+
           if (isImage) {
             return (
               <TouchableOpacity onPress={() => handleViewImage(fileInfo.url, fileInfo.name)}>
-                <Image 
-                  source={{ uri: fileInfo.url }} 
+                <Image
+                  source={{ uri: fileInfo.url }}
                   style={{ width: 150, height: 150, borderRadius: 10 }}
                   resizeMode="cover"
                 />
@@ -609,7 +677,7 @@ export default function App({ navigation, route }) {
             );
           } else {
             return (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center' }}
                 onPress={() => handleViewFile(fileInfo)}
               >
@@ -633,7 +701,8 @@ export default function App({ navigation, route }) {
         return <Text style={{ color: '#fff' }}>[Tin nhắn không hỗ trợ]</Text>;
       }
     };
-    
+    const users = await getUserbySearch(item.sender, "");
+    const user = users[0];
     return (
       <TouchableOpacity
         style={[
@@ -644,18 +713,16 @@ export default function App({ navigation, route }) {
         delayLongPress={500}
       >
         {!isCurrentUser && (
-          <Image source={{ uri: otherUser.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
+          <Image source={{ uri: chatRoom.isGroup ? user.avatar : otherUser.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
         )}
         <View style={{ alignItems: 'center' }}>
-          <Text style={{ color: themeColors.text, fontSize: 10 }}>
-            {moment(item.timestamp).format('HH:mm dd/MM/YY')}
-          </Text>
+
           <View
             style={[
               styles.blockChat,
               {
-                backgroundColor: item.isRevoked 
-                  ? (isCurrentUser ? 'rgba(111, 211, 159, 0.2)' : 'rgba(139, 185, 242, 0.2)') 
+                backgroundColor: item.isRevoked
+                  ? (isCurrentUser ? 'rgba(111, 211, 159, 0.2)' : 'rgba(139, 185, 242, 0.2)')
                   : (isCurrentUser ? '#6fd39f' : '#8bb9f2'),
                 borderRadius: 15,
                 padding: item.isRevoked ? 0 : 10,
@@ -665,8 +732,18 @@ export default function App({ navigation, route }) {
               },
             ]}
           >
+            {
+              chatRoom.isGroup && !isCurrentUser && user?.fullName && (
+                <Text style={{ color: '#000', fontSize: 8, fontWeight: 'bold', marginBottom: 3 }}>
+                  {user.fullName}:
+                </Text>
+              )
+            }
             {renderMessageContent()}
           </View>
+          <Text style={{ color: themeColors.text, fontSize: 10 }}>
+            {moment(item.timestamp).format('HH:mm dd/MM/YY')}
+          </Text>
         </View>
         {isCurrentUser && (
           <Image source={{ uri: thisUser.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
@@ -679,7 +756,7 @@ export default function App({ navigation, route }) {
     setSelectedImage({ url: imageUrl, name: imageName });
     setShowImageViewer(true);
   };
-  
+
   const handleViewFile = (fileInfo) => {
     setSelectedFile(fileInfo);
     setShowFileOptions(true);
@@ -695,10 +772,10 @@ export default function App({ navigation, route }) {
         Alert.alert('Cần quyền truy cập', 'Ứng dụng cần quyền truy cập bộ nhớ để tải xuống file.');
         return;
       }
-  
+
       // Tạo đường dẫn lưu file tạm thời
       const tempFileUri = FileSystem.cacheDirectory + fileName;
-  
+
       // Tải file xuống
       const downloadResumable = FileSystem.createDownloadResumable(
         fileUrl,
@@ -709,15 +786,15 @@ export default function App({ navigation, route }) {
           console.log(`Tiến độ tải: ${progress * 100}%`);
         }
       );
-  
+
       const { uri } = await downloadResumable.downloadAsync();
       console.log('File đã tải xuống tại:', uri);
-  
+
       if (uri) {
         // Kiểm tra loại file dựa trên phần mở rộng
         const fileExt = fileName.split('.').pop().toLowerCase();
         const mediaExts = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'mp3', 'wav', 'm4a'];
-  
+
         if (mediaExts.includes(fileExt)) {
           // Nếu là file media, lưu vào MediaLibrary
           const asset = await MediaLibrary.createAssetAsync(uri);
@@ -737,13 +814,13 @@ export default function App({ navigation, route }) {
           setIsDownloading(false); // Tắt trạng thái tải
           // Nếu muốn thông báo thành công, bạn có thể bật lại dòng này:
           // Alert.alert('Thành công', `File đã được lưu tại: ${finalUri}`);
-  
+
           // Nếu có thể chia sẻ, cung cấp tùy chọn chia sẻ file
           if (await Sharing.isAvailableAsync()) {
             await Sharing.shareAsync(finalUri);
           }
         }
-  
+
         // Xóa file tạm nếu cần
         try {
           await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
@@ -758,6 +835,177 @@ export default function App({ navigation, route }) {
     }
   };
 
+  const [showModalAdd, setShowModalAdd] = useState(false);
+  const [listFriends, setListFriends] = useState()
+
+  const [participantsInfo, setParticipantsInfo] = useState([]);
+  const [friendsNotInGroup, setFriendsNotInGroup] = useState([]);
+  const [groupName, setGroupName] = useState("");
+
+  // Lấy danh sách thành viên hiện tại từ participants (sử dụng getUserbySearch)
+  useEffect(() => {
+    const fetchParticipantsInfo = async () => {
+      if (!phongChat?.participants) return;
+
+      const results = await Promise.all(
+        phongChat.participants.map(phone => getUserbySearch(phone, ""))
+      );
+      setParticipantsInfo(results.map(res => res[0])); // mỗi res là mảng 1 phần tử
+    };
+
+    fetchParticipantsInfo();
+  }, [phongChat]);
+
+  // Lọc bạn bè chưa nằm trong participants
+  useEffect(() => {
+    const phonesInGroup = phongChat?.participants || [];
+    const notInGroup = contacts.filter(friend => !phonesInGroup.includes(friend.phone));
+    setFriendsNotInGroup(notInGroup);
+  }, [contacts, phongChat]);
+
+  const [newList, setNewList] = useState([]);
+
+  const handleAddMemberToNewList = (phone) => {
+    setNewList((prev) =>
+      prev.includes(phone)
+        ? prev.filter(p => p !== phone) // Bỏ ra
+        : [...prev, phone]              // Thêm vào
+    );
+  };
+
+  const createGroup = () => {
+    const mergedList = [...phongChat.participants, ...newList];
+    const uniqueList = [...new Set(mergedList)];
+
+    if (!groupName.trim() || !/^(?! )[A-Za-zÀ-ỹ0-9 ]{3,50}$/.test(groupName)) {
+      Alert.alert("Tên nhóm không hợp lệ.");
+      return;
+    }
+
+    if (uniqueList.length < 3) {
+      Alert.alert("Một nhóm phải có ít nhất ba thành viên.");
+      return;
+    }
+
+    createGroupChatRoom({
+      nameGroup: groupName,
+      createdBy: thisUser.phoneNumber,
+      participants: uniqueList
+    }).then((data) => {
+      console.log("Tạo nhóm thành công:", data);
+      return;
+    }).catch((err) => {
+      console.error("Lỗi khi tạo nhóm:", err);
+      Alert.alert("Lỗi", "Tạo nhóm thất bại.");
+    });
+  };
+
+  const updateGroup = () => {
+    const mergedList = [...phongChat.participants, ...newList];
+    const uniqueList = [...new Set(mergedList)];
+
+    if (!groupName.trim() || !/^(?! )[A-Za-zÀ-ỹ0-9 ]{3,50}$/.test(groupName)) {
+      Alert.alert("Tên nhóm không hợp lệ.");
+      return;
+    }
+
+    if (uniqueList.length < 3) {
+      Alert.alert("Một nhóm phải có ít nhất ba thành viên.");
+      return;
+    }
+    console.log("unique ", uniqueList)
+    console.log("id ", phongChat.chatRoomId);
+
+    updateChatRoom({
+      roomId: phongChat.chatRoomId,
+      nameGroup: groupName,
+      participants: uniqueList,
+    }).then((data) => {
+      console.log("Cập nhật nhóm thành công:", data);
+      Alert.alert("Thành công", "Nhóm đã được cập nhật.");
+      handleCloseModalAdd();
+      return;
+    }).catch((err) => {
+      console.error("Lỗi khi cập nhật nhóm:", err);
+      Alert.alert("Lỗi", "Cập nhật nhóm thất bại.");
+    });
+  };
+
+  const handleRemoveMember = async (phoneToRemove, name) => {
+    Alert.alert(
+      "Xác nhận",
+      `Bạn có chắc muốn xoá ${name} khỏi nhóm?`,
+      [
+        {
+          text: "Huỷ",
+          style: "cancel"
+        },
+        {
+          text: "Xoá",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const result = await deleteMember(phongChat.chatRoomId, phoneToRemove);
+
+              // Cập nhật lại UI nếu cần
+              setParticipantsInfo((prev) =>
+                prev.filter((user) => user.phoneNumber !== phoneToRemove)
+              );
+
+              Alert.alert("Thành công", "Đã xoá thành viên khỏi nhóm.");
+              return;
+            } catch (err) {
+              Alert.alert("Lỗi", err.message || "Không thể xoá thành viên.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDisbandGroup = async () => {
+    Alert.alert(
+      "Xác nhận",
+      "Bạn có chắc chắn muốn giải tán nhóm không? Sau khi giải tán, không thể gửi tin nhắn nữa.",
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Đồng ý",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const result = await disbandGroup(phongChat.chatRoomId);
+              console.log("Giải tán nhóm thành công:", result);
+              Alert.alert("Thành công", "Nhóm đã được giải tán.");
+              navigation.goBack();
+            } catch (error) {
+              console.error("Lỗi giải tán nhóm:", error);
+              Alert.alert("Lỗi", error.message || "Không thể giải tán nhóm.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleOpenModalAdd = () => {
+    if (phongChat.status === 'DISBANDED') {
+      Alert.alert("Nhóm đã bị giải tán, thao tác này đã bị khóa");
+      return;
+    }
+    setShowModalAdd(true);
+  };
+
+  const handleCloseModalAdd = () => {
+    setShowModalAdd(false);
+  };
+
+  useEffect(() => {
+    if (phongChat.isGroup) {
+      setGroupName(phongChat.nameGroup || "");
+    }
+  }, [phongChat]);
+
   const styles = getStyles(themeColors);
   return (
     <KeyboardAvoidingView
@@ -771,9 +1019,38 @@ export default function App({ navigation, route }) {
               <TouchableOpacity onPress={() => navigation.goBack()}>
                 <Ionicons name="chevron-back" size={20} color="#fff" />
               </TouchableOpacity>
-              <Image source={{ uri: otherUser.avatar }} style={styles.avatar} />
-              <Text style={styles.name}>{otherUser.fullName}</Text>
+              <Image source={{ uri: chatRoom.isGroup ? chatRoom.avatar : otherUser.avatar }} style={styles.avatar} />
+              <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">{chatRoom.isGroup ? chatRoom.fullName : otherUser.fullName}</Text>
             </View>
+
+
+            {phongChat.status === "DISBANDED" && (
+              <View
+                style={{
+                  backgroundColor: "red",
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 12,
+                  alignSelf: "center",
+                }}
+              >
+                <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>Đã giải tán</Text>
+              </View>
+            )}
+            {!phongChat.isGroup && (
+              <>
+                <TouchableOpacity style={{ padding: 5, marginLeft: 20 }} onPress={handleOpenModalAdd}>
+                  <FontAwesome6 name="users" size={20} color="#fff" />
+                </TouchableOpacity>
+              </>
+            )}
+            {phongChat.isGroup && (
+              <>
+                <TouchableOpacity style={{ padding: 5 }} onPress={handleOpenModalAdd}>
+                  <Entypo name="dots-three-vertical" size={20} color="#fff" />
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
 
@@ -782,23 +1059,22 @@ export default function App({ navigation, route }) {
           style={styles.content}
           data={messages}
           keyExtractor={(item, index) => index.toString()}
-          onContentSizeChange={() =>
-            flatListRef.current.scrollToEnd({ animated: true })
-          }
-          onLayout={() => flatListRef.current.scrollToEnd({ animated: true })}
           renderItem={renderItem}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
         />
+
 
         <View style={styles.bottomtab}>
           <TouchableOpacity style={styles.touch} onPress={pickImage}>
-            <Ionicons name="image" size={30} color={themeColors.text} />
+            <Ionicons name="image" size={30} color={themeColors.icon} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.touch} onPress={pickDocument}>
-            <Ionicons name="document-attach" size={30} color={themeColors.text} />
+            <Ionicons name="document-attach" size={30} color={themeColors.icon} />
           </TouchableOpacity>
           {!isRecording ? (
             <TouchableOpacity style={styles.touch} onPress={startRecording}>
-              <Ionicons name="mic" size={30} color={themeColors.text} />
+              <Ionicons name="mic" size={30} color={themeColors.icon} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={styles.recordingControl} onPress={stopRecording}>
@@ -814,9 +1090,12 @@ export default function App({ navigation, route }) {
             editable={true}
           />
           <TouchableOpacity style={styles.touch} onPress={handleSend}>
-            <Ionicons name="send" size={30} color={themeColors.text} />
+            <Ionicons name="send" size={30} color={themeColors.icon} />
           </TouchableOpacity>
         </View>
+
+
+
 
         {/* Modal tùy chọn tin nhắn */}
         <Modal
@@ -825,20 +1104,20 @@ export default function App({ navigation, route }) {
           animationType="fade"
           onRequestClose={() => setShowMessageOptions(false)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.modalOverlay}
             activeOpacity={1}
             onPress={() => setShowMessageOptions(false)}
           >
             <View style={styles.modalContent}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalOption}
                 onPress={handleDeleteMessagePress}
               >
                 <MaterialIcons name="delete" size={24} color="red" />
                 <Text style={styles.modalOptionText}>Thu hồi tin nhắn</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalOption}
                 onPress={() => setShowMessageOptions(false)}
               >
@@ -858,13 +1137,13 @@ export default function App({ navigation, route }) {
         >
           <View style={styles.imageViewerContainer}>
             <View style={styles.imageViewerHeader}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowImageViewer(false)}
               >
                 <Ionicons name="close" size={28} color="#fff" />
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.downloadButton}
                 onPress={() => downloadFile(selectedImage?.url, selectedImage?.name)}
               >
@@ -893,7 +1172,7 @@ export default function App({ navigation, route }) {
           animationType="slide"
           onRequestClose={() => setShowFileOptions(false)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.modalOverlay}
             activeOpacity={1}
             onPress={() => setShowFileOptions(false)}
@@ -908,15 +1187,15 @@ export default function App({ navigation, route }) {
               <View style={styles.fileDetailsContainer}>
                 <Ionicons name="document-outline" size={40} color={themeColors.text} />
                 <View style={styles.fileDetails}>
-                  <Text style={[styles.fileName, {color: themeColors.text}]}>
+                  <Text style={[styles.fileName, { color: themeColors.text }]}>
                     {selectedFile?.name}
                   </Text>
-                  <Text style={[styles.fileSize, {color: themeColors.text}]}>
+                  <Text style={[styles.fileSize, { color: themeColors.text }]}>
                     {selectedFile && Math.round(selectedFile.size / 1024)} KB
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.downloadFileButton}
                 onPress={() => {
                   downloadFile(selectedFile?.url, selectedFile?.name);
@@ -926,7 +1205,7 @@ export default function App({ navigation, route }) {
                 <Ionicons name="download-outline" size={24} color="#fff" />
                 <Text style={styles.downloadButtonText}>Tải xuống</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={() => setShowFileOptions(false)}
               >
@@ -935,6 +1214,193 @@ export default function App({ navigation, route }) {
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Modal add member */}
+        <Modal
+          visible={showModalAdd}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={handleCloseModalAdd}
+        >
+          <View style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <View style={{
+              width: '85%',
+              backgroundColor: themeColors.background,
+              padding: 20,
+              borderRadius: 20
+            }}>
+
+              {
+                phongChat.isGroup && (
+                  <View style={{ marginBottom: 10, position: 'relative' }}>
+                    <Image
+                      source={{ uri: phongChat.avatar }}
+                      style={{ width: 80, height: 80, borderRadius: 50, alignSelf: 'center' }}
+                    />
+                    <TouchableOpacity style={{ position: 'absolute', right: 100, top: 60 }}>
+                      <Feather name="edit" size={18} color={themeColors.icon2} />
+                    </TouchableOpacity>
+                    <View>
+                      <TextInput
+                        placeholder="Nhập tên nhóm"
+                        placeholderTextColor="#aaa"
+                        value={groupName}
+                        onChangeText={setGroupName}
+                        style={{
+                          borderWidth: 1,
+                          borderColor: '#ccc',
+                          borderRadius: 10,
+                          padding: 10,
+                          marginTop: 15,
+                          color: themeColors.text
+                        }}
+                      />
+                    </View>
+                  </View>
+                )
+              }
+
+              {
+                phongChat.isGroup && thisUser.phoneNumber === phongChat.admin && (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FF3B30',
+                      padding: 12,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                      marginBottom: 20
+                    }}
+                    onPress={handleDisbandGroup}
+                  >
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Giải tán nhóm</Text>
+                  </TouchableOpacity>
+
+                )
+              }
+
+              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10, color: themeColors.text }}>
+                {phongChat?.isGroup ? `Thành viên nhóm hiện tại (${phongChat.participants.length})` : 'Thành viên'}
+              </Text>
+
+              {/* Danh sách thành viên hiện tại */}
+              <FlatList
+                data={participantsInfo}
+                keyExtractor={(item) => item.phoneNumber}
+                renderItem={({ item }) => (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <Image
+                      source={{ uri: item.avatar }}
+                      style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: themeColors.text }}>
+                        {item.fullName || item.phoneNumber}
+                      </Text>
+                      {phongChat.isGroup && phongChat.admin === item.phoneNumber && <Text style={{
+                        backgroundColor: themeColors.primary, fontSize: 12, color: '#fff', padding: 5, textAlign: 'center', borderRadius: 10, width: 100, fontWeight: 'bold'
+                      }}>is admin</Text>}
+
+                      {phongChat.isGroup &&
+                        thisUser.phoneNumber === phongChat.admin && // chỉ admin mới thấy
+                        item.phoneNumber !== phongChat.admin &&     // không hiển thị để xoá admin
+                        item.phoneNumber !== thisUser.phoneNumber && // không xoá chính mình
+                        (
+                          <TouchableOpacity style={{ alignSelf: 'flex-end' }} onPress={() => handleRemoveMember(item.phoneNumber, item.fullName)}>
+                            <Feather name="delete" size={18} color="red" />
+                          </TouchableOpacity>
+                        )
+                      }
+                    </View>
+                  </View>
+                )}
+              />
+
+
+              <View style={{ height: 10 }} />
+
+              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10, color: themeColors.text }}>Thêm Thành Viên</Text>
+
+              {/* Danh sách bạn bè chưa là thành viên */}
+              <FlatList
+                data={friendsNotInGroup}
+                keyExtractor={(item) => item.phone}
+                style={{ maxHeight: 200 }}
+                renderItem={({ item }) => {
+                  const isSelected = newList.includes(item.phone);
+
+                  return (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 8,
+                        backgroundColor: isSelected ? themeColors.primary : 'transparent',
+                        padding: 8,
+                        borderRadius: 10,
+                      }}
+                      onPress={() => handleAddMemberToNewList(item.phone)}
+                    >
+                      <Image
+                        source={{ uri: item.avatar }}
+                        style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }}
+                      />
+                      <Text style={{ color: themeColors.text }}>{item.name}</Text>
+                    </TouchableOpacity>
+                  );
+                }}
+                ListEmptyComponent={
+                  <Text style={{ color: themeColors.text }}>Không có bạn nào để thêm</Text>
+                }
+              />
+
+
+              {/* Nếu không phải nhóm thì có thêm input + nút tạo nhóm */}
+              {!phongChat?.isGroup && (
+                <>
+                  <TextInput
+                    placeholder="Nhập tên nhóm"
+                    placeholderTextColor="#aaa"
+                    value={groupName}
+                    onChangeText={setGroupName}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: '#ccc',
+                      borderRadius: 10,
+                      padding: 10,
+                      marginTop: 15,
+                      color: themeColors.text
+                    }}
+                  />
+
+                  <TouchableOpacity style={{ marginTop: 10, backgroundColor: '#2196F3', padding: 10, borderRadius: 10 }} onPress={createGroup}>
+                    <Text style={{ color: '#fff', textAlign: 'center' }}>Tạo nhóm</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {
+                phongChat.isGroup && (
+                  <>
+                    <TouchableOpacity style={{ marginTop: 10, backgroundColor: '#2196F3', padding: 10, borderRadius: 10 }} onPress={updateGroup}>
+                      <Text style={{ color: '#fff', textAlign: 'center' }}>Lưu thay đổi</Text>
+                    </TouchableOpacity>
+                  </>
+                )
+              }
+
+              <TouchableOpacity onPress={handleCloseModalAdd} style={{ marginTop: 20 }}>
+                <Text style={{ color: 'red', textAlign: 'right' }}>Đóng</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+
       </View>
     </KeyboardAvoidingView>
   );
@@ -946,39 +1412,48 @@ const getStyles = (themeColors) => StyleSheet.create({
     backgroundColor: themeColors.background,
   },
   head: {
-    width: '100%',
+    width: '95%',
     backgroundColor: themeColors.primary,
-    height: 100,
-    paddingTop: 40,
-    paddingHorizontal: 20
+    height: 65,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    marginTop: 45,
+    alignSelf: 'center',
+    top: 0
   },
   user: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    marginTop: 5
   },
   avatar: {
     width: 55,
     height: 55,
     marginLeft: 10,
+    borderRadius: 50,
+    borderWidth: 1,
+    borderColor: '#fff'
   },
   name: {
-    fontSize: 24,
+    fontSize: 14,
     color: '#fff',
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     fontWeight: 'bold'
   },
   content: {
     flex: 1,
   },
   bottomtab: {
-    height: 100,
+    height: 70,
     backgroundColor: themeColors.primary,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingHorizontal: 10,
-    paddingBottom: 20,
+    paddingTop: 5,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30
   },
   textInput: {
     flex: 1,
@@ -988,7 +1463,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     marginHorizontal: 10,
     borderColor: '#ccc',
     borderWidth: 1,
-    color: themeColors.text
+    color: '#fff'
   },
   contextChat: {
     paddingVertical: 20,
@@ -1001,9 +1476,10 @@ const getStyles = (themeColors) => StyleSheet.create({
     padding: 5
   },
   blockChat: {
-    backgroundColor: '#7399C3',
-    padding: 15,
-    borderRadius: 20,
+    // backgroundColor: '#7399C3',
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+    borderRadius: 30,
   },
   touch: {
     marginHorizontal: 5
@@ -1025,7 +1501,7 @@ const getStyles = (themeColors) => StyleSheet.create({
   },
   // Style cho modal
   modalOverlay: {
-    flex: 1, 
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center'
@@ -1172,10 +1648,10 @@ const getStyles = (themeColors) => StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)', // Nền mờ
     zIndex: 1000,
   },
-  blockChat: {
-    padding: 15,
-    borderRadius: 20,
-  },
+  // blockChat: {
+  //   padding: 15,
+  //   borderRadius: 20,
+  // },
   revokedMessage: {
     color: '#a0a0a0',
     fontStyle: 'italic',

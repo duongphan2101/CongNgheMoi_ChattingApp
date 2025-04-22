@@ -623,6 +623,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   // Khi mở modal để edit nhóm hiện tại
   const openEditModal = async () => {
+    if(chatRoom.status === 'DISBANDED'){
+      toast.error("Nhóm đã bị giải tán, thao tác này đã bị khóa");
+      return;
+    }
     setNameGroup(chatRoom.nameGroup);
     const data = await fetchFriends();
     setListAddtoGroup([...chatRoom.participants]);
@@ -781,7 +785,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   {chatRoom.status === 'DISBANDED' && (
                     <span
                       className="badge bg-danger ms-2"
-                    // style={{color: 'red', fontSize: 14, marginLeft: 10}}
                     >NHÓM ĐÃ BỊ GIẢI TÁN</span>
                   )}
                 </p>
@@ -883,7 +886,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                             display: "block",
                           }}
                         >
-                          {new Date(msg.timestamp).toLocaleString("vi-VN", {
+                          {new Date(msg.timestamp).toLocaleString("en-US", {
                             timeZone: "Asia/Ho_Chi_Minh",
                             hour: "numeric",
                             minute: "numeric",

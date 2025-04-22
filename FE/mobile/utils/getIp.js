@@ -12,7 +12,7 @@ const getIp = (service = 'auth') => {
   // Nếu không thể lấy được địa chỉ IP
   if (!debugHost) {
     console.log("Không thể lấy IP từ Expo, sử dụng IP mặc định");
-    debugHost = "192.168.1.144";
+    debugHost = "192.168.1.7";
   }
 
   const PORT = {

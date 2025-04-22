@@ -45,9 +45,9 @@ export default function App({ navigation }) {
         if (conv.chatRoomId === newMessage.chatRoomId) {
           return {
             ...conv,
-            lastMessage: newMessage.type === "text" ? newMessage.message : 
-                        newMessage.type === "audio" ? "[Tin nhắn thoại]" : 
-                        newMessage.type === "file" ? "[File đính kèm]" : "[Tin nhắn]",
+            lastMessage: newMessage.type === "text" ? newMessage.message :
+              newMessage.type === "audio" ? "[Tin nhắn thoại]" :
+                newMessage.type === "file" ? "[File đính kèm]" : "[Tin nhắn]",
             lastMessageTime: newMessage.timestamp
           };
         }
@@ -61,8 +61,8 @@ export default function App({ navigation }) {
       return prevConversations.map(conv => {
         // Chỉ cập nhật nếu tin nhắn bị thu hồi là tin nhắn cuối cùng
         // Để làm điều này cần so sánh timestamp
-        if (conv.chatRoomId === revokedMessage.chatRoomId && 
-            conv.lastMessageTime === revokedMessage.timestamp) {
+        if (conv.chatRoomId === revokedMessage.chatRoomId &&
+          conv.lastMessageTime === revokedMessage.timestamp) {
           return {
             ...conv,
             lastMessage: "[Tin nhắn đã bị thu hồi]"
@@ -134,10 +134,9 @@ export default function App({ navigation }) {
               (phone) => phone !== currentUserPhone
             );
             const otherUser = usersInfo[otherPhone];
-
             // Format hiển thị thời gian tin nhắn cuối cùng
-            let lastMessageDisplay = item.lastMessage;
-            
+            let lastMessageDisplay = item.lastMessage || "Chưa có tin nhắn nào";
+
             // Định dạng thời gian nếu cần
             // let lastMessageTime = '';
             // if (item.lastMessageTime) {
@@ -148,18 +147,18 @@ export default function App({ navigation }) {
             return (
               <TouchableOpacity
                 style={styles.user}
-                onPress={() => navigation.navigate('chatting', { otherUser: otherUser, chatRoom: item.chatRoomId, thisUser: thisUser})}
+                onPress={() => navigation.navigate('chatting', { otherUser: otherUser, chatRoom: item, thisUser: thisUser })}
               >
                 <Image
                   source={{
-                    uri: otherUser?.avatar,
+                    uri: item.isGroup ? item.avatar : otherUser?.avatar,
                   }}
                   style={styles.avatar}
                 />
                 <View style={styles.userInfo}>
-                  <Text style={styles.text}>{otherUser?.fullName || 'Đang tải...'}</Text>
+                  <Text style={styles.text}>{item.isGroup ? item.fullName : otherUser?.fullName || 'Đang tải...'}</Text>
                   <Text style={styles.mess} numberOfLines={1} ellipsizeMode="tail">
-                    {lastMessageDisplay}
+                    {lastMessageDisplay} 
                   </Text>
                 </View>
                 {/* <Text style={styles.time}>{lastMessageTime}</Text> */}

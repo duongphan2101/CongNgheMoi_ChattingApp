@@ -432,7 +432,7 @@ const getStyles = (themeColors) => StyleSheet.create({
   },
   header: {
     width: '100%',
-    backgroundColor: '#2D5D7B',
+    backgroundColor: themeColors.primary,
     paddingBottom: 20,
   },
   headerContent: {
@@ -526,8 +526,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     marginHorizontal: 5,
   },
   genderButtonActive: {
-    backgroundColor: '#2D5D7B',
-    borderColor: '#2D5D7B',
+    backgroundColor: themeColors.primary,
   },
   genderText: {
     color: themeColors.text,
@@ -537,7 +536,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     color: 'white',
   },
   saveButton: {
-    backgroundColor: '#2D5D7B',
+    backgroundColor: themeColors.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',

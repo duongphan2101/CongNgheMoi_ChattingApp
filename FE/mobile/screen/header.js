@@ -71,7 +71,7 @@ const Header = ({ navigation }) => {
 
   return (
     <TouchableWithoutFeedback onPress={handleOutsidePress}>
-      <View>
+      <View style={{backgroundColor: themeColors.background}}>
         <View style={styles.headerContainer}>
           <View style={styles.block}>
             <TextInput 
@@ -129,7 +129,9 @@ const getStyles = (themeColors) => StyleSheet.create({
     backgroundColor: themeColors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 40
+    paddingTop: 40,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   TextInputStyle: {
     height: 40,
