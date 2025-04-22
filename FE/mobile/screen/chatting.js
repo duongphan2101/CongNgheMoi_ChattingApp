@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, memo } from "react";
 import {
   View,
   Text,
@@ -32,21 +32,285 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import sendFile from '../api/api_sendFile';
-// import * as Sharing from 'expo-sharing';
-// import * as MediaLibrary from 'expo-media-library';
 import getChatIdFromRoom from '../api/api_getChatIdbyChatRoomId';
 import getChatRoom from '../api/api_getChatRoombyChatRoomId.js';
 const BASE_URL = getIp();
 const socket = io(`http://${BASE_URL}:3618`);
 const notificationSocket = io(`http://${BASE_URL}:3515`);
 import createGroupChatRoom from '../api/api_createChatRoomforGroup.js';
-import useFriends from '../api/api_getListFriends.js'
+import useFriends from '../api/api_getListFriends.js';
 import updateChatRoom from '../api/api_updateChatRoomforGroup.js';
-import deleteMember from "../api/api_deleteMember.js"
+import deleteMember from "../api/api_deleteMember.js";
 import disbandGroup from '../api/api_disbandGroup.js';
 
 // Danh sách emoji reaction, đồng bộ với web
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡"];
+
+// Component riêng cho item tin nhắn
+const MessageItem = memo(({ item, isCurrentUser, themeColors, handleLongPressMessage, handleViewImage, handleViewFile, handlePlayAudio, chatRoom, otherUser, thisUser, highlightedMessageId, users, setSelectedReaction, fetchReactionUsersInfo, setShowReactionUsers}) => {
+  const styles = getStyles(themeColors);
+  const isHighlighted = highlightedMessageId === item.timestamp;
+
+  const renderMessageContent = () => {
+    if (item.isRevoked) {
+      return (
+        <Text
+          style={{
+            color: "#a0a0a0",
+            fontStyle: "italic",
+            maxWidth: "90%",
+            flexWrap: "wrap",
+            backgroundColor: isCurrentUser
+              ? "rgba(111, 211, 159, 0.2)"
+              : "rgba(139, 185, 242, 0.2)",
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: "#a0a0a0",
+            borderStyle: "dashed",
+          }}
+        >
+          Tin nhắn đã được thu hồi
+        </Text>
+      );
+    } else if (item.type === "text") {
+      return (
+        <Text
+          style={{
+            color: "#fff",
+            maxWidth: "90%",
+            flexWrap: "wrap",
+          }}
+        >
+          {item.message}
+        </Text>
+      );
+    } else if (item.type === "audio") {
+      return (
+        <TouchableOpacity
+          onPress={() => handlePlayAudio(item.fileInfo?.url || item.message)}
+        >
+          <Ionicons name="play-circle" size={30} color="#fff" />
+        </TouchableOpacity>
+      );
+    } else if (item.type === "file") {
+      try {
+        const fileInfo = JSON.parse(item.message);
+        const fileExt = fileInfo.name.split(".").pop().toLowerCase();
+        const isImage = ["jpg", "jpeg", "png", "gif"].includes(fileExt);
+
+        if (isImage) {
+          return (
+            <TouchableOpacity
+              onPress={() => handleViewImage(fileInfo.url, fileInfo.name)}
+            >
+              <Image
+                source={{ uri: fileInfo.url }}
+                style={{ width: 150, height: 150, borderRadius: 10 }}
+                resizeMode="cover"
+              />
+              <Text style={{ color: "#fff", fontSize: 12, marginTop: 5 }}>
+                {fileInfo.name.length > 20
+                  ? fileInfo.name.substring(0, 20) + "..."
+                  : fileInfo.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        } else {
+          return (
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center' }}
+              onPress={() => handleViewFile(fileInfo)}
+            >
+              <Ionicons name="document-attach" size={30} color="#fff" />
+              <View style={{ marginLeft: 10 }}>
+                <Text style={{ color: "#fff" }}>
+                  {fileInfo.name.length > 20
+                    ? fileInfo.name.substring(0, 20) + "..."
+                    : fileInfo.name}
+                </Text>
+                <Text style={{ color: "#fff", fontSize: 12 }}>
+                  {Math.round(fileInfo.size / 1024)} KB
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        }
+      } catch (error) {
+        console.log("Lỗi parse JSON:", error, "message:", item.message);
+        return <Text style={{ color: "#fff" }}>[Tin nhắn file lỗi]</Text>;
+      }
+    } else {
+      return <Text style={{ color: "#fff" }}>[Tin nhắn không hỗ trợ]</Text>;
+    }
+  };
+
+  const renderReactions = () => {
+    if (!item.reactions || Object.keys(item.reactions).length === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.reactionContainer}>
+        {Object.entries(item.reactions).map(([emoji, users]) => (
+          users.length > 0 && (
+            <TouchableOpacity
+              key={emoji}
+              onPress={() => {
+                setSelectedReaction({ emoji, users });
+                fetchReactionUsersInfo(users);
+                setShowReactionUsers(true);
+              }}
+              style={styles.reactionTouchable}
+            >
+              <Text style={styles.reactionIcon}>
+                {emoji} {users.length}
+              </Text>
+            </TouchableOpacity>
+          )
+        ))}
+      </View>
+    );
+  };
+
+  const user = users;
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.userChatting,
+        { justifyContent: isCurrentUser ? "flex-end" : "flex-start" },
+        isHighlighted && styles.highlightedMessage,
+      ]}
+      onLongPress={() => handleLongPressMessage(item)}
+      delayLongPress={500}
+      activeOpacity={0.8}
+    >
+      {!isCurrentUser && (
+        <Image source={{ uri: user?.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
+      )}
+      <View style={{ alignItems: 'center' }}>
+        <View
+          style={[
+            styles.blockChat,
+            {
+              backgroundColor: item.isRevoked
+                ? (isCurrentUser ? 'rgba(111, 211, 159, 0.2)' : 'rgba(139, 185, 242, 0.2)')
+                : (isCurrentUser ? '#6fd39f' : '#8bb9f2'),
+              borderRadius: 15,
+              padding: item.isRevoked ? 0 : 10,
+              borderWidth: item.isRevoked ? 1 : 0,
+              borderColor: item.isRevoked ? "#a0a0a0" : "transparent",
+              borderStyle: item.isRevoked ? "dashed" : "solid",
+            },
+          ]}
+        >
+          {chatRoom.isGroup && !isCurrentUser && user?.fullName && (
+            <Text style={{ color: '#000', fontSize: 8, fontWeight: 'bold', marginBottom: 3 }}>
+              {user.fullName}:
+            </Text>
+          )}
+          {item.replyTo && !item.isRevoked && (
+            <TouchableOpacity
+              onPress={() => {
+                const index = messages.findIndex(
+                  (m) => m.timestamp === item.replyTo.timestamp
+                );
+                if (index !== -1) {
+                  flatListRef.current.scrollToIndex({
+                    index,
+                    animated: true,
+                  });
+                  setHighlightedMessageId(item.replyTo.timestamp);
+                }
+              }}
+              style={styles.replyPreview}
+            >
+              <Text style={styles.replyText}>
+                {item.replyTo.sender === thisUser.phoneNumber
+                  ? "Bạn"
+                  : otherUser.fullName}
+              </Text>
+              <Text style={styles.replyMessage}>{item.replyTo.message}</Text>
+            </TouchableOpacity>
+          )}
+          {renderMessageContent()}
+        </View>
+        <Text style={{ color: themeColors.text, fontSize: 10 }}>
+          {moment(item.timestamp).format('HH:mm dd/MM/YY')}
+        </Text>
+        {!item.isRevoked && renderReactions()}
+      </View>
+      {isCurrentUser && (
+        <Image
+          source={{ uri: thisUser.avatar }}
+          style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }}
+        />
+      )}
+    </TouchableOpacity>
+  );
+});
+
+// Component riêng cho MessageInput
+const MessageInput = memo(({ message, setMessage, handleSend, pickImage, pickDocument, startRecording, stopRecording, isRecording, themeColors, replyingTo, handleCancelReply }) => {
+  const styles = getStyles(themeColors);
+  const inputRef = useRef(null);
+
+  // Tự động lấy lại focus nếu mất
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [message]);
+
+  return (
+    <View style={styles.bottomtab}>
+      {replyingTo && (
+        <View style={styles.replyingTo}>
+          <Text style={styles.replyingToText}>
+            Đang trả lời: {replyingTo.message}
+          </Text>
+          <TouchableOpacity onPress={handleCancelReply}>
+            <Ionicons name="close" size={20} color="#ff4d4f" />
+          </TouchableOpacity>
+        </View>
+      )}
+      <TouchableOpacity style={styles.touch} onPress={pickImage}>
+        <Ionicons name="image" size={30} color={themeColors.icon} />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.touch} onPress={pickDocument}>
+        <Ionicons name="document-attach" size={30} color={themeColors.icon} />
+      </TouchableOpacity>
+      {!isRecording ? (
+        <TouchableOpacity style={styles.touch} onPress={startRecording}>
+          <Ionicons name="mic" size={30} color={themeColors.icon} />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.recordingControl}
+          onPress={stopRecording}
+        >
+          <View style={styles.stopIcon} />
+        </TouchableOpacity>
+      )}
+      <TextInput
+        ref={inputRef}
+        style={styles.textInput}
+        placeholder="Nhập nội dung ..."
+        placeholderTextColor="#ccc"
+        value={message}
+        onChangeText={setMessage}
+        editable={true}
+        onFocus={() => console.log('TextInput focused')}
+        onBlur={() => console.log('TextInput blurred')}
+      />
+      <TouchableOpacity style={styles.touch} onPress={handleSend}>
+        <Ionicons name="send" size={30} color={themeColors.icon} />
+      </TouchableOpacity>
+    </View>
+  );
+});
 
 export default function App({ navigation, route }) {
   const { theme } = useTheme();
@@ -74,11 +338,16 @@ export default function App({ navigation, route }) {
   const [showReactionUsers, setShowReactionUsers] = useState(false);
   const [selectedReaction, setSelectedReaction] = useState({ emoji: "", users: [] });
   const [reactionUsersInfo, setReactionUsersInfo] = useState([]);
-
   const [replyingTo, setReplyingTo] = useState(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
-
   const [phongChat, setPhongChat] = useState(chatRoom);
+  const [showModalAdd, setShowModalAdd] = useState(false);
+  const [listFriends, setListFriends] = useState();
+  const [participantsInfo, setParticipantsInfo] = useState([]);
+  const [friendsNotInGroup, setFriendsNotInGroup] = useState([]);
+  const [groupName, setGroupName] = useState("");
+  const [newList, setNewList] = useState([]);
+
   const handleReplyMessage = (msg) => {
     setReplyingTo({
       ...msg,
@@ -100,9 +369,10 @@ export default function App({ navigation, route }) {
     }
   };
 
-const test = () => {
-  console.log("DM EXPO");
-}
+  // const test = () => {
+  //   console.log("DM EXPO");
+  // };
+
 
   const fetchReactionUsersInfo = async (users) => {
     try {
@@ -118,6 +388,8 @@ const test = () => {
     }
   };
 
+
+
   const handleCopyMessage = () => {
     if (selectedMessage?.type === "text" && !selectedMessage.isRevoked) {
       Clipboard.setString(selectedMessage.message);
@@ -132,8 +404,16 @@ const test = () => {
     setHighlightedMessageId(null);
   };
 
-  useEffect(() => {
+  // Hàm debounce
+  const debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  };
 
+  useEffect(() => {
     const fetchData = async () => {
       try {
         const data = await getChatRoom(chatRoom.chatRoomId);
@@ -147,6 +427,7 @@ const test = () => {
     if (chatRoom?.chatRoomId) {
       fetchData();
     }
+
   }, [chatRoom?.chatRoomId]);
 
   useEffect(() => {
@@ -154,7 +435,7 @@ const test = () => {
   }, []);
 
   useEffect(() => {
-    setListFriends(contacts)
+    setListFriends(contacts);
   }, [contacts]);
 
   useEffect(() => {
@@ -200,14 +481,14 @@ const test = () => {
         }
         socket.emit("updateLastMessage", {
           chatRoomId: chatRoom.chatRoomId,
-          message: newMessage
+          message: newMessage,
         });
         return [...prev, newMessage];
       });
     };
 
-    const handleTyping = () => setTyping(true);
-    const handleStopTyping = () => setTyping(false);
+    const handleTyping = debounce(() => setTyping(true), 500);
+    const handleStopTyping = debounce(() => setTyping(false), 500);
 
     const handleMessageRevoked = (data) => {
       setMessages((prev) =>
@@ -336,7 +617,7 @@ const test = () => {
         phongChat.chatRoomId,
         selectedMessage.timestamp,
         currentUserPhone,
-        emoji // Gửi trực tiếp emoji
+        emoji
       );
       setShowReactionPicker(false);
       setShowMessageOptions(false);
@@ -419,6 +700,7 @@ const test = () => {
       Alert.alert("Lỗi", "Không có bản ghi âm để gửi.");
       return;
     }
+    const chatId = await getChatIdFromRoom(phongChat.chatRoomId);
     const formData = new FormData();
     formData.append("file", {
       uri,
@@ -428,6 +710,7 @@ const test = () => {
     formData.append("chatRoomId", chatRoom.chatRoomId);
     formData.append("sender", currentUserPhone);
     formData.append("receiver", otherUser.phoneNumber);
+    formData.append("chatId", chatId)
 
     try {
       const response = await fetch(`http://${BASE_URL}:3618/sendAudio`, {
@@ -611,9 +894,7 @@ const test = () => {
               fileObjects
             );
             console.log("Files sent successfully:", result);
-
           } catch (uploadError) {
-
             console.error("Upload error details:", uploadError);
             Alert.alert(
               "Lỗi Upload",
@@ -675,7 +956,6 @@ const test = () => {
           });
         }
 
-        // 
         if (totalSize > 30 * 1024 * 1024) { // tong kich co 30MB
           Alert.alert("Files quá lớn", "Tổng kích thước các file không được vượt quá 30MB");
           return;
@@ -691,9 +971,7 @@ const test = () => {
               fileObjects
             );
             console.log("Documents sent successfully:", result);
-
           } catch (uploadError) {
-
             console.error("Upload error details:", uploadError);
             Alert.alert(
               "Lỗi Upload",
@@ -747,214 +1025,47 @@ const test = () => {
     }
   };
 
-  const renderItem = async ({ item }) => {
-    const isCurrentUser = item.sender === thisUser.phoneNumber;
-    const isHighlighted = highlightedMessageId === item.timestamp;
+  const [userMap, setUserMap] = useState({});
 
-    const renderMessageContent = () => {
-      if (item.isRevoked) {
-        return (
-          <Text
-            style={{
-              color: "#a0a0a0",
-              fontStyle: "italic",
-              maxWidth: "90%",
-              flexWrap: "wrap",
-              backgroundColor: isCurrentUser
-                ? "rgba(111, 211, 159, 0.2)"
-                : "rgba(139, 185, 242, 0.2)",
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: "#a0a0a0",
-              borderStyle: "dashed",
-            }}
-          >
-            Tin nhắn đã được thu hồi
-          </Text>
-        );
-      } else if (item.type === "text") {
-        return (
-          <Text
-            style={{
-              color: "#fff",
-              maxWidth: "90%",
-              flexWrap: "wrap",
-            }}
-          >
-            {item.message}
-          </Text>
-        );
-      } else if (item.type === "audio") {
-        return (
-          <TouchableOpacity
-            onPress={() => handlePlayAudio(item.fileInfo?.url || item.message)}
-          >
-            <Ionicons name="play-circle" size={30} color="#fff" />
-          </TouchableOpacity>
-        );
-      } else if (item.type === "file") {
-        try {
-          const fileInfo = JSON.parse(item.message);
-          const fileExt = fileInfo.name.split(".").pop().toLowerCase();
-          const isImage = ["jpg", "jpeg", "png", "gif"].includes(fileExt);
-
-          if (isImage) {
-            return (
-              <TouchableOpacity
-                onPress={() => handleViewImage(fileInfo.url, fileInfo.name)}
-              >
-                <Image
-                  source={{ uri: fileInfo.url }}
-                  style={{ width: 150, height: 150, borderRadius: 10 }}
-                  resizeMode="cover"
-                />
-                <Text style={{ color: "#fff", fontSize: 12, marginTop: 5 }}>
-                  {fileInfo.name.length > 20
-                    ? fileInfo.name.substring(0, 20) + "..."
-                    : fileInfo.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          } else {
-            return (
-              <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-                onPress={() => handleViewFile(fileInfo)}
-              >
-                <Ionicons name="document-attach" size={30} color="#fff" />
-                <View style={{ marginLeft: 10 }}>
-                  <Text style={{ color: "#fff" }}>
-                    {fileInfo.name.length > 20
-                      ? fileInfo.name.substring(0, 20) + "..."
-                      : fileInfo.name}
-                  </Text>
-                  <Text style={{ color: "#fff", fontSize: 12 }}>
-                    {Math.round(fileInfo.size / 1024)} KB
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const map = {};
+      for (const msg of messages) {
+        if (!map[msg.sender]) {
+          const result = await getUserbySearch(msg.sender, "");
+          if (result.length > 0) {
+            map[msg.sender] = result[0];
           }
-        } catch (error) {
-          console.log("Lỗi parse JSON:", error, "message:", item.message);
-          return <Text style={{ color: "#fff" }}>[Tin nhắn file lỗi]</Text>;
         }
-      } else {
-        return <Text style={{ color: "#fff" }}>[Tin nhắn không hỗ trợ]</Text>;
       }
-    };
-    const users = await getUserbySearch(item.sender, "");
-    const user = users[0];
-
-    const renderReactions = () => {
-      if (!item.reactions || Object.keys(item.reactions).length === 0) {
-        return null;
-      }
-
-      return (
-        <View style={styles.reactionContainer}>
-          {Object.entries(item.reactions).map(([emoji, users]) => (
-            users.length > 0 && (
-              <TouchableOpacity
-                key={emoji}
-                onPress={() => {
-                  setSelectedReaction({ emoji, users });
-                  fetchReactionUsersInfo(users);
-                  setShowReactionUsers(true);
-                }}
-                style={styles.reactionTouchable}
-              >
-                <Text style={styles.reactionIcon}>
-                  {emoji} {users.length}
-                </Text>
-              </TouchableOpacity>
-            )
-          ))}
-        </View>
-      );
+      setUserMap(map);
     };
 
+    fetchUsers();
+  }, [messages]);
+
+  const renderItem = ({ item }) => {
+    const isCurrentUser = item.sender === thisUser.phoneNumber;
+    const users = userMap[item.sender];
     return (
-      <TouchableOpacity
-        style={[
-          styles.userChatting,
-          { justifyContent: isCurrentUser ? "flex-end" : "flex-start" },
-          isHighlighted && styles.highlightedMessage,
-        ]}
-        onLongPress={() => handleLongPressMessage(item)}
-        delayLongPress={500}
-        activeOpacity={0.8}
-      >
-        {!isCurrentUser && (
-          <Image source={{ uri: chatRoom.isGroup ? user.avatar : otherUser.avatar }} style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }} />
-        )}
-        <View style={{ alignItems: 'center' }}>
+      <MessageItem
+        item={item}
+        isCurrentUser={isCurrentUser}
+        themeColors={themeColors}
+        handleLongPressMessage={handleLongPressMessage}
+        handleViewImage={handleViewImage}
+        handleViewFile={handleViewFile}
+        handlePlayAudio={handlePlayAudio}
+        chatRoom={chatRoom}
+        otherUser={otherUser}
+        thisUser={thisUser}
+        highlightedMessageId={highlightedMessageId}
+        users={users}
+        setSelectedReaction={setSelectedReaction}
+        fetchReactionUsersInfo={fetchReactionUsersInfo}
+        setShowReactionUsers={setShowReactionUsers}
 
-          <View
-            style={[
-              styles.blockChat,
-              {
-                backgroundColor: item.isRevoked
-                  ? (isCurrentUser ? 'rgba(111, 211, 159, 0.2)' : 'rgba(139, 185, 242, 0.2)')
-                  : (isCurrentUser ? '#6fd39f' : '#8bb9f2'),
-                borderRadius: 15,
-                padding: item.isRevoked ? 0 : 10,
-                borderWidth: item.isRevoked ? 1 : 0,
-                borderColor: item.isRevoked ? "#a0a0a0" : "transparent",
-                borderStyle: item.isRevoked ? "dashed" : "solid",
-              },
-            ]}
-          >
-
-            {
-              chatRoom.isGroup && !isCurrentUser && user?.fullName && (
-                <Text style={{ color: '#000', fontSize: 8, fontWeight: 'bold', marginBottom: 3 }}>
-                  {user.fullName}:
-                </Text>
-              )
-            }
-
-            {item.replyTo && !item.isRevoked && (
-              <TouchableOpacity
-                onPress={() => {
-                  const index = messages.findIndex(
-                    (m) => m.timestamp === item.replyTo.timestamp
-                  );
-                  if (index !== -1) {
-                    flatListRef.current.scrollToIndex({
-                      index,
-                      animated: true,
-                    });
-                    setHighlightedMessageId(item.replyTo.timestamp);
-                  }
-                }}
-                style={styles.replyPreview}
-              >
-                <Text style={styles.replyText}>
-                  {item.replyTo.sender === currentUserPhone
-                    ? "Bạn"
-                    : otherUser.fullName}
-                </Text>
-                <Text style={styles.replyMessage}>{item.replyTo.message}</Text>
-              </TouchableOpacity>
-            )}
-
-            {renderMessageContent()}
-          </View>
-          <Text style={{ color: themeColors.text, fontSize: 10 }}>
-            {moment(item.timestamp).format('HH:mm dd/MM/YY')}
-          </Text>
-          {!item.isRevoked && renderReactions()}
-        </View>
-        {isCurrentUser && (
-          <Image
-            source={{ uri: thisUser.avatar }}
-            style={{ height: 50, width: 50, marginTop: 15, borderRadius: 50 }}
-          />
-        )}
-      </TouchableOpacity>
+      />
     );
   };
 
@@ -968,14 +1079,7 @@ const test = () => {
     setShowFileOptions(true);
   };
 
-  const [showModalAdd, setShowModalAdd] = useState(false);
-  const [listFriends, setListFriends] = useState()
-
-  const [participantsInfo, setParticipantsInfo] = useState([]);
-  const [friendsNotInGroup, setFriendsNotInGroup] = useState([]);
-  const [groupName, setGroupName] = useState("");
-
-  // Lấy danh sách thành viên hiện tại từ participants (sử dụng getUserbySearch)
+  // Lấy danh sách thành viên hiện tại từ participants
   useEffect(() => {
     const fetchParticipantsInfo = async () => {
       if (!phongChat?.participants) return;
@@ -983,7 +1087,7 @@ const test = () => {
       const results = await Promise.all(
         phongChat.participants.map(phone => getUserbySearch(phone, ""))
       );
-      setParticipantsInfo(results.map(res => res[0])); // mỗi res là mảng 1 phần tử
+      setParticipantsInfo(results.map(res => res[0]));
     };
 
     fetchParticipantsInfo();
@@ -996,13 +1100,11 @@ const test = () => {
     setFriendsNotInGroup(notInGroup);
   }, [contacts, phongChat]);
 
-  const [newList, setNewList] = useState([]);
-
   const handleAddMemberToNewList = (phone) => {
     setNewList((prev) =>
       prev.includes(phone)
-        ? prev.filter(p => p !== phone) // Bỏ ra
-        : [...prev, phone]              // Thêm vào
+        ? prev.filter(p => p !== phone)
+        : [...prev, phone]
     );
   };
 
@@ -1026,6 +1128,7 @@ const test = () => {
       participants: uniqueList
     }).then((data) => {
       console.log("Tạo nhóm thành công:", data);
+      Alert.alert("Tạo nhóm thành công!")
       return;
     }).catch((err) => {
       console.error("Lỗi khi tạo nhóm:", err);
@@ -1046,9 +1149,6 @@ const test = () => {
       Alert.alert("Một nhóm phải có ít nhất ba thành viên.");
       return;
     }
-    console.log("unique ", uniqueList)
-    console.log("id ", phongChat.chatRoomId);
-
     updateChatRoom({
       roomId: phongChat.chatRoomId,
       nameGroup: groupName,
@@ -1079,12 +1179,9 @@ const test = () => {
           onPress: async () => {
             try {
               const result = await deleteMember(phongChat.chatRoomId, phoneToRemove);
-
-              // Cập nhật lại UI nếu cần
               setParticipantsInfo((prev) =>
                 prev.filter((user) => user.phoneNumber !== phoneToRemove)
               );
-
               Alert.alert("Thành công", "Đã xoá thành viên khỏi nhóm.");
               return;
             } catch (err) {
@@ -1143,7 +1240,8 @@ const test = () => {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "ios" ? "padding" : "padding"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 50}
     >
       <View style={styles.container}>
         <View style={styles.head}>
@@ -1155,8 +1253,6 @@ const test = () => {
               <Image source={{ uri: chatRoom.isGroup ? chatRoom.avatar : otherUser.avatar }} style={styles.avatar} />
               <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">{chatRoom.isGroup ? chatRoom.fullName : otherUser.fullName}</Text>
             </View>
-
-
             {phongChat.status === "DISBANDED" && (
               <View
                 style={{
@@ -1171,18 +1267,14 @@ const test = () => {
               </View>
             )}
             {!phongChat.isGroup && (
-              <>
-                <TouchableOpacity style={{ padding: 5, marginLeft: 20 }} onPress={handleOpenModalAdd}>
-                  <FontAwesome6 name="users" size={20} color="#fff" />
-                </TouchableOpacity>
-              </>
+              <TouchableOpacity style={{ padding: 5, marginLeft: 20 }} onPress={handleOpenModalAdd}>
+                <FontAwesome6 name="users" size={20} color="#fff" />
+              </TouchableOpacity>
             )}
             {phongChat.isGroup && (
-              <>
-                <TouchableOpacity style={{ padding: 5 }} onPress={handleOpenModalAdd}>
-                  <Entypo name="dots-three-vertical" size={20} color="#fff" />
-                </TouchableOpacity>
-              </>
+              <TouchableOpacity style={{ padding: 5 }} onPress={handleOpenModalAdd}>
+                <Entypo name="dots-three-vertical" size={20} color="#fff" />
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -1193,58 +1285,32 @@ const test = () => {
           data={messages}
           keyExtractor={(item, index) => index.toString()}
           renderItem={renderItem}
+          initialNumToRender={10}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          getItemLayout={(data, index) => ({
+            length: 100,
+            offset: 100 * index,
+            index,
+          })}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
         />
 
+        <MessageInput
+          message={message}
+          setMessage={setMessage}
+          handleSend={handleSend}
+          pickImage={pickImage}
+          pickDocument={pickDocument}
+          startRecording={startRecording}
+          stopRecording={stopRecording}
+          isRecording={isRecording}
+          themeColors={themeColors}
+          replyingTo={replyingTo}
+          handleCancelReply={handleCancelReply}
+        />
 
-        <View style={styles.bottomtab}>
-          {replyingTo && (
-            <View style={styles.replyingTo}>
-              <Text style={styles.replyingToText}>
-                Đang trả lời: {replyingTo.message}
-              </Text>
-              <TouchableOpacity onPress={handleCancelReply}>
-                <Ionicons name="close" size={20} color="#ff4d4f" />
-              </TouchableOpacity>
-            </View>
-          )}
-          <TouchableOpacity style={styles.touch} onPress={pickImage}>
-            <Ionicons name="image" size={30} color={themeColors.icon} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.touch} onPress={pickDocument}>
-            <Ionicons name="document-attach" size={30} color={themeColors.icon} />
-          </TouchableOpacity >
-          {!isRecording ? (
-            <TouchableOpacity style={styles.touch} onPress={startRecording}>
-              <Ionicons name="mic" size={30} color={themeColors.icon} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.recordingControl}
-              onPress={stopRecording}
-            >
-              <View style={styles.stopIcon} />
-            </TouchableOpacity>
-          )
-          }
-          <TextInput
-            style={styles.textInput}
-            placeholder="Nhập nội dung ..."
-            placeholderTextColor="#ccc"
-            value={message}
-            onChangeText={setMessage}
-            editable={true}
-          />
-          <TouchableOpacity style={styles.touch} onPress={handleSend}>
-            <Ionicons name="send" size={30} color={themeColors.icon} />
-          </TouchableOpacity>
-        </View >
-
-
-
-
-        {/* Modal tùy chọn tin nhắn */}
         <Modal
           transparent={true}
           visible={showMessageOptions}
@@ -1284,7 +1350,6 @@ const test = () => {
                 style={styles.modalOption}
                 onPress={() => {
                   setShowReactionPicker(true);
-                  test()
                 }}
               >
                 <Ionicons name="heart" size={24} color={themeColors.text} />
@@ -1314,7 +1379,6 @@ const test = () => {
           </TouchableOpacity>
         </Modal>
 
-        {/* Modal chọn reaction */}
         <Modal
           transparent={true}
           visible={showReactionPicker}
@@ -1340,8 +1404,7 @@ const test = () => {
           </TouchableOpacity>
         </Modal>
 
-        {/* Modal xem ảnh toàn màn hình */}
-        < Modal
+        <Modal
           transparent={true}
           visible={showImageViewer}
           animationType="fade"
@@ -1377,10 +1440,9 @@ const test = () => {
               <Text style={styles.imageName}>{selectedImage?.name}</Text>
             </View>
           </View>
-        </Modal >
+        </Modal>
 
-        {/* Modal tùy chọn tải xuống file */}
-        < Modal
+        <Modal
           transparent={true}
           visible={showFileOptions}
           animationType="slide"
@@ -1431,10 +1493,9 @@ const test = () => {
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
-        </Modal >
+        </Modal>
 
-        {/* Modal add member */}
-        < Modal
+        <Modal
           visible={showModalAdd}
           transparent={true}
           animationType="slide"
@@ -1452,60 +1513,50 @@ const test = () => {
               padding: 20,
               borderRadius: 20
             }}>
-
-              {
-                phongChat.isGroup && (
-                  <View style={{ marginBottom: 10, position: 'relative' }}>
-                    <Image
-                      source={{ uri: phongChat.avatar }}
-                      style={{ width: 80, height: 80, borderRadius: 50, alignSelf: 'center' }}
-                    />
-                    <TouchableOpacity style={{ position: 'absolute', right: 100, top: 60 }}>
-                      <Feather name="edit" size={18} color={themeColors.icon2} />
-                    </TouchableOpacity>
-                    <View>
-                      <TextInput
-                        placeholder="Nhập tên nhóm"
-                        placeholderTextColor="#aaa"
-                        value={groupName}
-                        onChangeText={setGroupName}
-                        style={{
-                          borderWidth: 1,
-                          borderColor: '#ccc',
-                          borderRadius: 10,
-                          padding: 10,
-                          marginTop: 15,
-                          color: themeColors.text
-                        }}
-                      />
-                    </View>
-                  </View>
-                )
-              }
-
-              {
-                phongChat.isGroup && thisUser.phoneNumber === phongChat.admin && (
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: '#FF3B30',
-                      padding: 12,
-                      borderRadius: 10,
-                      alignItems: 'center',
-                      marginBottom: 20
-                    }}
-                    onPress={handleDisbandGroup}
-                  >
-                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Giải tán nhóm</Text>
+              {phongChat.isGroup && (
+                <View style={{ marginBottom: 10, position: 'relative' }}>
+                  <Image
+                    source={{ uri: phongChat.avatar }}
+                    style={{ width: 80, height: 80, borderRadius: 50, alignSelf: 'center' }}
+                  />
+                  <TouchableOpacity style={{ position: 'absolute', right: 100, top: 60 }}>
+                    <Feather name="edit" size={18} color={themeColors.icon2} />
                   </TouchableOpacity>
-
-                )
-              }
-
+                  <View>
+                    <TextInput
+                      placeholder="Nhập tên nhóm"
+                      placeholderTextColor="#aaa"
+                      value={groupName}
+                      onChangeText={setGroupName}
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#ccc',
+                        borderRadius: 10,
+                        padding: 10,
+                        marginTop: 15,
+                        color: themeColors.text
+                      }}
+                    />
+                  </View>
+                </View>
+              )}
+              {phongChat.isGroup && thisUser.phoneNumber === phongChat.admin && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#FF3B30',
+                    padding: 12,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    marginBottom: 20
+                  }}
+                  onPress={handleDisbandGroup}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Giải tán nhóm</Text>
+                </TouchableOpacity>
+              )}
               <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10, color: themeColors.text }}>
                 {phongChat?.isGroup ? `Thành viên nhóm hiện tại (${phongChat.participants.length})` : 'Thành viên'}
               </Text>
-
-              {/* Danh sách thành viên hiện tại */}
               <FlatList
                 data={participantsInfo}
                 keyExtractor={(item) => item.phoneNumber}
@@ -1522,12 +1573,10 @@ const test = () => {
                       {phongChat.isGroup && phongChat.admin === item.phoneNumber && <Text style={{
                         backgroundColor: themeColors.primary, fontSize: 12, color: '#fff', padding: 5, textAlign: 'center', borderRadius: 10, width: 100, fontWeight: 'bold'
                       }}>is admin</Text>}
-
                       {phongChat.isGroup &&
-                        thisUser.phoneNumber === phongChat.admin && // chỉ admin mới thấy
-                        item.phoneNumber !== phongChat.admin &&     // không hiển thị để xoá admin
-                        item.phoneNumber !== thisUser.phoneNumber && // không xoá chính mình
-                        (
+                        thisUser.phoneNumber === phongChat.admin &&
+                        item.phoneNumber !== phongChat.admin &&
+                        item.phoneNumber !== thisUser.phoneNumber && (
                           <TouchableOpacity style={{ alignSelf: 'flex-end' }} onPress={() => handleRemoveMember(item.phoneNumber, item.fullName)}>
                             <Feather name="delete" size={18} color="red" />
                           </TouchableOpacity>
@@ -1537,20 +1586,14 @@ const test = () => {
                   </View>
                 )}
               />
-
-
               <View style={{ height: 10 }} />
-
               <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10, color: themeColors.text }}>Thêm Thành Viên</Text>
-
-              {/* Danh sách bạn bè chưa là thành viên */}
               <FlatList
                 data={friendsNotInGroup}
                 keyExtractor={(item) => item.phone}
                 style={{ maxHeight: 200 }}
                 renderItem={({ item }) => {
                   const isSelected = newList.includes(item.phone);
-
                   return (
                     <TouchableOpacity
                       style={{
@@ -1575,9 +1618,6 @@ const test = () => {
                   <Text style={{ color: themeColors.text }}>Không có bạn nào để thêm</Text>
                 }
               />
-
-
-              {/* Nếu không phải nhóm thì có thêm input + nút tạo nhóm */}
               {!phongChat?.isGroup && (
                 <>
                   <TextInput
@@ -1594,31 +1634,23 @@ const test = () => {
                       color: themeColors.text
                     }}
                   />
-
                   <TouchableOpacity style={{ marginTop: 10, backgroundColor: '#2196F3', padding: 10, borderRadius: 10 }} onPress={createGroup}>
                     <Text style={{ color: '#fff', textAlign: 'center' }}>Tạo nhóm</Text>
                   </TouchableOpacity>
                 </>
               )}
-
-              {
-                phongChat.isGroup && (
-                  <>
-                    <TouchableOpacity style={{ marginTop: 10, backgroundColor: '#2196F3', padding: 10, borderRadius: 10 }} onPress={updateGroup}>
-                      <Text style={{ color: '#fff', textAlign: 'center' }}>Lưu thay đổi</Text>
-                    </TouchableOpacity>
-                  </>
-                )
-              }
-
+              {phongChat.isGroup && (
+                <TouchableOpacity style={{ marginTop: 10, backgroundColor: '#2196F3', padding: 10, borderRadius: 10 }} onPress={updateGroup}>
+                  <Text style={{ color: '#fff', textAlign: 'center' }}>Lưu thay đổi</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={handleCloseModalAdd} style={{ marginTop: 20 }}>
                 <Text style={{ color: 'red', textAlign: 'right' }}>Đóng</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </Modal >
+        </Modal>
 
-        {/* Modal hiển thị danh sách người thả reaction */}
         <Modal
           transparent={true}
           visible={showReactionUsers}
@@ -1662,11 +1694,11 @@ const test = () => {
             </View>
           </TouchableOpacity>
         </Modal>
-
-      </View >
-    </KeyboardAvoidingView >
+      </View>
+    </KeyboardAvoidingView>
   );
 }
+
 const getStyles = (themeColors) =>
   StyleSheet.create({
     container: {
@@ -1674,11 +1706,13 @@ const getStyles = (themeColors) =>
       backgroundColor: themeColors.background,
     },
     head: {
-      width: "100%",
+      width: "95%",
       backgroundColor: themeColors.primary,
-      height: 100,
-      paddingTop: 40,
+      height: 65,
+      marginTop: 40,
       paddingHorizontal: 20,
+      alignSelf: 'center',
+      borderRadius: 30,
     },
     user: {
       flexDirection: "row",
@@ -1689,7 +1723,8 @@ const getStyles = (themeColors) =>
       width: 55,
       height: 55,
       marginLeft: 10,
-      borderRadius: 50
+      borderRadius: 50,
+      marginTop: 5
     },
     name: {
       fontSize: 24,
@@ -1708,6 +1743,8 @@ const getStyles = (themeColors) =>
       alignItems: "center",
       paddingHorizontal: 10,
       paddingBottom: 20,
+      borderTopLeftRadius: 30,
+      borderTopRightRadius: 30
     },
     textInput: {
       flex: 1,

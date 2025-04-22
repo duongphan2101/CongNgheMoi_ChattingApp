@@ -53,6 +53,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [tagQuery, setTagQuery] = useState("");
   const [userMap, setUserMap] = useState({});
   const handleOpenOptionsModal = () => {
+    if (chatRoom.status === "DISBANDED") {
+      toast.error("Nhóm đã bị giải tán. Thao tác này đã bị khóa");
+      return;
+    }
     setIsOptionsModalOpen(true);
   };
 
@@ -79,7 +83,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       { base: "u", letters: "ùúûüũūŭůűų" },
       { base: "y", letters: "ýỳỹỷỵ" },
     ];
-  
+
     let result = str;
     for (const { base, letters } of accentsMap) {
       for (const letter of letters) {
@@ -96,8 +100,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         msg.type === "audio"
           ? "Tin nhắn thoại"
           : msg.type === "file"
-          ? "File đính kèm"
-          : msg.message,
+            ? "File đính kèm"
+            : msg.message,
     });
     setActiveMessageId(null);
     setHighlightedMessageId(msg.timestamp);
@@ -117,27 +121,27 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   const handleAddReaction = async (messageId, reaction) => {
     if (chatRoom.status === "DISBANDED") {
-        toast.error("Nhóm đã bị giải tán. Không thể thêm reaction.");
-        return;
+      toast.error("Nhóm đã bị giải tán. Không thể thêm reaction.");
+      return;
     }
 
     try {
-        const response = await fetch("http://localhost:3618/addReaction", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                chatRoomId: chatRoom.chatRoomId,
-                messageId: messageId,
-                user: currentUserPhone,
-                reaction: reaction,
-            }),
-        });
+      const response = await fetch("http://localhost:3618/addReaction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatRoomId: chatRoom.chatRoomId,
+          messageId: messageId,
+          user: currentUserPhone,
+          reaction: reaction,
+        }),
+      });
 
-        if (!response.ok) throw new Error("Không thể thêm reaction!");
-        setShowReactions(null);
+      if (!response.ok) throw new Error("Không thể thêm reaction!");
+      setShowReactions(null);
     } catch (error) {
-        console.error("Lỗi khi thêm reaction:", error);
-        toast.error("Không thể thêm reaction!");
+      console.error("Lỗi khi thêm reaction:", error);
+      toast.error("Không thể thêm reaction!");
     }
   };
 
@@ -295,8 +299,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     socket.on("tagged", (data) => {
       if (data.taggedUsers.includes(currentUserPhone)) {
         toast.info(
-          `Bạn được tag trong tin nhắn từ ${
-            userMap[data.sender]?.fullName || data.sender
+          `Bạn được tag trong tin nhắn từ ${userMap[data.sender]?.fullName || data.sender
           }`,
           {
             position: "bottom-right",
@@ -324,28 +327,28 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     fetch(`http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}`, {
       method: "GET",
       headers: {
-          "Content-Type": "application/json",
+        "Content-Type": "application/json",
       },
     })
-    .then((res) => res.json())
-    .then((data) => {
+      .then((res) => res.json())
+      .then((data) => {
         setMessages(data);
         const reactionsData = {};
         data.forEach((msg) => {
-            if (msg.reactions) {
-                reactionsData[msg.timestamp] = msg.reactions;
-            }
+          if (msg.reactions) {
+            reactionsData[msg.timestamp] = msg.reactions;
+          }
         });
         setMessageReactions(reactionsData);
         const revoked = data.filter((msg) => msg.isRevoked);
         if (revoked.length > 0) {
-            setRevokedMessages(revoked.map((msg) => msg.timestamp));
+          setRevokedMessages(revoked.map((msg) => msg.timestamp));
         }
-    })
-    .catch((err) => {
+      })
+      .catch((err) => {
         console.error("Lỗi khi lấy tin nhắn:", err);
         toast.error("Không thể lấy tin nhắn!");
-    });
+      });
 
     socket.emit("joinRoom", chatRoom.chatRoomId);
 
@@ -380,8 +383,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
     socket.on("messageReacted", (data) => {
       setMessageReactions((prev) => ({
-          ...prev,
-          [data.messageId]: data.reactions,
+        ...prev,
+        [data.messageId]: data.reactions,
       }));
     });
 
@@ -459,7 +462,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       const filteredMembers = members.filter((member) =>
         member.fullName.toLowerCase().includes(query)
       );
-     setSuggestionList([...suggestions, ...filteredMembers]);
+      setSuggestionList([...suggestions, ...filteredMembers]);
     } else {
       setShowSuggestions(false);
       setSuggestionList([]);
@@ -505,34 +508,34 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
             style={{
               padding: "8px 12px",
               cursor: "pointer",
-              fontWeight: member.phoneNumber === "all" ,
-              
+              fontWeight: member.phoneNumber === "all",
+
               borderBottom: "1px solid #eee",
             }}
             onMouseEnter={(e) => (e.target.style.background = "#f0f0f0")}
             onMouseLeave={(e) => (e.target.style.background = "#fff")}
           >
             <img
-            src={
-              member.phoneNumber === "all"
-                ? chatRoom.avatar || a1 // Use group avatar or default for @All
-                : member.avatar || a1
-            }
-            alt="avatar"
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: "50%",
-              marginRight: 10,
-              objectFit: "cover",
-            }}
-          />
-          <span
-            style={{
-              fontWeight: member.phoneNumber === "all" ? "bold" : "normal",
-              color: member.phoneNumber === "all" ? "#007bff" : "#000",
-            }}
-          ></span>
+              src={
+                member.phoneNumber === "all"
+                  ? chatRoom.avatar || a1 // Use group avatar or default for @All
+                  : member.avatar || a1
+              }
+              alt="avatar"
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                marginRight: 10,
+                objectFit: "cover",
+              }}
+            />
+            <span
+              style={{
+                fontWeight: member.phoneNumber === "all" ? "bold" : "normal",
+                color: member.phoneNumber === "all" ? "#007bff" : "#000",
+              }}
+            ></span>
             {member.fullName}
           </div>
         ))}
@@ -584,10 +587,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       chatId,
       replyTo: replyingTo
         ? {
-            timestamp: replyingTo.timestamp,
-            message: replyingTo.message,
-            sender: replyingTo.sender,
-          }
+          timestamp: replyingTo.timestamp,
+          message: replyingTo.message,
+          sender: replyingTo.sender,
+        }
         : null,
       taggedUsers, // Thêm danh sách người được tag
     };
@@ -698,8 +701,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         const errorData = await response.json();
         console.error("Lỗi Server:", response.status, errorData);
         throw new Error(
-          `Tải file lên thất bại: ${
-            errorData.error || `Mã lỗi: ${response.status}`
+          `Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`
           }`
         );
       }
@@ -877,22 +879,21 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   const renderReactions = (reactions, isRevoked) => {
     if (isRevoked || !reactions || Object.keys(reactions).length === 0) return null;
-  
+
     return (
       <div className="message-reactions">
         {Object.entries(reactions).map(([reaction, users]) => (
           <div
             key={reaction}
-            className={`reaction-badge ${
-              activeReactionTooltip === `${reaction}-${users.join(",")}` ? "active" : ""
-            }`}
-            // onClick={() =>
-            //   setActiveReactionTooltip(
-            //     activeReactionTooltip === `${reaction}-${users.join(",")}`
-            //       ? null
-            //       : `${reaction}-${users.join(",")}`
-            //   )
-            // }
+            className={`reaction-badge ${activeReactionTooltip === `${reaction}-${users.join(",")}` ? "active" : ""
+              }`}
+          // onClick={() =>
+          //   setActiveReactionTooltip(
+          //     activeReactionTooltip === `${reaction}-${users.join(",")}`
+          //       ? null
+          //       : `${reaction}-${users.join(",")}`
+          //   )
+          // }
           >
             {reaction} {users.length}
             <div className="reaction-tooltip">
@@ -955,7 +956,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   // Khi mở modal để edit nhóm hiện tại
   const openEditModal = async () => {
-    if(chatRoom.status === 'DISBANDED'){
+    if (chatRoom.status === 'DISBANDED') {
       toast.error("Nhóm đã bị giải tán, thao tác này đã bị khóa");
       return;
     }
@@ -1039,7 +1040,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       }
       setUserMap(map);
     };
-  
+
     if (messages.length > 0) {
       fetchUsers();
     }
@@ -1124,7 +1125,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 <p className="chat-header_name px-2 m-0">
                   {chatRoom.isGroup
                     ? chatRoom.nameGroup ||
-                      userChatting.map((u) => u.fullName).join(", ")
+                    userChatting.map((u) => u.fullName).join(", ")
                     : userChatting?.[0]?.fullName || "Người lạ"}
                   {chatRoom.status === "DISBANDED" && (
                     <span
@@ -1162,9 +1163,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   <div
                     key={index}
                     id={`message-${msg.timestamp}`}
-                    className={`message ${isSentByCurrentUser ? "sent" : "received"} ${
-                      isHighlighted ? "highlighted" : ""
-                    }`}
+                    className={`message ${isSentByCurrentUser ? "sent" : "received"} ${isHighlighted ? "highlighted" : ""
+                      }`}
                     onMouseEnter={() => setHoveredMessageId(msg.timestamp)}
                     onMouseLeave={() => {
                       setHoveredMessageId(null);
@@ -1201,9 +1201,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                             <span>
                               {msg.replyTo.sender === currentUserPhone
                                 ? "Bạn đã trả lời tin nhắn của mình"
-                                : `Đã trả lời tin nhắn của ${
-                                    userMap[msg.replyTo.sender]?.fullName || "người khác"
-                                  }`}
+                                : `Đã trả lời tin nhắn của ${userMap[msg.replyTo.sender]?.fullName || "người khác"
+                                }`}
                             </span>
                             <p
                               style={{
@@ -1237,41 +1236,41 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                         {renderMessageContent(msg)}
 
                         <div className="message-footer" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                        <span
-                          className="timestamp"
-                          style={{
-                            color: "lightgrey",
-                            fontSize: "12px",
-                          }}
-                        >
-                          {new Date(msg.timestamp).toLocaleString("en-US", {
-                            timeZone: "Asia/Ho_Chi_Minh",
-                            hour: "numeric",
-                            minute: "numeric",
-                            hour12: true,
-                          })}
-                        </span>
-                      </div>
-
-                      {renderReactions(messageReactions[msg.timestamp], msg.isRevoked)}
-
-                      {showReactions === msg.timestamp && (
-                        <div
-                          className="reaction-picker"
-                          onMouseEnter={() => setShowReactions(msg.timestamp)}
-                          onMouseLeave={() => setShowReactions(null)}
-                        >
-                          {["👍", "❤️", "😂", "😮", "😢", "😡"].map((emoji) => (
-                            <button
-                              key={emoji}
-                              onClick={() => handleAddReaction(msg.timestamp, emoji)}
-                              className="reaction-option"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
+                          <span
+                            className="timestamp"
+                            style={{
+                              color: "lightgrey",
+                              fontSize: "12px",
+                            }}
+                          >
+                            {new Date(msg.timestamp).toLocaleString("en-US", {
+                              timeZone: "Asia/Ho_Chi_Minh",
+                              hour: "numeric",
+                              minute: "numeric",
+                              hour12: true,
+                            })}
+                          </span>
                         </div>
-                      )}
+
+                        {renderReactions(messageReactions[msg.timestamp], msg.isRevoked)}
+
+                        {showReactions === msg.timestamp && (
+                          <div
+                            className="reaction-picker"
+                            onMouseEnter={() => setShowReactions(msg.timestamp)}
+                            onMouseLeave={() => setShowReactions(null)}
+                          >
+                            {["👍", "❤️", "😂", "😮", "😢", "😡"].map((emoji) => (
+                              <button
+                                key={emoji}
+                                onClick={() => handleAddReaction(msg.timestamp, emoji)}
+                                className="reaction-option"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
