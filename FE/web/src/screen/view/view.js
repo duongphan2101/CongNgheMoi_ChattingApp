@@ -9,17 +9,18 @@ import "react-toastify/dist/ReactToastify.css";
 
 import a3 from "../../assets/imgs/1.jpg";
 
+// import fetchFriends from "../../API/api_getListFriends";
 import getUser from "../../API/api_getUser";
 import getUserbySearch from "../../API/api_searchUSer";
 import getConversations from "../../API/api_getConversation";
-import checkChatRoom from "../../API/api_checkChatRoom";
+// import checkChatRoom from "../../API/api_checkChatRoom";
 import getChatRoom from "../../API/api_getChatRoombyChatRoomId";
 import "./style.css";
 
 function View({ setIsLoggedIn }) {
   const [currentView, setCurrentView] = useState("chat");
   const [keyWord, setKeyWord] = useState("");
-  const [userChatting, setUserChatting] = useState({});
+  const [userChatting, setUserChatting] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -35,39 +36,39 @@ function View({ setIsLoggedIn }) {
 
   const renderView = () => {
     switch (currentView) {
-        case "chat":
-            return (
-                <Chat
-                    setCurrentView={setCurrentView}
-                    chatRoom={chatRoom || {}}
-                    userChatting={userChatting || []}
-                    user={userInfo || {}}
-                    updateLastMessage={updateLastMessage}
-                />
-            );
-        case "setting":
-            return (
-                <Setting
-                    setCurrentView={setCurrentView}
-                    setIsLoggedIn={setIsLoggedIn}
-                />
-            );
-        case "cloud":
-            return <Cloud setCurrentView={setCurrentView} />;
-        case "contacts":
-            return (
-                <Contacts
-                    setCurrentView={setCurrentView}
-                    friendRequests={friendRequests} // Truyền danh sách lời mời kết bạn
-                    friends={friends} // Truyền danh sách bạn bè
-                    handleAcceptFriendRequest={handleAcceptFriendRequest} // Truyền hàm chấp nhận
-                    handleRejectFriendRequest={handleRejectFriendRequest} // Truyền hàm từ chối
-                />
-            );
-        default:
-            return <Chat setCurrentView={setCurrentView} />;
+      case "chat":
+        return (
+          <Chat
+            setCurrentView={setCurrentView}
+            chatRoom={chatRoom || {}}
+            userChatting={userChatting || []}
+            user={userInfo || {}}
+            updateLastMessage={updateLastMessage}
+          />
+        );
+      case "setting":
+        return (
+          <Setting
+            setCurrentView={setCurrentView}
+            setIsLoggedIn={setIsLoggedIn}
+          />
+        );
+      case "cloud":
+        return <Cloud setCurrentView={setCurrentView} />;
+      case "contacts":
+        return (
+          <Contacts
+            setCurrentView={setCurrentView}
+            friendRequests={friendRequests} // Truyền danh sách lời mời kết bạn
+            friends={friends} // Truyền danh sách bạn bè
+            handleAcceptFriendRequest={handleAcceptFriendRequest} // Truyền hàm chấp nhận
+            handleRejectFriendRequest={handleRejectFriendRequest} // Truyền hàm từ chối
+          />
+        );
+      default:
+        return <Chat setCurrentView={setCurrentView} />;
     }
-};
+  };
 
   const [currentDate] = useState({
     year: new Date().getFullYear(),
@@ -102,69 +103,84 @@ function View({ setIsLoggedIn }) {
     fetchUser();
   }, []);
 
+  const fetchFriends = useCallback(async () => {
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+      toast.error("Vui lòng đăng nhập!");
+      return;
+  }
+
+  try {
+      const response = await fetch("http://localhost:3824/user/friends", {
+          method: "GET",
+          headers: {
+              Authorization: `Bearer ${token}`,
+          },
+      });
+
+      if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
+
+      const data = await response.json();
+      setFriends(data);
+  } catch (error) {
+      
+  }
+}, []);
+
   const fetchFriendRequests = useCallback(async () => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
-        toast.error("Vui lòng đăng nhập!");
-        return;
+      toast.error("Vui lòng đăng nhập!");
+      return;
     }
 
     try {
-        const response = await fetch("http://localhost:3824/user/friendRequests", {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
+      const response = await fetch("http://localhost:3824/user/friendRequests", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        if (!response.ok) throw new Error("Lỗi khi lấy danh sách lời mời kết bạn!");
+      if (!response.ok) throw new Error("Lỗi khi lấy danh sách lời mời kết bạn!");
 
-        const data = await response.json();
+      const data = await response.json();
 
-        // Kiểm tra nếu có lời mời mới
-        if (data.length > friendRequests.length) {
-            setHasNewFriendRequest(true);
-        }
+      // Kiểm tra nếu có lời mời mới
+      if (data.length > friendRequests.length) {
+        setHasNewFriendRequest(true);
+      }
 
-        setFriendRequests(data);
+      setFriendRequests(data);
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách lời mời kết bạn:", error);
-        toast.error("Không thể lấy danh sách lời mời kết bạn!");
+      console.error("Lỗi khi lấy danh sách lời mời kết bạn:", error);
+      toast.error("Không thể lấy danh sách lời mời kết bạn!");
     }
-}, [friendRequests.length]); // Thêm dependency nếu cần
+  }, [friendRequests.length]); // Thêm dependency nếu cần
 
-useEffect(() => {
+  useEffect(() => {
     fetchFriendRequests();
-}, [fetchFriendRequests]);
+  }, [fetchFriendRequests]);
 
 useEffect(() => {
-  const fetchFriends = async () => {
-      const token = localStorage.getItem("accessToken");
-      if (!token) {
-          toast.error("Vui lòng đăng nhập!");
-          return;
-      }
-
-      try {
-          const response = await fetch("http://localhost:3824/user/friends", {
-              method: "GET",
-              headers: {
-                  Authorization: `Bearer ${token}`,
-              },
-          });
-
-          if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
-
-          const data = await response.json();
-          console.log("Friends data:", data); // Kiểm tra dữ liệu trả về
-          setFriends(data);
-      } catch (error) {
-          
-      }
-  };
-
   fetchFriends();
-}, []);
+}, [fetchFriends]);
+
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     fetchFriendRequests();
+  //   }, 2000);
+
+  //   return () => clearInterval(interval); // Cleanup interval on component unmount
+  // }, [fetchFriendRequests]);
+
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     fetchFriends()
+  //   }, 1000);
+
+  //   return () => clearInterval(interval); // Cleanup interval on component unmount
+  // }, [fetchFriends]);
 
   const handleEdit = () => {
     const editData = { ...userInfo };
@@ -182,23 +198,23 @@ useEffect(() => {
       editData.month = defaultDate.getMonth() + 1;
       editData.day = defaultDate.getDate();
     }
-    
+
     setEditInfo(editData);
     setShowEditModal(true);
   };
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
-    
+
     setEditInfo((prev) => {
       const newInfo = { ...prev };
-      
+
       if (name === "year" || name === "month" || name === "day") {
         newInfo[name] = parseInt(value, 10);
       } else {
         newInfo[name] = value;
       }
-      
+
       // Kiểm tra ngày tháng để ngăn ngày tương lai
       if (name === "year" || name === "month") {
         // Nếu năm là năm hiện tại, kiểm tra tháng
@@ -206,9 +222,16 @@ useEffect(() => {
           // Nếu tháng lớn hơn tháng hiện tại, đặt lại thành tháng hiện tại
           if (newInfo.month > currentDate.month) {
             newInfo.month = currentDate.month;
+            if (newInfo.day > currentDate.day) {
+              newInfo.day = currentDate.day;
+            }
+          } else if (newInfo.month === currentDate.month && newInfo.day > currentDate.day) {
+            if (newInfo.day > currentDate.day) {
+              newInfo.day = currentDate.day;
+            }
           }
         }
-        
+
         //kiểm tra xem ngày hiện tại có hợp lệ cho tháng,năm mới kh
         if (newInfo.year && newInfo.month && newInfo.day) {
           const daysInMonth = getDaysInMonth(newInfo.year, newInfo.month);
@@ -217,7 +240,7 @@ useEffect(() => {
           }
         }
       }
-      
+
       if (name === "day") {
         if (newInfo.year === currentDate.year && newInfo.month === currentDate.month) {
           //nếu ngày lớn hơn ngày hiện tại, đặt lại thành ngày hiện tại
@@ -226,7 +249,7 @@ useEffect(() => {
           }
         }
       }
-      
+
       return newInfo;
     });
   };
@@ -334,104 +357,166 @@ useEffect(() => {
     e.preventDefault();
 
     if (!keyWord.trim()) {
-        toast.warning("Vui lòng nhập từ khóa tìm kiếm.");
-        return;
+      toast.warning("Vui lòng nhập từ khóa tìm kiếm.");
+      return;
     }
 
     try {
-        const result = await getUserbySearch(keyWord, keyWord);
+      const result = await getUserbySearch(keyWord, keyWord);
 
-        if (!result || result.length === 0) {
-            toast.warning("Không tìm thấy user!");
-            setUserSearch([]);
-        } else {
-            // Lọc bỏ chính số điện thoại của người dùng
-            const filteredResult = result.filter(
-                (user) => user.phoneNumber !== userInfo.phoneNumber
-            );
+      if (!result || result.length === 0) {
+        toast.warning("Không tìm thấy user!");
+        setUserSearch([]);
+      } else {
+        // Lọc bỏ chính số điện thoại của người dùng
+        const filteredResult = result.filter(
+          (user) => user.phoneNumber !== userInfo.phoneNumber
+        );
 
-            if (filteredResult.length === 0) {
-                toast.warning("Không tìm thấy user phù hợp!");
-            }
-
-            setUserSearch(filteredResult);
-            setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
+        if (filteredResult.length === 0) {
+          toast.warning("Không tìm thấy user phù hợp!");
         }
+
+        setUserSearch(filteredResult);
+        setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
+      }
     } catch (error) {
-        console.error("Lỗi khi gọi API:", error);
-        toast.warning("Lỗi khi tìm kiếm user!");
+      console.error("Lỗi khi gọi API:", error);
+      toast.warning("Lỗi khi tìm kiếm user!");
     }
-};
+  };
 
   const [userChatList, setUserChatList] = useState([]);
+  const [reloadConversations, setReloadConversations] = useState(false);
 
   useEffect(() => {
     if (!userInfo?.phoneNumber) return;
 
     let isMounted = true;
-
     (async () => {
       const data = await getConversations();
       if (!isMounted || !data?.length) return;
 
       const myPhone = userInfo.phoneNumber;
-
       const userData = await Promise.all(
         data.map(async (convo) => {
+          if (convo.isGroup) {
+            return {
+              name: convo.fullName,
+              avatar: convo.avatar,
+              isUnreadBy:
+                Array.isArray(convo.isUnreadBy) &&
+                convo.isUnreadBy.includes(myPhone),
+              lastMessage: convo.lastMessage,
+              lastMessageAt: convo.lastMessageAt, // ⚠️ bạn cần đảm bảo trường này tồn tại
+              isGroup: true,
+              chatRoomId: convo.chatRoomId,
+            };
+          }
+
           const partnerPhone = convo.participants.find((p) => p !== myPhone);
-
           if (!partnerPhone) return null;
-
           const userArray = await getUserbySearch(partnerPhone, "");
           const user = Array.isArray(userArray) ? userArray[0] : userArray;
-
           return user
             ? {
-                ...user,
-                lastMessage: convo.lastMessage,
-                isUnreadBy:
-                  Array.isArray(convo.isUnreadBy) &&
-                  convo.isUnreadBy.includes(myPhone),
-              }
+              ...user,
+              lastMessage: convo.lastMessage,
+              lastMessageAt: convo.lastMessageAt, // ⚠️ cần trường này
+              isUnreadBy:
+                Array.isArray(convo.isUnreadBy) &&
+                convo.isUnreadBy.includes(myPhone),
+              isGroup: false,
+              chatRoomId: convo.chatRoomId,
+            }
             : null;
         })
       );
 
-      setUserChatList(userData.filter((user) => user !== null));
+      const filteredList = userData.filter((u) => u !== null);
+
+      const sortedList = filteredList.sort((a, b) => {
+        const parseTime = (str) => {
+          if (!str) return new Date(0); // fallback cho item không có thời gian
+          const [time, date] = str.split(" ");
+          const [h, m, s] = time.split(":").map(Number);
+          const [d, mo, y] = date.split("/").map(Number);
+          return new Date(y, mo - 1, d, h, m, s);
+        };
+
+        return parseTime(b.lastMessageAt) - parseTime(a.lastMessageAt);
+      });
+
+      setUserChatList(sortedList);
     })();
 
     return () => {
       isMounted = false;
     };
-  }, [userInfo?.phoneNumber]);
+  }, [userInfo?.phoneNumber, reloadConversations]);
 
-  const check = async (phone1, phone2) => {
-    const chatting = await getUserbySearch(phone2, phone2);
-    setUserChatting(chatting);
 
-    const chatId = [phone1, phone2].sort().join("_");
-    const chatRoomId = await checkChatRoom(phone1, phone2);
+  const check = async (phone1, phone2, Id) => {
+    try {
+      const chatting = await getUserbySearch(phone2, "");
+
+      const chatId = [phone1, phone2].sort().join("_");
+      const chatRoomId = Id;
+      console.log("CHat CHat ", chatRoomId)
+      const chatRoomInfo = await getChatRoom(chatRoomId);
+      if (chatRoomInfo.isGroup) {
+        console.warn("Cảnh báo: Chat đơn nhưng trả về chatRoom nhóm!");
+        chatRoomInfo.isGroup = false;
+      }
+
+      setChatRoom(chatRoomInfo);
+      setUserChatting(Array.isArray(chatting) ? [chatting[0]] : []);
+
+      await markAsRead(chatId);
+    } catch (error) {
+      console.error("Lỗi trong check():", error.message);
+    }
+  };
+
+
+  const checkGroup = async (chatRoomId) => {
     const chatRoomInfo = await getChatRoom(chatRoomId);
     setChatRoom(chatRoomInfo);
 
-    // Mark the conversation as read
-    await markAsRead(chatId);
-  };
+    const otherUsers = chatRoomInfo.participants.filter(
+      (phone) => phone !== userInfo.phoneNumber
+    );
 
-  const updateLastMessage = (senderPhone, receiverPhone, lastMessage) => {
-    setUserChatList((prevList) =>
-      prevList.map((conversation) => {
-        if (
-          (conversation.phoneNumber === receiverPhone &&
-            userInfo.phoneNumber === senderPhone) ||
-          (conversation.phoneNumber === senderPhone &&
-            userInfo.phoneNumber === receiverPhone)
-        ) {
-          return { ...conversation, lastMessage };
-        }
-        return conversation;
+    // Lấy thông tin user từ getUserbySearch
+    const users = await Promise.all(
+      otherUsers.map(async (phone) => {
+        const result = await getUserbySearch(phone, "");
+        // Lấy phần tử đầu tiên trong mảng trả về từ getUserbySearch
+        return result.length > 0 ? result[0] : null;
       })
     );
+
+    const usersData = users.filter((user) => user !== null); // Loại bỏ các phần tử null
+
+    setUserChatting(usersData); // Dù là group, vẫn truyền danh sách còn lại
+  };
+
+
+  const updateLastMessage = (chatRoomId, message) => {
+    setUserChatList((prevList) => {
+      const updatedList = prevList.map((conversation) => {
+        if (!conversation || !conversation.chatRoomId) return conversation;
+
+        if (conversation.chatRoomId === chatRoomId) {
+          return { ...conversation, lastMessage: message };
+        }
+        return conversation;
+      });
+
+      const updated = updatedList.find((c) => c?.chatRoomId === chatRoomId);
+      const others = updatedList.filter((c) => c?.chatRoomId !== chatRoomId);
+      return updated ? [updated, ...others] : updatedList;
+    });
   };
 
   const renderLastMessage = (lastMessage) => {
@@ -442,9 +527,9 @@ useEffect(() => {
       if (parsed.name && parsed.url && parsed.size && parsed.type) {
         return "Vừa gửi một file";
       }
-    } catch (e) {}
+    } catch (e) { }
 
-    if (lastMessage.endsWith(".webm")) {
+    if (lastMessage.endsWith(".mp3")) {
       return "Tin nhắn thoại";
     }
 
@@ -478,19 +563,19 @@ useEffect(() => {
 
           return user
             ? {
-                ...user,
-                lastMessage: convo.lastMessage,
-                isUnreadBy:
-                  Array.isArray(convo.isUnreadBy) &&
-                  convo.isUnreadBy.includes(myPhone),
-              }
+              ...user,
+              lastMessage: convo.lastMessage,
+              isUnreadBy:
+                Array.isArray(convo.isUnreadBy) &&
+                convo.isUnreadBy.includes(myPhone),
+            }
             : null;
         })
       );
 
       setUserChatList(updatedUserData.filter((user) => user !== null));
     } catch (error) {
-      console.error("❌ Lỗi khi cập nhật trạng thái đọc:", error);
+      console.error("Lỗi khi cập nhật trạng thái đọc:", error);
     }
   };
 
@@ -523,7 +608,7 @@ useEffect(() => {
         return; // không tạo lại nữa
       }
 
-      const chatRoomId = `c${Math.floor(100 + Math.random() * 90000)}`;
+      const chatRoomId = `C${Math.floor(100 + Math.random() * 90000)}`;
 
       const chatRoomData = {
         chatRoomId,
@@ -591,7 +676,7 @@ useEffect(() => {
         toast.error("Vui lòng đăng nhập để gửi yêu cầu kết bạn!");
         return;
       }
-  
+
       const response = await fetch("http://localhost:3824/user/sendFriendRequest", {
         method: "POST",
         headers: {
@@ -600,9 +685,9 @@ useEffect(() => {
         },
         body: JSON.stringify({ receiverPhone }),
       });
-  
+
       if (!response.ok) throw new Error("Gửi yêu cầu kết bạn thất bại!");
-  
+
       toast.success("Gửi yêu cầu kết bạn thành công!");
     } catch (error) {
       console.error("Lỗi gửi yêu cầu kết bạn:", error);
@@ -613,56 +698,56 @@ useEffect(() => {
   const handleAcceptFriendRequest = async (requestId) => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
-        toast.error("Vui lòng đăng nhập!");
-        return;
+      toast.error("Vui lòng đăng nhập!");
+      return;
     }
 
     try {
-        const response = await fetch("http://localhost:3824/user/acceptFriendRequest", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ requestId }),
-        });
+      const response = await fetch("http://localhost:3824/user/acceptFriendRequest", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ requestId }),
+      });
 
-        if (!response.ok) throw new Error("Chấp nhận lời mời kết bạn thất bại!");
+      if (!response.ok) throw new Error("Chấp nhận lời mời kết bạn thất bại!");
 
-        toast.success("Đã chấp nhận lời mời kết bạn!");
-        fetchFriendRequests(); // Cập nhật lại danh sách lời mời
+      toast.success("Đã chấp nhận lời mời kết bạn!");
+      fetchFriendRequests(); // Cập nhật lại danh sách lời mời
     } catch (error) {
-        console.error("Lỗi khi chấp nhận lời mời kết bạn:", error);
-        toast.error("Không thể chấp nhận lời mời kết bạn!");
+      console.error("Lỗi khi chấp nhận lời mời kết bạn:", error);
+      toast.error("Không thể chấp nhận lời mời kết bạn!");
     }
-};
+  };
 
-const handleRejectFriendRequest = async (requestId) => {
+  const handleRejectFriendRequest = async (requestId) => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
-        toast.error("Vui lòng đăng nhập!");
-        return;
+      toast.error("Vui lòng đăng nhập!");
+      return;
     }
 
     try {
-        const response = await fetch("http://localhost:3824/user/rejectFriendRequest", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ requestId }),
-        });
+      const response = await fetch("http://localhost:3824/user/rejectFriendRequest", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ requestId }),
+      });
 
-        if (!response.ok) throw new Error("Từ chối lời mời kết bạn thất bại!");
+      if (!response.ok) throw new Error("Từ chối lời mời kết bạn thất bại!");
 
-        toast.success("Đã từ chối lời mời kết bạn!");
-        fetchFriendRequests(); // Cập nhật lại danh sách lời mời
+      toast.success("Đã từ chối lời mời kết bạn!");
+      fetchFriendRequests(); // Cập nhật lại danh sách lời mời
     } catch (error) {
-        console.error("Lỗi khi từ chối lời mời kết bạn:", error);
-        toast.error("Không thể từ chối lời mời kết bạn!");
+      console.error("Lỗi khi từ chối lời mời kết bạn:", error);
+      toast.error("Không thể từ chối lời mời kết bạn!");
     }
-};
+  };
 
   return (
     <div className="wrapper">
@@ -686,69 +771,69 @@ const handleRejectFriendRequest = async (requestId) => {
             <div className="search_theme" ref={searchRef}>
               <ul className="m-0 p-0" style={{ flex: 1 }}>
                 {userSearch.map((user, index) => {
-    const isFriend = friends.some((friend) => friend.phoneNumber === user.phoneNumber);
+                  const isFriend = friends.some((friend) => friend.phoneNumber === user.phoneNumber);
 
-    return (
-        <li
-            key={user.id || user.phoneNumber || index}
-            style={{
-                listStyleType: "none",
-                width: "100%",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                padding: "10px",
-                borderRadius: "8px",
-                transition: "background 0.2s ease-in-out",
-                justifyContent: "space-between", // Thêm để căn nút sang phải
-            }}
-            onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#222")
-            }
-            onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "transparent")
-            }
-        >
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                }}
-                onClick={() =>
-                    handleUserClick(userInfo.phoneNumber, user.phoneNumber)
-                }
-            >
-                <img
-                    className="user-avt"
-                    src={user?.avatar}
-                    alt="Avatar"
-                    style={{
-                        width: "40px",
-                        height: "40px",
-                        borderRadius: "50%",
-                    }}
-                />
-                <span
-                    className="mx-4"
-                    style={{ fontSize: "16px", fontWeight: "500" }}
-                >
-                    {user.fullName}
-                </span>
-            </div>
-            {!isFriend && ( // Chỉ hiển thị nút "Thêm bạn" nếu chưa kết bạn
-                <button
-                    className="btn btn-primary btn-sm"
-                    onClick={(e) => {
-                        e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
-                        handleSendFriendRequest(user.phoneNumber);
-                    }}
-                >
-                    Thêm bạn
-                </button>
-            )}
-        </li>
-    );
-})}
+                  return (
+                    <li
+                      key={user.id || user.phoneNumber || index}
+                      style={{
+                        listStyleType: "none",
+                        width: "100%",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        transition: "background 0.2s ease-in-out",
+                        justifyContent: "space-between", // Thêm để căn nút sang phải
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = "#222")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "transparent")
+                      }
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                        onClick={() =>
+                          handleUserClick(userInfo.phoneNumber, user.phoneNumber)
+                        }
+                      >
+                        <img
+                          className="user-avt"
+                          src={user?.avatar}
+                          alt="Avatar"
+                          style={{
+                            width: "40px",
+                            height: "40px",
+                            borderRadius: "50%",
+                          }}
+                        />
+                        <span
+                          className="mx-4"
+                          style={{ fontSize: "16px", fontWeight: "500" }}
+                        >
+                          {user.fullName}
+                        </span>
+                      </div>
+                      {!isFriend && ( // Chỉ hiển thị nút "Thêm bạn" nếu chưa kết bạn
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
+                            handleSendFriendRequest(user.phoneNumber);
+                          }}
+                        >
+                          Thêm bạn
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -757,18 +842,28 @@ const handleRejectFriendRequest = async (requestId) => {
         {/* User List */}
         <div className="user-list">
           {userChatList.length > 0 ? (
-            userChatList.map((user, index) => (
+            userChatList.map((user) => (
               <div
                 className="user"
-                key={index}
+                key={user.chatRoomId}
                 onClick={async () => {
-                  await markAsRead(user.chatId);
-                  check(userInfo.phoneNumber, user.phoneNumber);
+
+                  if (user.isGroup) {
+                    await checkGroup(user.chatRoomId);
+                  } else if (user.phoneNumber) {
+                    await check(userInfo.phoneNumber, user.phoneNumber, user.chatRoomId);
+                  }
+
+                  setReloadConversations((prev) => !prev);
                 }}
               >
                 <img className="user-avt" src={user.avatar} alt="User" />
                 <div>
-                  <strong>{user.fullName || "Chưa Cập Nhật"}</strong>
+                  <strong>
+                    {user.isGroup
+                      ? user.name || "Nhóm chưa đặt tên"
+                      : user.fullName || "Chưa cập nhật"}
+                  </strong>
                   <br />
                   <small className={user.isUnreadBy ? "bold-message" : ""}>
                     {renderLastMessage(user.lastMessage)}
@@ -777,12 +872,12 @@ const handleRejectFriendRequest = async (requestId) => {
               </div>
             ))
           ) : (
-            <p style={{
-              padding: "0 50px",
-            }}>
-              Hãy tìm bạn bè bằng số điện thoại và trò chuyện với họ ngay nào!</p>
+            <p style={{ padding: "0 50px" }}>
+              Hãy tìm bạn bè bằng số điện thoại và trò chuyện với họ ngay nào!
+            </p>
           )}
         </div>
+
 
         <div className="sidebar-bottom d-flex justify-content-around align-items-center">
           <button
@@ -815,31 +910,31 @@ const handleRejectFriendRequest = async (requestId) => {
             )}
           </div>
           <button
-    className={`sidebar-bottom-btn btn ${hasNewFriendRequest ? "active" : ""}`}
-    onClick={() => {
-        setCurrentView("contacts");
-        setHasNewFriendRequest(false); // Xóa trạng thái lời mời mới khi người dùng vào trang "Contacts"
-    }}
-    style={{ position: "relative" }}
->
-    <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i>
-    {hasNewFriendRequest && (
-        <span
-            style={{
-                position: "absolute",
-                top: "5px",
-                right: "5px",
-                backgroundColor: "red",
-                color: "white",
-                borderRadius: "50%",
-                padding: "2px 6px",
-                fontSize: "12px",
+            className={`sidebar-bottom-btn btn ${hasNewFriendRequest ? "active" : ""}`}
+            onClick={() => {
+              setCurrentView("contacts");
+              setHasNewFriendRequest(false);
             }}
-        >
-            !
-        </span>
-    )}
-</button>
+            style={{ position: "relative" }}
+          >
+            <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i>
+            {hasNewFriendRequest && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "5px",
+                  right: "5px",
+                  backgroundColor: "red",
+                  color: "white",
+                  borderRadius: "50%",
+                  padding: "2px 6px",
+                  fontSize: "12px",
+                }}
+              >
+                !
+              </span>
+            )}
+          </button>
           {/* <button
             className="sidebar-bottom-btn btn"
             onClick={() => setCurrentView("cloud")}
@@ -945,8 +1040,8 @@ const handleRejectFriendRequest = async (requestId) => {
                       {userInfo?.gender === "Male"
                         ? "Nam"
                         : userInfo?.gender === "Female"
-                        ? "Nữ"
-                        : "Chưa cập nhật"}
+                          ? "Nữ"
+                          : "Chưa cập nhật"}
                     </strong>
                   </p>
                   <p>
@@ -1008,34 +1103,34 @@ const handleRejectFriendRequest = async (requestId) => {
                   <div className="mb-3">
                     <label className="form-label">Giới tính</label>
                     <div>
-                    <div className="form-check form-check-inline">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        name="gender"
-                        id="genderMale"
-                        value="Male"
-                        checked={editInfo?.gender === "Male"}
-                        onChange={handleEditChange}
-                      />
-                      <label className="form-check-label" htmlFor="genderMale">
-                        Nam
-                      </label>
-                    </div>
-                    <div className="form-check form-check-inline">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        name="gender"
-                        id="genderFemale"
-                        value="Female"
-                        checked={editInfo?.gender === "Female"}
-                        onChange={handleEditChange}
-                      />
-                      <label className="form-check-label" htmlFor="genderFemale">
-                        Nữ
-                      </label>
-                    </div>
+                      <div className="form-check form-check-inline">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="gender"
+                          id="genderMale"
+                          value="Male"
+                          checked={editInfo?.gender === "Male"}
+                          onChange={handleEditChange}
+                        />
+                        <label className="form-check-label" htmlFor="genderMale">
+                          Nam
+                        </label>
+                      </div>
+                      <div className="form-check form-check-inline">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="gender"
+                          id="genderFemale"
+                          value="Female"
+                          checked={editInfo?.gender === "Female"}
+                          onChange={handleEditChange}
+                        />
+                        <label className="form-check-label" htmlFor="genderFemale">
+                          Nữ
+                        </label>
+                      </div>
                     </div>
                   </div>
                   <div className="mb-3">
@@ -1048,12 +1143,12 @@ const handleRejectFriendRequest = async (requestId) => {
                         onChange={handleEditChange}
                       >
                         <option value="" disabled>Ngày</option>
-                        {editInfo.year && editInfo.month ? 
+                        {editInfo.year && editInfo.month ?
                           Array.from({ length: getDaysInMonth(editInfo.year, editInfo.month) }, (_, i) => {
                             const day = i + 1;
-                            const isDisabled = editInfo.year === currentDate.year && 
-                                              editInfo.month === currentDate.month && 
-                                              day > currentDate.day;
+                            const isDisabled = editInfo.year === currentDate.year &&
+                              editInfo.month === currentDate.month &&
+                              day > currentDate.day;
                             return (
                               <option key={day} value={day} disabled={isDisabled}>
                                 {day}
@@ -1064,9 +1159,9 @@ const handleRejectFriendRequest = async (requestId) => {
                           // Mặc định hiển thị 31 ngày nếu chưa chọn tháng hoặc năm
                           Array.from({ length: 31 }, (_, i) => {
                             const day = i + 1;
-                            const isDisabled = editInfo.year === currentDate.year && 
-                                              editInfo.month === currentDate.month && 
-                                              day > currentDate.day;
+                            const isDisabled = editInfo.year === currentDate.year &&
+                              editInfo.month === currentDate.month &&
+                              day > currentDate.day;
                             return (
                               <option key={day} value={day} disabled={isDisabled}>
                                 {day}

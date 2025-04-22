@@ -1,12 +1,16 @@
-import React, { useState } from "react";
+import React, { useState} from "react";
 import "./contacts_style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
+import axios from "axios";
+
+const BASE_URL = "localhost";
 
 function Contacts({
   friendRequests,
   friends,
   handleAcceptFriendRequest,
   handleRejectFriendRequest,
+  setFriends,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -16,7 +20,45 @@ function Contacts({
     contact.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  console.log("Friends in Contacts:", friends);
+  const handleUnfriend = async (friendPhone) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        alert("Vui lòng đăng nhập!");
+        return;
+      }
+
+      console.log("Đang gửi yêu cầu hủy kết bạn với:", friendPhone);
+      console.log("Token:", token);
+
+      const response = await axios.post(
+        `http://${BASE_URL}:3824/user/unfriend`,
+        { friendPhone },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log("Response từ server:", response.data);
+
+      if (response.data.message === "Đã hủy kết bạn thành công!") {
+        // Cập nhật UI bằng cách reload trang
+    
+        alert("Đã hủy kết bạn!");
+      }
+    } catch (error) {
+      console.error("Lỗi hủy kết bạn:", error);
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+        console.error("Response status:", error.response.status);
+        console.error("Response headers:", error.response.headers);
+      }
+      alert("Không thể hủy kết bạn! Vui lòng thử lại sau.");
+    }
+  };
 
   return (
     <div className="chat-box container">
@@ -40,25 +82,25 @@ function Contacts({
       </div>
 
       {/* Hiển thị danh sách lời mời kết bạn */}
-      <div className="friend-requests mt-4">
-        <h5 className="text-light">Lời mời kết bạn</h5>
+      <div className="friend-requests">
+        <h5>Lời mời kết bạn</h5>
         {friendRequests && friendRequests.length > 0 ? (
           <ul className="list-group">
             {friendRequests.map((request) => (
               <li
                 key={request.RequestId} // Đảm bảo RequestId là duy nhất
-                className="list-group-item d-flex justify-content-between align-items-center"
+                className="list-group-item"
               >
                 <span>{request.senderPhone}</span>
                 <div>
                   <button
-                    className="btn btn-success btn-sm me-2"
+                    className="btn btn-success me-2"
                     onClick={() => handleAcceptFriendRequest(request.RequestId)}
                   >
                     Chấp nhận
                   </button>
                   <button
-                    className="btn btn-danger btn-sm"
+                    className="btn btn-danger"
                     onClick={() => handleRejectFriendRequest(request.RequestId)}
                   >
                     Từ chối
@@ -77,19 +119,26 @@ function Contacts({
         <h5 className="text-light">Danh sách bạn bè</h5>
         {friends.length > 0 ? (
           friends.map((friend) => (
-            <div key={friend.id} className="contact-item"> {/* Đảm bảo friend.id là duy nhất */}
+            <div key={friend.phoneNumber} className="contact-item">
               <div className="d-flex align-items-center">
                 <div className="contact-avatar">
                   <img
-                    src={friend.avatar || "default-avatar.png"} // Hiển thị avatar mặc định nếu không có
-                    alt={friend.fullName || "Unknown"} // Hiển thị tên mặc định nếu không có
+                    src={friend.avatar || "default-avatar.png"}
+                    alt={friend.fullName || "Unknown"}
                     className="user-avt"
                   />
                 </div>
                 <div className="contact-info">
                   <h5 className="mb-0">{friend.fullName || "Không rõ"}</h5>
+                  <small>{friend.phoneNumber}</small>
                 </div>
               </div>
+              <button 
+                className="unfriend-button"
+                onClick={() => handleUnfriend(friend.phoneNumber)}
+              >
+                Hủy kết bạn
+              </button>
             </div>
           ))
         ) : (

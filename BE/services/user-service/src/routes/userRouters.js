@@ -3,9 +3,11 @@ const jwt = require("jsonwebtoken");
 const AWS = require("aws-sdk");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
+const socketIO = require('socket.io');
 require("dotenv").config();
 
 const router = express.Router();
+const io = socketIO();
 
 AWS.config.update({
   region: process.env.AWS_REGION,
@@ -288,7 +290,7 @@ router.post("/sendFriendRequest", async (req, res) => {
         .json({ message: "Thiếu số điện thoại người nhận!" });
     }
 
-    const requestId = generateRequestId(); // Sử dụng hàm để tạo requestId
+    const requestId = generateRequestId();
     const params = {
       TableName: "FriendRequests",
       Item: {
@@ -301,6 +303,16 @@ router.post("/sendFriendRequest", async (req, res) => {
     };
 
     await dynamoDB.put(params).promise();
+
+    // Gửi sự kiện realtime
+    io.emit('newFriendRequest', {
+      RequestId: requestId,
+      senderPhone,
+      receiverPhone,
+      status: "PENDING",
+      createdAt: new Date().toISOString(),
+    });
+
     res
       .status(200)
       .json({ message: "Gửi yêu cầu kết bạn thành công!", requestId });
@@ -384,6 +396,13 @@ router.post("/acceptFriendRequest", async (req, res) => {
       dynamoDB.update(addFriendToSenderParams).promise(),
     ]);
 
+    // // Gửi sự kiện realtime
+    // io.emit('friendRequestAccepted', {
+    //   RequestId: requestId,
+    //   senderPhone: friendRequest.senderPhone,
+    //   receiverPhone: friendRequest.receiverPhone,
+    // });
+
     res.status(200).json({ message: "Chấp nhận yêu cầu kết bạn thành công!" });
   } catch (error) {
     console.error("Lỗi chấp nhận yêu cầu kết bạn:", error);
@@ -437,7 +456,6 @@ router.post("/rejectFriendRequest", async (req, res) => {
 
     await dynamoDB.update(updateRequestParams).promise();
 
-    res.status(200).json({ message: "Đã từ chối yêu cầu kết bạn!" });
   } catch (error) {
     console.error("Lỗi từ chối yêu cầu kết bạn:", error);
     res.status(500).json({ message: "Lỗi server!", error: error.message });
@@ -471,7 +489,6 @@ router.get("/friends", async (req, res) => {
         Key: { phoneNumber: friendPhone },
       };
       const { Item: friend } = await dynamoDB.get(friendParams).promise();
-      console.log("Friend data:", friend); // Kiểm tra dữ liệu của từng bạn bè
       return friend
         ? {
             phoneNumber: friend.phoneNumber,
@@ -489,6 +506,73 @@ router.get("/friends", async (req, res) => {
     res.status(200).json(validFriends);
   } catch (error) {
     console.error("Lỗi lấy danh sách bạn bè:", error);
+    res.status(500).json({ message: "Lỗi server!", error: error.message });
+  }
+});
+
+// API: Hủy kết bạn
+router.post("/unfriend", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Không có token!" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const currentUserPhone = decoded.phoneNumber;
+
+    const { friendPhone } = req.body;
+    if (!friendPhone) {
+      return res.status(400).json({ message: "Thiếu số điện thoại người bạn!" });
+    }
+
+    // Lấy danh sách bạn bè của người dùng hiện tại
+    const getCurrentUserParams = {
+      TableName: "Users",
+      Key: { phoneNumber: currentUserPhone },
+    };
+    const { Item: currentUser } = await dynamoDB.get(getCurrentUserParams).promise();
+
+    if (!currentUser || !currentUser.friends || !currentUser.friends.includes(friendPhone)) {
+      return res.status(404).json({ message: "Người này không phải là bạn của bạn!" });
+    }
+
+    // Lấy danh sách bạn bè của người bạn
+    const getFriendParams = {
+      TableName: "Users",
+      Key: { phoneNumber: friendPhone },
+    };
+    const { Item: friend } = await dynamoDB.get(getFriendParams).promise();
+
+    if (!friend || !friend.friends || !friend.friends.includes(currentUserPhone)) {
+      return res.status(404).json({ message: "Người này không phải là bạn của bạn!" });
+    }
+
+    // Xóa bạn bè khỏi danh sách của người dùng hiện tại
+    const updateCurrentUserParams = {
+      TableName: "Users",
+      Key: { phoneNumber: currentUserPhone },
+      UpdateExpression: "SET friends = :friends",
+      ExpressionAttributeValues: {
+        ":friends": currentUser.friends.filter(phone => phone !== friendPhone)
+      },
+    };
+
+    // Xóa bạn bè khỏi danh sách của người bạn
+    const updateFriendParams = {
+      TableName: "Users",
+      Key: { phoneNumber: friendPhone },
+      UpdateExpression: "SET friends = :friends",
+      ExpressionAttributeValues: {
+        ":friends": friend.friends.filter(phone => phone !== currentUserPhone)
+      },
+    };
+
+    await Promise.all([
+      dynamoDB.update(updateCurrentUserParams).promise(),
+      dynamoDB.update(updateFriendParams).promise()
+    ]);
+
+  } catch (error) {
+    console.error("Lỗi hủy kết bạn:", error);
     res.status(500).json({ message: "Lỗi server!", error: error.message });
   }
 });

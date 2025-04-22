@@ -20,8 +20,7 @@ import PrivateRoute from "./components/PrivateRoute";
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentView, setCurrentView] = useState("login");
-  console.log("isLoggedIn", isLoggedIn);
-
+  console.log(isLoggedIn)
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     setIsLoggedIn(!!token);
