@@ -1577,7 +1577,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           >
             <div className="modal-content p-0">
               <div className="modal-header d-flex justify-content-between align-items-center">
-                {/* <h5 className="modal-title">Tạo Nhóm</h5> */}
+                <h5 className="modal-title">Thêm thành viên</h5>
                 <button
                   type="button"
                   className="btn-close"
@@ -1586,18 +1586,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
               </div>
 
               <div className="modal-body">
-                {/* Input tên nhóm */}
-                <div className="mb-3">
-                  <label className="form-label fw-bold">Tên nhóm</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Nhập tên nhóm..."
-                    value={nameGroup}
-                    onChange={(e) => setNameGroup(e.target.value)}
-                  />
-                </div>
-
                 {/* Thành viên nhóm */}
                 <div className="mb-3">
                   <p className="fw-bold">
@@ -1809,9 +1797,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
         >
           <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Đổi tên nhóm</h5>
+            <div className="modal-content p-0">
+              <div className="modal-header d-flex align-items-center">
+                <h5 className="modal-title flex-grow-1">Đổi tên nhóm</h5>
                 <button
                   type="button"
                   className="btn-close"
@@ -1822,9 +1810,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
               <form onSubmit={handleUpdateGroupName}>
                 <div className="modal-body">
                   <div className="mb-3">
-                    <label htmlFor="groupName" className="form-label fw-bold">
-                      Tên nhóm mới
-                    </label>
                     <input
                       type="text"
                       className="form-control"
@@ -1855,7 +1840,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                     className="btn btn-primary"
                     disabled={!newGroupName.trim()}
                   >
-                    Lưu thay đổi
+                    Xác nhận
                   </button>
                 </div>
               </form>

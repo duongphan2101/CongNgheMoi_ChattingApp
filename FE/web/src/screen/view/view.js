@@ -12,15 +12,15 @@ import getUser from "../../API/api_getUser";
 import getUserInfo from "../../API/api_getUser";
 import getUserbySearch from "../../API/api_searchUSer";
 import getConversations from "../../API/api_getConversation";
+import createChatRoom from "../../API/api_createChatRoom";
 import checkChatRoom from "../../API/api_checkChatRoom";
 import getChatRoom from "../../API/api_getChatRoombyChatRoomId";
 import "./style.css";
-import createChatRoom from "../../API/api_createChatRoomforGroup";
+import createChatRoomGroup from "../../API/api_createChatRoomforGroup";
 import useFetchUserChatList from "../../hooks/refetch_Conversation.js";
 
 const socket = io("http://localhost:3618");
 const notificationSocket = io("http://localhost:3515");
-
 
 function View({ setIsLoggedIn }) {
   const [currentView, setCurrentView] = useState("chat");
@@ -45,6 +45,12 @@ function View({ setIsLoggedIn }) {
   const [nameGroup, setNameGroup] = useState("");
   const [listAddtoGroup, setListAddtoGroup] = useState([]);
   const [thisUser, setThisUser] = useState(null);
+  const [selectedChatRoomId, setSelectedChatRoomId] = useState(null);
+  const optionsRef = useRef(null);
+
+  const toggleOptions = (chatRoomId) => {
+    setSelectedChatRoomId((prev) => (prev === chatRoomId ? null : chatRoomId));
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -121,15 +127,15 @@ function View({ setIsLoggedIn }) {
           const user = Array.isArray(userArray) ? userArray[0] : userArray;
           return user
             ? {
-              ...user,
-              lastMessage: convo.lastMessage,
-              lastMessageAt: convo.lastMessageAt, // ⚠️ cần trường này
-              isUnreadBy:
-                Array.isArray(convo.isUnreadBy) &&
-                convo.isUnreadBy.includes(myPhone),
-              isGroup: false,
-              chatRoomId: convo.chatRoomId,
-            }
+                ...user,
+                lastMessage: convo.lastMessage,
+                lastMessageAt: convo.lastMessageAt, // ⚠️ cần trường này
+                isUnreadBy:
+                  Array.isArray(convo.isUnreadBy) &&
+                  convo.isUnreadBy.includes(myPhone),
+                isGroup: false,
+                chatRoomId: convo.chatRoomId,
+              }
             : null;
         })
       );
@@ -165,7 +171,9 @@ function View({ setIsLoggedIn }) {
       if (data.createdBy !== thisUser.phoneNumber) {
         const u = await getUserbySearch(data.createdBy, "");
         playNotificationSound();
-        toast.success(`${u[0]?.fullName || "Ai đó"} đã thêm bạn vào nhóm ${data.groupName}`);
+        toast.success(
+          `${u[0]?.fullName || "Ai đó"} đã thêm bạn vào nhóm ${data.groupName}`
+        );
       }
 
       const newChatRoom = {
@@ -181,7 +189,9 @@ function View({ setIsLoggedIn }) {
 
       setUserChatList((prevList) => {
         // Nếu đã có trong list thì không thêm lại
-        const existed = prevList.some((room) => room.chatRoomId === newChatRoom.chatRoomId);
+        const existed = prevList.some(
+          (room) => room.chatRoomId === newChatRoom.chatRoomId
+        );
         if (existed) return prevList;
 
         const updatedList = [newChatRoom, ...prevList];
@@ -239,8 +249,7 @@ function View({ setIsLoggedIn }) {
     }
 
     try {
-
-      await createChatRoom({
+      await createChatRoomGroup({
         nameGroup,
         createdBy: userInfo.phoneNumber,
         participants: listAddtoGroup,
@@ -407,7 +416,7 @@ function View({ setIsLoggedIn }) {
   }, [currentView]);
 
   useEffect(() => {
-    if (currentView === 'contacts') {
+    if (currentView === "contacts") {
       const interval = setInterval(() => {
         fetchFriendRequests();
         fetchFriends();
@@ -834,46 +843,42 @@ function View({ setIsLoggedIn }) {
       const sortedPhones = [currentUserPhone, targetUserPhone].sort();
       const chatId = `${sortedPhones[0]}_${sortedPhones[1]}`;
 
-      // Kiểm tra Conversation đã tồn tại
-      const checkRes = await fetch(
-        "http://localhost:3618/checkConversationExist",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ chatId }),
-        }
+      // Kiểm tra ChatRoom đã tồn tại
+      const checkChatRoomRes = await fetch(
+        `http://localhost:3618/checkChatRoom?myPhone=${currentUserPhone}&userPhone=${targetUserPhone}`
       );
 
-      const checkData = await checkRes.json();
+      const checkChatRoomData = await checkChatRoomRes.json();
 
-      if (checkData.exists) {
-        console.log("Conversation đã tồn tại với chatId:", checkData.chatId);
-        return checkData.chatRoomId; // Trả về chatRoomId nếu đã tồn tại
+      console.log("checkChatRoomData",checkChatRoomData)
+
+      let chatRoomId;
+
+      if (checkChatRoomData?.chatRoomId) {
+        console.log(
+          "ChatRoom đã tồn tại với chatRoomId:",
+          checkChatRoomData.chatRoomId
+        );
+        chatRoomId = checkChatRoomData.chatRoomId; // Sử dụng ChatRoom đã tồn tại
+      } else {
+        // Tạo mới ChatRoom nếu chưa tồn tại
+        chatRoomId = `C${Math.floor(100 + Math.random() * 90000)}`;
+        const chatRoomData = {
+          chatRoomId,
+          isGroup: false,
+          participants: [currentUserPhone, targetUserPhone],
+        };
+
+        const createdChatRoom = await createChatRoom(chatRoomData);
+
+        if (!createdChatRoom) {
+          throw new Error("Tạo ChatRoom thất bại!");
+        }
+
+        console.log("ChatRoom mới đã được tạo với chatRoomId:", chatRoomId);
       }
 
-      // Tạo ChatRoom
-      const chatRoomId = `C${Math.floor(100 + Math.random() * 90000)}`;
-      const chatRoomData = {
-        chatRoomId,
-        isGroup: false,
-        participants: [currentUserPhone, targetUserPhone],
-      };
-
-      const chatRoomRes = await fetch("http://localhost:3618/createChatRoom", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(chatRoomData),
-      });
-
-      if (!chatRoomRes.ok) {
-        throw new Error("Tạo ChatRoom thất bại!");
-      }
-
-      // Tạo Conversation
+      // Tạo mới Conversation
       const conversationData = {
         chatId,
         chatRoomId,
@@ -895,10 +900,10 @@ function View({ setIsLoggedIn }) {
         throw new Error("Tạo Conversation thất bại!");
       }
 
-      console.log("ChatRoom và Conversation đã được tạo thành công!");
-      return chatRoomId; // Trả về chatRoomId sau khi tạo thành công
+      console.log("Conversation đã được tạo thành công!");
+      return chatRoomId; // Trả về chatRoomId
     } catch (error) {
-      console.error("Lỗi khi tạo ChatRoom và Conversation:", error);
+      console.error("Lỗi khi xử lý ChatRoom và Conversation:", error);
       return null; // Trả về null nếu có lỗi
     }
   };
@@ -915,22 +920,23 @@ function View({ setIsLoggedIn }) {
 
   useEffect(() => {
     if (!socket || !userInfo?.phoneNumber) return;
-  
+
     socket.emit("joinUser", userInfo.phoneNumber);
-  
+
     const handleGroupCreated = async (data) => {
       console.log("Nhóm mới được tạo:", data);
-  
+
       try {
         const response = await fetch("http://localhost:3618/chatRooms", {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         });
-  
-        if (!response.ok) throw new Error("Không thể tải danh sách cuộc trò chuyện!");
-  
+
+        if (!response.ok)
+          throw new Error("Không thể tải danh sách cuộc trò chuyện!");
+
         const chatRooms = await response.json();
-  
+
         const updatedUserChatList = chatRooms.map((chatRoom) => {
           if (chatRoom.isGroup) {
             return {
@@ -946,7 +952,7 @@ function View({ setIsLoggedIn }) {
             const otherUserPhone = chatRoom.participants.find(
               (phone) => phone !== userInfo.phoneNumber
             );
-  
+
             return {
               fullName: otherUserPhone || "Chưa cập nhật",
               avatar: chatRoom.avatar,
@@ -959,20 +965,19 @@ function View({ setIsLoggedIn }) {
             };
           }
         });
-  
+
         setUserChatList(updatedUserChatList);
       } catch (error) {
         console.error("Lỗi khi tải danh sách cuộc trò chuyện:", error);
       }
     };
-  
+
     socket.on("groupCreated", handleGroupCreated);
-  
+
     return () => {
       socket.off("groupCreated", handleGroupCreated); // Dọn sạch chính xác callback
     };
   }, [userInfo?.phoneNumber]);
-  
 
   // Ẩn danh sách khi nhấn ra ngoài
   useEffect(() => {
@@ -980,8 +985,13 @@ function View({ setIsLoggedIn }) {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setIsSearchVisible(false); // Ẩn danh sách khi nhấn ra ngoài
       }
+      if (
+        !event.target.closest(".options-menu") &&
+        !event.target.closest(".options-btn")
+      ) {
+        setSelectedChatRoomId(null); // Đóng menu khi nhấn ra ngoài
+      }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -1075,6 +1085,35 @@ function View({ setIsLoggedIn }) {
     }
   };
 
+  // Hàm xử lý xóa hội thoại
+  const handleDeleteConversation = async (chatRoomId) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3618/deleteConversation/${chatRoomId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Xóa hội thoại thất bại!");
+      }
+
+      // Cập nhật danh sách hội thoại sau khi xóa
+      setUserChatList((prevList) =>
+        prevList.filter((user) => user.chatRoomId !== chatRoomId)
+      );
+
+      toast.success("Xóa hội thoại thành công!");
+    } catch (error) {
+      console.error("Lỗi khi xóa hội thoại:", error);
+      toast.error("Không thể xóa hội thoại!");
+    }
+  };
+
   // Thêm useEffect để lắng nghe sự kiện newConversation
   useEffect(() => {
     if (!userInfo?.phoneNumber) return;
@@ -1127,9 +1166,15 @@ function View({ setIsLoggedIn }) {
     <div className="wrapper">
       {/* Sidebar */}
       <div className="sidebar">
-        <div className="sidebar-header row m-0" style={{ position: "relative" }}>
+        <div
+          className="sidebar-header row m-0"
+          style={{ position: "relative" }}
+        >
           <div className="col-11 p-0">
-            <form className="sidebar-header_search" onSubmit={handleGetUserbyKey}>
+            <form
+              className="sidebar-header_search"
+              onSubmit={handleGetUserbyKey}
+            >
               <input
                 type="search"
                 placeholder="Search..."
@@ -1142,13 +1187,13 @@ function View({ setIsLoggedIn }) {
               </button>
             </form>
 
-          {isSearchVisible && userSearch.length > 0 && (
-            <div className="search_theme" ref={searchRef}>
-              <ul className="m-0 p-0" style={{ flex: 1 }}>
-                {userSearch.map((user, index) => {
-                  const isFriend = friends.some(
-                    (friend) => friend.phoneNumber === user.phoneNumber
-                  );
+            {isSearchVisible && userSearch.length > 0 && (
+              <div className="search_theme" ref={searchRef}>
+                <ul className="m-0 p-0" style={{ flex: 1 }}>
+                  {userSearch.map((user, index) => {
+                    const isFriend = friends.some(
+                      (friend) => friend.phoneNumber === user.phoneNumber
+                    );
 
                     return (
                       <li
@@ -1164,7 +1209,8 @@ function View({ setIsLoggedIn }) {
                           transition: "background 0.2s ease-in-out",
                           justifyContent: "space-between", // Thêm để căn nút sang phải
                         }}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation(); // Ngăn sự kiện lan truyền
                           if (!userInfo?.phoneNumber) {
                             console.error("userInfo.phoneNumber bị thiếu!");
                             return;
@@ -1184,9 +1230,6 @@ function View({ setIsLoggedIn }) {
                             display: "flex",
                             alignItems: "center",
                           }}
-                          onClick={() =>
-                            handleUserClick(userInfo.phoneNumber, user.phoneNumber)
-                          }
                         >
                           <img
                             className="user-avt"
@@ -1225,63 +1268,25 @@ function View({ setIsLoggedIn }) {
           </div>
 
           <div className="col-1 m-0 p-0">
-            <button className="btn btn-link" style={{ width: "100%", height: "100%" }} onClick={openCreateModal} tooltip="Tạo nhóm">
+            <button
+              className="btn btn-link"
+              style={{ width: "100%", height: "100%" }}
+              onClick={openCreateModal}
+              tooltip="Tạo nhóm"
+            >
               <i className="bi bi-plus-lg text-light"></i>
             </button>
           </div>
-
         </div>
 
         {/* User List */}
         <div className="user-list">
-          {userChatList.length > 0 ? (
-            userChatList.map((user) => (
-              <div
-                className="user"
-                key={user.chatRoomId}
-                onClick={async () => {
-                  try {
-                    if (!user) {
-                      console.error("User không tồn tại!");
-                      return;
-                    }
-
-                    if (user.isGroup) {
-                      if (!user.chatRoomId) {
-                        console.error("chatRoomId không tồn tại cho nhóm!");
-                        return;
-                      }
-                      await checkGroup(user.chatRoomId);
-                    } else if (user.phoneNumber) {
-                      let chatRoomId = user.chatRoomId;
-
-                      if (!chatRoomId) {
-                        console.warn("chatRoomId bị thiếu! Đang tạo lại...");
-                        chatRoomId = await createChatRoomAndConversation(
-                          userInfo.phoneNumber,
-                          user.phoneNumber
-                        );
-                        if (!chatRoomId) {
-                          console.error("Không thể tạo lại chatRoomId!");
-                          return;
-                        }
-                      }
-
-                      await check(
-                        userInfo.phoneNumber,
-                        user.phoneNumber,
-                        chatRoomId
-                      );
-                    } else {
-                      console.error("Không thể xác định loại user!");
-                    }
-
-                    setReloadConversations((prev) => !prev);
-                  } catch (error) {
-                    console.error("Lỗi trong onClick:", error);
-                  }
-                }}
-              >
+          {userChatList.map((user) => (
+            <div
+              className="user d-flex align-items-center justify-content-between"
+              key={user.chatRoomId}
+            >
+              <div className="d-flex align-items-center">
                 <img className="user-avt" src={user.avatar || a3} alt="User" />
                 <div>
                   <strong>
@@ -1295,16 +1300,32 @@ function View({ setIsLoggedIn }) {
                   </small>
                 </div>
               </div>
-            ))
-          ) : (
-            <p
-              style={{
-                padding: "0 50px",
-              }}
-            >
-              Hãy tìm bạn bè bằng số điện thoại và trò chuyện với họ ngay nào!
-            </p>
-          )}
+              <div className="options">
+                <button
+                  className="btn btn-link options-btn"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
+                    toggleOptions(user.chatRoomId);
+                  }}
+                >
+                  <i className="bi bi-three-dots-vertical"></i>
+                </button>
+                {selectedChatRoomId === user.chatRoomId && (
+                  <div className="options-menu">
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
+                        handleDeleteConversation(user.chatRoomId);
+                      }}
+                    >
+                      Xóa hội thoại
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="sidebar-bottom d-flex justify-content-around align-items-center">
@@ -1749,48 +1770,47 @@ function View({ setIsLoggedIn }) {
                       Những người bạn có thể thêm vào nhóm
                     </p>
                     <ul className="list-group">
-                      {listFriends
-                        .map((friend) => (
-                          <li
-                            key={friend.phoneNumber}
-                            className="list-group-item d-flex justify-content-between align-items-center li-mem-group"
-                            style={{
-                              padding: "10px 15px",
-                              borderRadius: "8px",
-                              marginBottom: "8px",
-                              boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-                              transition: "background-color 0.3s",
-                            }}
-                          >
-                            <div className="d-flex align-items-center">
-                              <img
-                                src={friend.avatar}
-                                alt="avatar"
-                                className="rounded-circle"
-                                style={{
-                                  width: 45,
-                                  height: 45,
-                                  objectFit: "cover",
-                                  marginRight: 12,
-                                }}
-                              />
-                              <span style={{ fontWeight: 500 }}>
-                                {friend.fullName}
-                              </span>
-                            </div>
-                            <input
-                              type="checkbox"
-                              style={{ transform: "scale(1.2)" }}
-                              value={friend.phoneNumber}
-                              onChange={() =>
-                                handleTogglePhoneNumber(friend.phoneNumber)
-                              }
-                              checked={listAddtoGroup.includes(
-                                friend.phoneNumber
-                              )}
+                      {listFriends.map((friend) => (
+                        <li
+                          key={friend.phoneNumber}
+                          className="list-group-item d-flex justify-content-between align-items-center li-mem-group"
+                          style={{
+                            padding: "10px 15px",
+                            borderRadius: "8px",
+                            marginBottom: "8px",
+                            boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+                            transition: "background-color 0.3s",
+                          }}
+                        >
+                          <div className="d-flex align-items-center">
+                            <img
+                              src={friend.avatar}
+                              alt="avatar"
+                              className="rounded-circle"
+                              style={{
+                                width: 45,
+                                height: 45,
+                                objectFit: "cover",
+                                marginRight: 12,
+                              }}
                             />
-                          </li>
-                        ))}
+                            <span style={{ fontWeight: 500 }}>
+                              {friend.fullName}
+                            </span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            style={{ transform: "scale(1.2)" }}
+                            value={friend.phoneNumber}
+                            onChange={() =>
+                              handleTogglePhoneNumber(friend.phoneNumber)
+                            }
+                            checked={listAddtoGroup.includes(
+                              friend.phoneNumber
+                            )}
+                          />
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 )}
