@@ -107,12 +107,14 @@ const Header = ({ navigation }) => {
                     />
                     <Text style={styles.text}>{item.fullName}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.addFriendButton}
-                    onPress={() => handleSendFriendRequest(item.phoneNumber)}
-                  >
-                    <Text style={styles.addFriendText}>Thêm bạn</Text>
-                  </TouchableOpacity>
+                  {typeof item.isFriend === 'boolean' && !item.isFriend && (
+                      <TouchableOpacity
+                        style={styles.addFriendButton}
+                        onPress={() => handleSendFriendRequest(item.phoneNumber)}
+                      >
+                        <Text style={styles.addFriendText}>Thêm bạn</Text>
+                      </TouchableOpacity>
+                    )}
                 </View>
               )}
             />

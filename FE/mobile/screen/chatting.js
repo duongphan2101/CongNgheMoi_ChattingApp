@@ -47,7 +47,7 @@ import disbandGroup from '../api/api_disbandGroup.js';
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡"];
 
 // Component riêng cho item tin nhắn
-const MessageItem = memo(({ item, isCurrentUser, themeColors, handleLongPressMessage, handleViewImage, handleViewFile, handlePlayAudio, chatRoom, otherUser, thisUser, highlightedMessageId, users, setSelectedReaction, fetchReactionUsersInfo, setShowReactionUsers}) => {
+const MessageItem = memo(({ item, isCurrentUser, themeColors, handleLongPressMessage, handleViewImage, handleViewFile, handlePlayAudio, chatRoom, otherUser, thisUser, highlightedMessageId, users, setSelectedReaction, fetchReactionUsersInfo, setShowReactionUsers, setHighlightedMessageId, flatListRef, messages}) => {
   const styles = getStyles(themeColors);
   const isHighlighted = highlightedMessageId === item.timestamp;
 
@@ -1064,7 +1064,9 @@ export default function App({ navigation, route }) {
         setSelectedReaction={setSelectedReaction}
         fetchReactionUsersInfo={fetchReactionUsersInfo}
         setShowReactionUsers={setShowReactionUsers}
-
+        setHighlightedMessageId={setHighlightedMessageId}
+        flatListRef={flatListRef}
+        messages={messages}
       />
     );
   };
@@ -1241,7 +1243,7 @@ export default function App({ navigation, route }) {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "padding"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 50}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -30}
     >
       <View style={styles.container}>
         <View style={styles.head}>

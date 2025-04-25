@@ -11,10 +11,12 @@ function Register() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [repassword, setrePassword] = useState("");
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState(""); // State for email error message
   const navigate = useNavigate();
+
   const validateInputs = () => {
 
     if (!/^\d{10}$/.test(phoneNumber)) {
@@ -22,8 +24,9 @@ function Register() {
       return false;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^(?!.*\.\.)[a-zA-Z0-9](\.?[a-zA-Z0-9_%+-])*@[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/.test(email)) {
       toast.error("Email không hợp lệ.");
+      return false;
     }
 
     if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(password)) {
@@ -31,8 +34,8 @@ function Register() {
       return false;
     }
 
-    if (!/^[a-zA-Z0-9 ]{3,}$/.test(userName)) {
-      toast.error("Tên người dùng phải có ít nhất 3 ký tự và chỉ chứa chữ cái hoặc số.");
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9 ]{2,}$/.test(userName)) {
+      toast.error("Tên người dùng phải có ít nhất 3 ký tự, không có khoảng trắng ở đầu, và chỉ chứa chữ cái hoặc số.");
       return false;
     }
     return true;
@@ -40,15 +43,18 @@ function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setEmailError(""); 
-  
+    setEmailError("");
+
     if (!validateInputs()) return;
-  
+    if (password !== repassword) {
+      toast.error("Mật khẩu không khớp.");
+      return;
+    }
     setLoading(true);
-  
+
     // Gửi thêm password và fullName trong request
     const response = await sendConfirmationEmail(email, phoneNumber, password, userName);
-    
+
     setLoading(false);
 
     // if (result) {
@@ -57,7 +63,7 @@ function Register() {
     // } else {
     //   toast.error("Đăng ký thất bại. Vui lòng thử lại!");
     // }
-  
+
     if (response.success) {
       toast.success(response.message);
       navigate("/login");
@@ -66,7 +72,7 @@ function Register() {
 
     }
   };
-  
+
 
   return (
     <div className="container chat-container blox">
@@ -96,6 +102,15 @@ function Register() {
           placeholder="Mật khẩu"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+        />
+
+        <input
+          className="form-control inp mt-4"
+          type="password"
+          placeholder="Nhập Lại Mật khẩu"
+          value={repassword}
+          onChange={(e) => setrePassword(e.target.value)}
+          security={true}
         />
 
         <input

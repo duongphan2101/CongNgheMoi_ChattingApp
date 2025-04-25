@@ -34,7 +34,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [showReactions, setShowReactions] = useState(null);
   const [messageReactions, setMessageReactions] = useState({});
   const [activeReactionTooltip, setActiveReactionTooltip] = useState(null);
-  console.log(revokedMessages);
+  // console.log(revokedMessages);
   const [listAddtoGroup, setListAddtoGroup] = useState([]);
   const [nameGroup, setNameGroup] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
@@ -933,7 +933,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [currentChatRoom, setCurrentChatRoom] = useState(chatRoom);
-  console.log("current chat room ", currentChatRoom);
+  // console.log("current chat room ", currentChatRoom);
 
   const handleOpenFriendsModal = async () => {
     if (chatRoom.isGroup) {
@@ -1135,19 +1135,22 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 </p>
               </div>
               <div className="col-sm-4 d-flex align-items-center justify-content-end">
-                <button className="btn" onClick={handleOpenFriendsModal}>
-                  <i
-                    className="bi bi-people-fill"
-                    style={{ fontSize: 25, color: "#fff" }}
-                  ></i>
-                </button>
                 {chatRoom.isGroup && (
-                  <button className="btn" onClick={handleOpenOptionsModal}>
-                    <i
-                      className="bi bi-three-dots-vertical"
-                      style={{ fontSize: 25, color: "#fff" }}
-                    ></i>
-                  </button>
+                  <>
+                    <button className="btn" onClick={handleOpenFriendsModal}>
+                      <i
+                        className="bi bi-people-fill"
+                        style={{ fontSize: 25, color: "#fff" }}
+                      ></i>
+                    </button>
+
+                    <button className="btn" onClick={handleOpenOptionsModal}>
+                      <i
+                        className="bi bi-three-dots-vertical"
+                        style={{ fontSize: 25, color: "#fff" }}
+                      ></i>
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1479,7 +1482,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           >
             <div className="modal-content p-0">
               <div className="modal-header d-flex justify-content-between align-items-center">
-                <h5 className="modal-title">Tạo Nhóm</h5>
+                {/* <h5 className="modal-title">Tạo Nhóm</h5> */}
                 <button
                   type="button"
                   className="btn-close"
