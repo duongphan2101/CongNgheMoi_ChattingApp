@@ -174,8 +174,17 @@ export default function App({ navigation, route }) {
       }
     });
 
+    // Lắng nghe khi có nhóm mới được tạo
+    socket.on('groupCreated', async (data) => {
+      if (data.participants.includes(thisUser.phoneNumber)) {
+        console.log(`Nhóm mới được tạo: ${data.nameGroup}`);
+        await fetchData(); // Load lại toàn bộ danh sách
+      }
+    });
+
     return () => {
       socket.off('newConversation');
+      socket.off('groupCreated');
     };
   }, [thisUser?.phoneNumber]);
 

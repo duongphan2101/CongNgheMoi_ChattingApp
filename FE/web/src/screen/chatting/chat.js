@@ -18,6 +18,7 @@ import deleteMember from "../../API/api_deleteMember.js";
 import disbandGroup from "../../API/api_disbandGroup.js";
 
 const socket = io("http://localhost:3618");
+console.log("connected to socket server",socket.connect);
 const notificationSocket = io("http://localhost:3515");
 
 function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
