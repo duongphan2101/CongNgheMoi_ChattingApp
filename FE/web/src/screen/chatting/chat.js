@@ -18,7 +18,7 @@ import deleteMember from "../../API/api_deleteMember.js";
 import disbandGroup from "../../API/api_disbandGroup.js";
 
 const socket = io("http://localhost:3618");
-console.log("connected to socket server",socket.connect);
+console.log("connected to socket server", socket.connect);
 const notificationSocket = io("http://localhost:3515");
 
 function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
@@ -101,8 +101,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         msg.type === "audio"
           ? "Tin nhắn thoại"
           : msg.type === "file"
-            ? "File đính kèm"
-            : msg.message,
+          ? "File đính kèm"
+          : msg.message,
     });
     setActiveMessageId(null);
     setHighlightedMessageId(msg.timestamp);
@@ -295,12 +295,17 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     };
   }, [user?.phoneNumber]);
 
+  //Modal đổi tên nhóm
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+
   // === BỔ SUNG: Lắng nghe sự kiện tag từ Socket.IO ===
   useEffect(() => {
     socket.on("tagged", (data) => {
       if (data.taggedUsers.includes(currentUserPhone)) {
         toast.info(
-          `Bạn được tag trong tin nhắn từ ${userMap[data.sender]?.fullName || data.sender
+          `Bạn được tag trong tin nhắn từ ${
+            userMap[data.sender]?.fullName || data.sender
           }`,
           {
             position: "bottom-right",
@@ -561,7 +566,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       if (name.toLowerCase() === "all" && chatRoom.isGroup) {
         taggedUsers = [
           ...taggedUsers,
-          ...chatRoom.participants.filter((phone) => phone !== currentUserPhone),
+          ...chatRoom.participants.filter(
+            (phone) => phone !== currentUserPhone
+          ),
         ];
       } else {
         const member = members.find((m) => m.fullName === name);
@@ -588,10 +595,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       chatId,
       replyTo: replyingTo
         ? {
-          timestamp: replyingTo.timestamp,
-          message: replyingTo.message,
-          sender: replyingTo.sender,
-        }
+            timestamp: replyingTo.timestamp,
+            message: replyingTo.message,
+            sender: replyingTo.sender,
+          }
         : null,
       taggedUsers, // Thêm danh sách người được tag
     };
@@ -620,12 +627,13 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const handleCopyMessage = (message) => {
     if (message.isRevoked) return;
     if (message.type === "text") {
-      navigator.clipboard.writeText(message.message)
+      navigator.clipboard
+        .writeText(message.message)
         .then(() => {
           toast.success("Đã sao chép tin nhắn");
           setActiveMessageId(null);
         })
-        .catch(err => {
+        .catch((err) => {
           console.error("Không thể sao chép tin nhắn:", err);
           toast.error("Không thể sao chép tin nhắn");
         });
@@ -702,7 +710,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
         const errorData = await response.json();
         console.error("Lỗi Server:", response.status, errorData);
         throw new Error(
-          `Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`
+          `Tải file lên thất bại: ${
+            errorData.error || `Mã lỗi: ${response.status}`
           }`
         );
       }
@@ -879,28 +888,35 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   };
 
   const renderReactions = (reactions, isRevoked) => {
-    if (isRevoked || !reactions || Object.keys(reactions).length === 0) return null;
+    if (isRevoked || !reactions || Object.keys(reactions).length === 0)
+      return null;
 
     return (
       <div className="message-reactions">
         {Object.entries(reactions).map(([reaction, users]) => (
           <div
             key={reaction}
-            className={`reaction-badge ${activeReactionTooltip === `${reaction}-${users.join(",")}` ? "active" : ""
-              }`}
-          // onClick={() =>
-          //   setActiveReactionTooltip(
-          //     activeReactionTooltip === `${reaction}-${users.join(",")}`
-          //       ? null
-          //       : `${reaction}-${users.join(",")}`
-          //   )
-          // }
+            className={`reaction-badge ${
+              activeReactionTooltip === `${reaction}-${users.join(",")}`
+                ? "active"
+                : ""
+            }`}
+            // onClick={() =>
+            //   setActiveReactionTooltip(
+            //     activeReactionTooltip === `${reaction}-${users.join(",")}`
+            //       ? null
+            //       : `${reaction}-${users.join(",")}`
+            //   )
+            // }
           >
             {reaction} {users.length}
             <div className="reaction-tooltip">
               <ul>
                 {users.map((phone) => {
-                  const user = userMap[phone] || { fullName: phone, avatar: a1 };
+                  const user = userMap[phone] || {
+                    fullName: phone,
+                    avatar: a1,
+                  };
                   return (
                     <li key={phone}>
                       <img src={user.avatar} alt={user.fullName} />
@@ -957,7 +973,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   // Khi mở modal để edit nhóm hiện tại
   const openEditModal = async () => {
-    if (chatRoom.status === 'DISBANDED') {
+    if (chatRoom.status === "DISBANDED") {
       toast.error("Nhóm đã bị giải tán, thao tác này đã bị khóa");
       return;
     }
@@ -968,6 +984,47 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     setIsEditMode(true);
     setEditingRoomId(chatRoom.chatRoomId);
     setModalListFriends(true);
+  };
+
+  // Add after your other handler functions
+  const handleOpenNameModal = () => {
+    if (chatRoom.status === "DISBANDED") {
+      toast.error("Nhóm đã bị giải tán. Thao tác này đã bị khóa");
+      return;
+    }
+    setNewGroupName(chatRoom.nameGroup || "");
+    setShowNameModal(true);
+  };
+
+  const handleUpdateGroupName = async (e) => {
+    e.preventDefault();
+
+    if (
+      !newGroupName.trim() ||
+      !/^(?! )[A-Za-zÀ-ỹ0-9 ]{3,50}$/.test(newGroupName)
+    ) {
+      toast.error("Tên nhóm không hợp lệ.");
+      return;
+    }
+
+    try {
+      await updateChatRoom({
+        roomId: chatRoom.chatRoomId,
+        nameGroup: newGroupName,
+        participants: chatRoom.participants,
+      });
+
+      setCurrentChatRoom({
+        ...chatRoom,
+        nameGroup: newGroupName,
+      });
+
+      toast.success("Đổi tên nhóm thành công!");
+      setShowNameModal(false);
+    } catch (err) {
+      console.error("Lỗi khi đổi tên nhóm:", err);
+      toast.error(err.message || "Đổi tên nhóm thất bại!");
+    }
   };
 
   const handleSaveGroup = async () => {
@@ -1124,14 +1181,26 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   alt="avatar"
                 />
                 <p className="chat-header_name px-2 m-0">
-                  {chatRoom.isGroup
-                    ? chatRoom.nameGroup ||
-                    userChatting.map((u) => u.fullName).join(", ")
-                    : userChatting?.[0]?.fullName || "Người lạ"}
+                  {chatRoom.isGroup ? (
+                    <>
+                      {chatRoom.nameGroup ||
+                        userChatting.map((u) => u.fullName).join(", ")}
+                      {chatRoom.status !== "DISBANDED" && (
+                        <button
+                          className="btn btn-edit ms-2"
+                          onClick={handleOpenNameModal} 
+                        >
+                          <i className="bi bi-pencil-fill text-light"></i>
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    userChatting?.[0]?.fullName || "Người lạ"
+                  )}
                   {chatRoom.status === "DISBANDED" && (
-                    <span
-                      className="badge bg-danger ms-2"
-                    >NHÓM ĐÃ BỊ GIẢI TÁN</span>
+                    <span className="badge bg-danger ms-2">
+                      NHÓM ĐÃ BỊ GIẢI TÁN
+                    </span>
                   )}
                 </p>
               </div>
@@ -1167,8 +1236,9 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   <div
                     key={index}
                     id={`message-${msg.timestamp}`}
-                    className={`message ${isSentByCurrentUser ? "sent" : "received"} ${isHighlighted ? "highlighted" : ""
-                      }`}
+                    className={`message ${
+                      isSentByCurrentUser ? "sent" : "received"
+                    } ${isHighlighted ? "highlighted" : ""}`}
                     onMouseEnter={() => setHoveredMessageId(msg.timestamp)}
                     onMouseLeave={() => {
                       setHoveredMessageId(null);
@@ -1184,7 +1254,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                     )}
 
                     <div className="message-wrapper">
-                      <div className="message-info" style={{ position: "relative" }}>
+                      <div
+                        className="message-info"
+                        style={{ position: "relative" }}
+                      >
                         {chatRoom.isGroup && (
                           <span
                             className="sender-name"
@@ -1205,8 +1278,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                             <span>
                               {msg.replyTo.sender === currentUserPhone
                                 ? "Bạn đã trả lời tin nhắn của mình"
-                                : `Đã trả lời tin nhắn của ${userMap[msg.replyTo.sender]?.fullName || "người khác"
-                                }`}
+                                : `Đã trả lời tin nhắn của ${
+                                    userMap[msg.replyTo.sender]?.fullName ||
+                                    "người khác"
+                                  }`}
                             </span>
                             <p
                               style={{
@@ -1222,9 +1297,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                                 cursor: "pointer",
                               }}
                               onClick={() => {
-                                const repliedMessageElement = document.getElementById(
-                                  `message-${msg.replyTo.timestamp}`
-                                );
+                                const repliedMessageElement =
+                                  document.getElementById(
+                                    `message-${msg.replyTo.timestamp}`
+                                  );
                                 repliedMessageElement?.scrollIntoView({
                                   behavior: "smooth",
                                   block: "start",
@@ -1239,7 +1315,14 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
                         {renderMessageContent(msg)}
 
-                        <div className="message-footer" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                        <div
+                          className="message-footer"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "flex-end",
+                          }}
+                        >
                           <span
                             className="timestamp"
                             style={{
@@ -1256,7 +1339,10 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                           </span>
                         </div>
 
-                        {renderReactions(messageReactions[msg.timestamp], msg.isRevoked)}
+                        {renderReactions(
+                          messageReactions[msg.timestamp],
+                          msg.isRevoked
+                        )}
 
                         {showReactions === msg.timestamp && (
                           <div
@@ -1264,15 +1350,19 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                             onMouseEnter={() => setShowReactions(msg.timestamp)}
                             onMouseLeave={() => setShowReactions(null)}
                           >
-                            {["👍", "❤️", "😂", "😮", "😢", "😡"].map((emoji) => (
-                              <button
-                                key={emoji}
-                                onClick={() => handleAddReaction(msg.timestamp, emoji)}
-                                className="reaction-option"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
+                            {["👍", "❤️", "😂", "😮", "😢", "😡"].map(
+                              (emoji) => (
+                                <button
+                                  key={emoji}
+                                  onClick={() =>
+                                    handleAddReaction(msg.timestamp, emoji)
+                                  }
+                                  className="reaction-option"
+                                >
+                                  {emoji}
+                                </button>
+                              )
+                            )}
                           </div>
                         )}
                       </div>
@@ -1307,14 +1397,18 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                                 className="message-option-item"
                                 onClick={() => handleCopyMessage(msg)}
                               >
-                                <i className="bi bi-clipboard"></i> Sao chép tin nhắn
+                                <i className="bi bi-clipboard"></i> Sao chép tin
+                                nhắn
                               </button>
                               {isSentByCurrentUser && (
                                 <button
                                   className="message-option-item"
-                                  onClick={() => handleRevokeMessage(msg.timestamp)}
+                                  onClick={() =>
+                                    handleRevokeMessage(msg.timestamp)
+                                  }
                                 >
-                                  <i className="bi bi-arrow-counterclockwise"></i> Thu hồi tin nhắn
+                                  <i className="bi bi-arrow-counterclockwise"></i>{" "}
+                                  Thu hồi tin nhắn
                                 </button>
                               )}
                             </div>
@@ -1701,6 +1795,70 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Group Name Change Modal */}
+      {showNameModal && (
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Đổi tên nhóm</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowNameModal(false)}
+                ></button>
+              </div>
+
+              <form onSubmit={handleUpdateGroupName}>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label htmlFor="groupName" className="form-label fw-bold">
+                      Tên nhóm mới
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="groupName"
+                      placeholder="Nhập tên nhóm mới..."
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      required
+                      minLength="3"
+                      maxLength="50"
+                    />
+                    <small className="form-text text-white">
+                      Tên nhóm phải có từ 3-50 ký tự.
+                    </small>
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowNameModal(false)}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={!newGroupName.trim()}
+                  >
+                    Lưu thay đổi
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
