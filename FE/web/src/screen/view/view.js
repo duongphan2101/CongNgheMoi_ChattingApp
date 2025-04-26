@@ -3,19 +3,22 @@ import Chat from "../chatting/chat";
 import Setting from "../setting/setting";
 import Cloud from "../cloud/cloud";
 import Contacts from "../contacts/contacts";
-
+import io from "socket.io-client";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import io from "socket.io-client";
-import a3 from "../../assets/imgs/1.jpg";
-
-// import fetchFriends from "../../API/api_getListFriends";
+import { playNotificationSound } from "../../utils/sound.js";
+import a3 from "../../assets/imgs/9334176.jpg";
 import getUser from "../../API/api_getUser";
+import getUserInfo from "../../API/api_getUser";
 import getUserbySearch from "../../API/api_searchUSer";
 import getConversations from "../../API/api_getConversation";
-// import checkChatRoom from "../../API/api_checkChatRoom";
+import checkChatRoom from "../../API/api_checkChatRoom";
 import getChatRoom from "../../API/api_getChatRoombyChatRoomId";
 import "./style.css";
+import createChatRoom from "../../API/api_createChatRoomforGroup";
+import useFetchUserChatList from "../../hooks/refetch_Conversation.js";
+const socket = io("http://localhost:3618");
+const notificationSocket = io("http://localhost:3515");
 
 const socket = io("http://localhost:3618");
 
@@ -35,6 +38,221 @@ function View({ setIsLoggedIn }) {
   const [friendRequests, setFriendRequests] = useState([]);
   const [friends, setFriends] = useState([]);
   const [hasNewFriendRequest, setHasNewFriendRequest] = useState(false);
+  const [userChatList, setUserChatList] = useState([]);
+  const [reloadConversations, setReloadConversations] = useState(false);
+  const [modalListFriends, setModalListFriends] = useState(false);
+  const [listFriends, setListFriends] = useState([]);
+  const [nameGroup, setNameGroup] = useState("");
+  const [listAddtoGroup, setListAddtoGroup] = useState([]);
+  const [thisUser, setThisUser] = useState(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const data = await getUser();
+        if (data) {
+          setUserInfo(data);
+          const editData = { ...data };
+          if (data.dob) {
+            const [year, month, day] = data.dob.split("-");
+            editData.year = year;
+            editData.month = parseInt(month, 10);
+            editData.day = parseInt(day, 10);
+          }
+          setEditInfo(editData);
+        }
+      } catch (error) {
+        console.error("Error fetching user info:", error);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const data = await getUserInfo();
+        if (data) {
+          setThisUser(data);
+        }
+      } catch (error) {
+        console.error("Error fetching user info:", error);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    if (userInfo?.phoneNumber) {
+      socket.emit("joinRoom", userInfo.phoneNumber);
+    }
+  }, [userInfo]);
+
+  useEffect(() => {
+    if (!userInfo?.phoneNumber) return;
+
+    let isMounted = true;
+    (async () => {
+      const data = await getConversations();
+      if (!isMounted || !data?.length) return;
+
+      const myPhone = userInfo.phoneNumber;
+      const userData = await Promise.all(
+        data.map(async (convo) => {
+          if (convo.isGroup) {
+            return {
+              name: convo.fullName,
+              avatar: convo.avatar,
+              isUnreadBy:
+                Array.isArray(convo.isUnreadBy) &&
+                convo.isUnreadBy.includes(myPhone),
+              lastMessage: convo.lastMessage,
+              lastMessageAt: convo.lastMessageAt, // ⚠️ bạn cần đảm bảo trường này tồn tại
+              isGroup: true,
+              chatRoomId: convo.chatRoomId,
+            };
+          }
+
+          const partnerPhone = convo.participants.find((p) => p !== myPhone);
+          if (!partnerPhone) return null;
+          const userArray = await getUserbySearch(partnerPhone, "");
+          const user = Array.isArray(userArray) ? userArray[0] : userArray;
+          return user
+            ? {
+              ...user,
+              lastMessage: convo.lastMessage,
+              lastMessageAt: convo.lastMessageAt, // ⚠️ cần trường này
+              isUnreadBy:
+                Array.isArray(convo.isUnreadBy) &&
+                convo.isUnreadBy.includes(myPhone),
+              isGroup: false,
+              chatRoomId: convo.chatRoomId,
+            }
+            : null;
+        })
+      );
+
+      const filteredList = userData.filter((u) => u !== null);
+
+      const sortedList = filteredList.sort((a, b) => {
+        const parseTime = (str) => {
+          if (!str) return new Date(0); // fallback cho item không có thời gian
+          const [time, date] = str.split(" ");
+          const [h, m, s] = time.split(":").map(Number);
+          const [d, mo, y] = date.split("/").map(Number);
+          return new Date(y, mo - 1, d, h, m, s);
+        };
+
+        return parseTime(b.lastMessageAt) - parseTime(a.lastMessageAt);
+      });
+
+      setUserChatList(sortedList);
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userInfo?.phoneNumber, reloadConversations]);
+
+  useEffect(() => {
+    if (!thisUser?.phoneNumber) return;
+
+    const handleNewChatRoom = async (data) => {
+      console.log("Nhận thông báo phòng chat mới:", data);
+
+      if (data.createdBy !== thisUser.phoneNumber) {
+        const u = await getUserbySearch(data.createdBy, "");
+        playNotificationSound();
+        toast.success(`${u[0]?.fullName || "Ai đó"} đã thêm bạn vào nhóm ${data.groupName}`);
+      }
+
+      const newChatRoom = {
+        name: data.groupName || "Nhóm mới", // hoặc data.nameGroup
+        avatar: data.avatar || "", // ảnh nhóm nếu có
+        isGroup: true,
+        chatRoomId: data.chatRoomId,
+        lastMessage: "",
+        lastMessageAt: null,
+        isUnreadBy: [],
+        fullName: "", // để không bị lỗi khi là group (dùng `name` thay thế)
+      };
+
+      setUserChatList((prevList) => {
+        // Nếu đã có trong list thì không thêm lại
+        const existed = prevList.some((room) => room.chatRoomId === newChatRoom.chatRoomId);
+        if (existed) return prevList;
+
+        const updatedList = [newChatRoom, ...prevList];
+        return updatedList.sort((a, b) => {
+          const parseTime = (str) => {
+            if (!str) return new Date(0);
+            const [time, date] = str.split(" ");
+            const [h, m, s] = time.split(":").map(Number);
+            const [d, mo, y] = date.split("/").map(Number);
+            return new Date(y, mo - 1, d, h, m, s);
+          };
+          return parseTime(b.lastMessageAt) - parseTime(a.lastMessageAt);
+        });
+      });
+    };
+
+    socket.on("newChatRoom", handleNewChatRoom);
+
+    return () => {
+      socket.off("newChatRoom", handleNewChatRoom);
+    };
+  }, [thisUser?.phoneNumber]);
+
+  const handleTogglePhoneNumber = (phoneNumber) => {
+    setListAddtoGroup((prev) => {
+      const mustHave = [userInfo.phoneNumber];
+      const withoutRemoved = prev.filter((p) => p !== phoneNumber);
+      const isAlreadyChecked = prev.includes(phoneNumber);
+
+      const newList = isAlreadyChecked
+        ? withoutRemoved
+        : [...prev, phoneNumber];
+
+      const finalList = Array.from(new Set([...newList, ...mustHave]));
+      return finalList;
+    });
+  };
+
+  const openCreateModal = async () => {
+    setNameGroup("");
+    setListAddtoGroup([]);
+
+    setModalListFriends(true);
+    setListFriends(friends);
+  };
+
+  const handleSaveGroup = async () => {
+    if (!nameGroup.trim() || !/^(?! )[A-Za-zÀ-ỹ0-9 ]{3,50}$/.test(nameGroup)) {
+      toast.error("Tên nhóm không hợp lệ.");
+      return;
+    }
+    if (listAddtoGroup.length < 3) {
+      toast.error("Một nhóm phải có ít nhất ba thành viên.");
+      return;
+    }
+
+    try {
+
+      await createChatRoom({
+        nameGroup,
+        createdBy: userInfo.phoneNumber,
+        participants: listAddtoGroup,
+      });
+      toast.success("Tạo nhóm thành công!");
+      setModalListFriends(false);
+      return;
+    } catch (error) {
+      console.error("Lỗi khi tạo nhóm:", error);
+      toast.error("Tạo nhóm thất bại!");
+    }
+  };
 
   const renderView = () => {
     switch (currentView) {
@@ -107,6 +325,30 @@ function View({ setIsLoggedIn }) {
     fetchUser();
   }, []);
 
+  const fetchFriends = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      toast.error("Vui lòng đăng nhập!");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:3824/user/friends", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Lỗi khi lấy danh sách bạn bè!");
+
+      const data = await response.json();
+      setFriends(data);
+    } catch (error) {
+
+    }
+  }, []);
+
   const fetchFriendRequests = useCallback(async () => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
@@ -169,11 +411,9 @@ function View({ setIsLoggedIn }) {
 
   useEffect(() => {
     fetchFriendRequests();
-  }, [fetchFriendRequests]);
-
-  useEffect(() => {
     fetchFriends();
-  }, [fetchFriends]);
+  }, [fetchFriendRequests, fetchFriends]);
+
 
   // Chỉ polling khi đang ở tab contacts
   useEffect(() => {
@@ -186,6 +426,17 @@ function View({ setIsLoggedIn }) {
       return () => clearInterval(interval);
     }
   }, [currentView]);
+
+  useEffect(() => {
+    if (currentView === 'contacts') {
+      const interval = setInterval(() => {
+        fetchFriendRequests();
+        fetchFriends();
+      }, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [currentView, fetchFriendRequests, fetchFriends]);
 
   const handleEdit = () => {
     const editData = { ...userInfo };
@@ -393,75 +644,6 @@ function View({ setIsLoggedIn }) {
     }
   };
 
-  const [userChatList, setUserChatList] = useState([]);
-  const [reloadConversations, setReloadConversations] = useState(false);
-
-  useEffect(() => {
-    if (!userInfo?.phoneNumber) return;
-
-    let isMounted = true;
-    (async () => {
-      const data = await getConversations();
-      if (!isMounted || !data?.length) return;
-
-      const myPhone = userInfo.phoneNumber;
-      const userData = await Promise.all(
-        data.map(async (convo) => {
-          if (convo.isGroup) {
-            return {
-              name: convo.fullName,
-              avatar: convo.avatar,
-              isUnreadBy:
-                Array.isArray(convo.isUnreadBy) &&
-                convo.isUnreadBy.includes(myPhone),
-              lastMessage: convo.lastMessage,
-              lastMessageAt: convo.lastMessageAt, // ⚠️ bạn cần đảm bảo trường này tồn tại
-              isGroup: true,
-              chatRoomId: convo.chatRoomId,
-            };
-          }
-
-          const partnerPhone = convo.participants.find((p) => p !== myPhone);
-          if (!partnerPhone) return null;
-          const userArray = await getUserbySearch(partnerPhone, "");
-          const user = Array.isArray(userArray) ? userArray[0] : userArray;
-          return user
-            ? {
-              ...user,
-              lastMessage: convo.lastMessage,
-              lastMessageAt: convo.lastMessageAt, // ⚠️ cần trường này
-              isUnreadBy:
-                Array.isArray(convo.isUnreadBy) &&
-                convo.isUnreadBy.includes(myPhone),
-              isGroup: false,
-              chatRoomId: convo.chatRoomId,
-            }
-            : null;
-        })
-      );
-
-      const filteredList = userData.filter((u) => u !== null);
-
-      const sortedList = filteredList.sort((a, b) => {
-        const parseTime = (str) => {
-          if (!str) return new Date(0); // fallback cho item không có thời gian
-          const [time, date] = str.split(" ");
-          const [h, m, s] = time.split(":").map(Number);
-          const [d, mo, y] = date.split("/").map(Number);
-          return new Date(y, mo - 1, d, h, m, s);
-        };
-
-        return parseTime(b.lastMessageAt) - parseTime(a.lastMessageAt);
-      });
-
-      setUserChatList(sortedList);
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [userInfo?.phoneNumber, reloadConversations]);
-
 
   const check = async (phone1, phone2, Id) => {
     try {
@@ -469,7 +651,6 @@ function View({ setIsLoggedIn }) {
 
       const chatId = [phone1, phone2].sort().join("_");
       const chatRoomId = Id;
-      console.log("CHat CHat ", chatRoomId)
       const chatRoomInfo = await getChatRoom(chatRoomId);
       if (chatRoomInfo.isGroup) {
         console.warn("Cảnh báo: Chat đơn nhưng trả về chatRoom nhóm!");
@@ -667,10 +848,28 @@ function View({ setIsLoggedIn }) {
     }
   };
 
-  // Chỉnh sửa sự kiện onClick trong danh sách tìm kiếm
   const handleUserClick = async (currentUserPhone, targetUserPhone) => {
-    await createChatRoomAndConversation(currentUserPhone, targetUserPhone);
-    check(currentUserPhone, targetUserPhone); // Gọi hàm check để cập nhật giao diện
+    try {
+      // Bước 1: kiểm tra xem đã có phòng chưa
+      const existingRoomId = await checkChatRoom(currentUserPhone, targetUserPhone);
+
+      let chatRoomId = existingRoomId;
+
+      // Bước 2: nếu chưa có thì tạo mới
+      if (!chatRoomId) {
+        chatRoomId = await createChatRoomAndConversation(currentUserPhone, targetUserPhone);
+      }
+
+      // Bước 3: nếu đã có chatRoomId thì cập nhật giao diện
+      if (chatRoomId) {
+        check(currentUserPhone, targetUserPhone, chatRoomId);
+      } else {
+        toast.error("Cần kết bạn để bắt đầu trò chuyện");
+      }
+    } catch (error) {
+      console.error("Lỗi khi xử lý click người dùng:", error);
+      toast.error("Có lỗi xảy ra.");
+    }
   };
 
   // Ẩn danh sách khi nhấn ra ngoài
@@ -821,95 +1020,99 @@ function View({ setIsLoggedIn }) {
     <div className="wrapper">
       {/* Sidebar */}
       <div className="sidebar">
-        <div className="sidebar-header" style={{ position: "relative" }}>
-          <form className="sidebar-header_search" onSubmit={handleGetUserbyKey}>
-            <input
-              type="search"
-              placeholder="Search..."
-              style={{ flex: 1 }}
-              value={keyWord}
-              onChange={(e) => setKeyWord(e.target.value)}
-            />
-            <button className="btn" type="submit">
-              <i className="bi bi-search text-light"></i>
-            </button>
-          </form>
+        <div className="sidebar-header row m-0" style={{ position: "relative" }}>
+          <div className="col-11 p-0">
+            <form className="sidebar-header_search" onSubmit={handleGetUserbyKey}>
+              <input
+                type="search"
+                placeholder="Search..."
+                style={{ flex: 1 }}
+                value={keyWord}
+                onChange={(e) => setKeyWord(e.target.value)}
+              />
+              <button className="btn" type="submit">
+                <i className="bi bi-search text-light"></i>
+              </button>
+            </form>
 
-          {isSearchVisible && userSearch.length > 0 && (
-            <div className="search_theme" ref={searchRef}>
-              <ul className="m-0 p-0" style={{ flex: 1 }}>
-                {userSearch.map((user, index) => {
-                  const isFriend = friends.some(
-                    (friend) => friend.phoneNumber === user.phoneNumber
-                  );
+            {isSearchVisible && userSearch.length > 0 && (
+              <div className="search_theme" ref={searchRef}>
+                <ul className="m-0 p-0" style={{ flex: 1 }}>
+                  {userSearch.map((user, index) => {
+                    const isFriend = friends.some((friend) => friend.phoneNumber === user.phoneNumber);
 
-                  return (
-                    <li
-                      key={user.id || user.phoneNumber || index}
-                      style={{
-                        listStyleType: "none",
-                        width: "100%",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "10px",
-                        borderRadius: "8px",
-                        transition: "background 0.2s ease-in-out",
-                        justifyContent: "space-between", // Thêm để căn nút sang phải
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = "#222")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = "transparent")
-                      }
-                    >
-                      <div
+                    return (
+                      <li
+                        key={user.id || user.phoneNumber || index}
                         style={{
+                          listStyleType: "none",
+                          width: "100%",
+                          cursor: "pointer",
                           display: "flex",
                           alignItems: "center",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          transition: "background 0.2s ease-in-out",
+                          justifyContent: "space-between", // Thêm để căn nút sang phải
                         }}
-                        onClick={() =>
-                          handleUserClick(
-                            userInfo.phoneNumber,
-                            user.phoneNumber
-                          )
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = "#222")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background = "transparent")
                         }
                       >
-                        <img
-                          className="user-avt"
-                          src={user?.avatar}
-                          alt="Avatar"
+                        <div
                           style={{
-                            width: "40px",
-                            height: "40px",
-                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
                           }}
-                        />
-                        <span
-                          className="mx-4"
-                          style={{ fontSize: "16px", fontWeight: "500" }}
+                          onClick={() =>
+                            handleUserClick(userInfo.phoneNumber, user.phoneNumber)
+                          }
                         >
-                          {user.fullName}
-                        </span>
-                      </div>
-                      {!isFriend && ( // Chỉ hiển thị nút "Thêm bạn" nếu chưa kết bạn
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
-                            handleSendFriendRequest(user.phoneNumber);
-                          }}
-                        >
-                          Thêm bạn
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
+                          <img
+                            className="user-avt"
+                            src={user?.avatar}
+                            alt="Avatar"
+                            style={{
+                              width: "40px",
+                              height: "40px",
+                              borderRadius: "50%",
+                            }}
+                          />
+                          <span
+                            className="mx-4"
+                            style={{ fontSize: "16px", fontWeight: "500" }}
+                          >
+                            {user.fullName}
+                          </span>
+                        </div>
+                        {!isFriend && ( // Chỉ hiển thị nút "Thêm bạn" nếu chưa kết bạn
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
+                              handleSendFriendRequest(user.phoneNumber);
+                            }}
+                          >
+                            Thêm bạn
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="col-1 m-0 p-0">
+            <button className="btn btn-link" style={{ width: "100%", height: "100%" }} onClick={openCreateModal} tooltip="Tạo nhóm">
+              <i className="bi bi-plus-lg text-light"></i>
+            </button>
+          </div>
+
         </div>
 
         {/* User List */}
@@ -930,12 +1133,12 @@ function View({ setIsLoggedIn }) {
                   setReloadConversations((prev) => !prev);
                 }}
               >
-                <img className="user-avt" src={user.avatar} alt="User" />
+                <img className="user-avt" src={user.avatar || a3} alt="User" />
                 <div>
                   <strong>
                     {user.isGroup
-                      ? user.name || "Nhóm chưa đặt tên"
-                      : user.fullName || "Chưa cập nhật"}
+                      ? user.name || "Loading..."
+                      : user.fullName || "Loading..."}
                   </strong>
                   <br />
                   <small className={user.isUnreadBy ? "bold-message" : ""}>
@@ -1348,6 +1551,109 @@ function View({ setIsLoggedIn }) {
                   onClick={handleSaveChanges}
                 >
                   Cập nhật
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalListFriends && (
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered modal-lg"
+            role="document"
+          >
+            <div className="modal-content p-0">
+              <div className="modal-header d-flex justify-content-between align-items-center">
+                <h5 className="modal-title">Tạo Nhóm</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setModalListFriends(false)}
+                ></button>
+              </div>
+
+              <div className="modal-body">
+                {/* Input tên nhóm */}
+                <div className="mb-3">
+                  <label className="form-label fw-bold">Tên nhóm</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Nhập tên nhóm..."
+                    value={nameGroup}
+                    onChange={(e) => setNameGroup(e.target.value)}
+                  />
+                </div>
+
+                {/* Danh sách bạn bè có thể thêm */}
+                {listFriends.length === 0 ? (
+                  <p className="text-muted">Không có bạn bè nào.</p>
+                ) : (
+                  <div>
+                    <p className="fw-bold">
+                      Những người bạn có thể thêm vào nhóm
+                    </p>
+                    <ul className="list-group">
+                      {listFriends
+                        .map((friend) => (
+                          <li
+                            key={friend.phoneNumber}
+                            className="list-group-item d-flex justify-content-between align-items-center li-mem-group"
+                            style={{
+                              padding: "10px 15px",
+                              borderRadius: "8px",
+                              marginBottom: "8px",
+                              boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+                              transition: "background-color 0.3s",
+                            }}
+                          >
+                            <div className="d-flex align-items-center">
+                              <img
+                                src={friend.avatar}
+                                alt="avatar"
+                                className="rounded-circle"
+                                style={{
+                                  width: 45,
+                                  height: 45,
+                                  objectFit: "cover",
+                                  marginRight: 12,
+                                }}
+                              />
+                              <span style={{ fontWeight: 500 }}>
+                                {friend.fullName}
+                              </span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              style={{ transform: "scale(1.2)" }}
+                              value={friend.phoneNumber}
+                              onChange={() =>
+                                handleTogglePhoneNumber(friend.phoneNumber)
+                              }
+                              checked={listAddtoGroup.includes(
+                                friend.phoneNumber
+                              )}
+                            />
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  className="btn btn-primary w-100"
+                  onClick={handleSaveGroup}
+                >
+                  Tạo nhóm
                 </button>
               </div>
             </div>

@@ -49,8 +49,8 @@ app.use(express.json());
 app.use(cors());
 
 // Routers
-const conversationRoutes = require("./routers/conversationRouter")(io);
-const chatRoomRoutes = require("./routers/ChatRoomRouter");
+const conversationRoutes = require("./routers/conversationRouter");
+const chatRoomRoutes = require("./routers/ChatRoomRouter")(io, pubClient);
 const messageRoutes = require("./routers/messageRouter")(io, pubClient);
 const uploadFileRouter = require("./routers/uploadFileRouter")(io, pubClient);
 const downloadRouter = require("./routers/downloadRouter");

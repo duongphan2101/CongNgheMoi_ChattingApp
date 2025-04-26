@@ -19,7 +19,6 @@ const getConversations = async () => {
         if (!response.ok) {
             throw new Error(data.message || "Lỗi khi lấy danh sách cuộc trò chuyện!");
         }
-
         return data;
     } catch (error) {
         console.error("Lỗi:", error);
