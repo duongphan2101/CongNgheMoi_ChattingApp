@@ -16,9 +16,9 @@ import checkChatRoom from "../../API/api_checkChatRoom";
 import getChatRoom from "../../API/api_getChatRoombyChatRoomId";
 import "./style.css";
 import createChatRoom from "../../API/api_createChatRoomforGroup";
-import useFetchUserChatList from "../../hooks/refetch_Conversation.js";
+// import useFetchUserChatList from "../../hooks/refetch_Conversation.js";
 const socket = io("http://localhost:3618");
-const notificationSocket = io("http://localhost:3515");
+// const notificationSocket = io("http://localhost:3515");
 
 function View({ setIsLoggedIn }) {
   const [currentView, setCurrentView] = useState("chat");

@@ -4,7 +4,8 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
 // Screens
 import Login from "./screen/login/login";
 import Register from "./screen/register/register";
@@ -79,6 +80,10 @@ function App() {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <App />
+    <ThemeProvider>
+      <LanguageProvider>
+        <App />
+      </LanguageProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );

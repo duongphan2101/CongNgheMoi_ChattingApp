@@ -1,20 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import "./setting_style.css";
 import { toast } from "react-toastify";
 import "bootstrap/dist/css/bootstrap.min.css";
-
+import { ThemeContext } from "../../contexts/ThemeContext";
 import changePasswordSetting from "../../API/api_changePassSetting";
+import { LanguageContext, locales } from "../../contexts/LanguageContext";
+
 
 function Setting({ setIsLoggedIn, setCurrentView }) {
   const [notifications, setNotifications] = useState(false);
-  const [language, setLanguage] = useState("Tiếng Việt");
+
   const [mode, setMode] = useState("Mặc định");
   const [showModal, setShowModal] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const { setTheme } = useContext(ThemeContext);
 
-
+  const { language, setLanguage } = useContext(LanguageContext);
+  const t = locales[language];
   const toggleNotifications = () => {
     setNotifications(!notifications);
   };
@@ -58,14 +62,14 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
   return (
     <div className="chat-box container">
       <div className="chat-header row">
-        <div className="col-sm-2 d-flex align-items-center">
+        <div className="col-12 d-flex align-items-center">
           <i className="sidebar-bottom_icon bi bi-gear text-light"></i>
-          <p className="chat-header_name px-2 m-0">Setting</p>
+          <p className="chat-header_name px-2 m-0">{t.setting}</p>
         </div>
       </div>
       <div className="settings">
         <div className="setting-item">
-          <label>Tắt thông báo</label>
+          <label>{t.notifications}</label>
           <label className="switch">
             <input
               type="checkbox"
@@ -76,33 +80,41 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
           </label>
         </div>
         <div className="setting-item">
-          <label>Ngôn Ngữ</label>
+          <label>{t.language}</label>
           <select
             className="mode-select"
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
           >
-            <option value="Vietnamese">Tiếng Việt</option>
-            <option value="English">Tiếng Anh</option>
+            <option value="vi">Tiếng Việt</option>
+            <option value="en">Tiếng Anh</option>
           </select>
         </div>
         <div className="setting-item">
-          <label>Chế độ</label>
+          <label>{t.mode}</label>
           <select
             className="mode-select"
             value={mode}
-            onChange={(e) => setMode(e.target.value)}
+            onChange={(e) => {
+              const selectedMode = e.target.value;
+              setMode(selectedMode);
+              if (selectedMode === "Dark Mode") {
+                setTheme("dark");
+              } else if (selectedMode === "Light Mode") {
+                setTheme("light");
+              }
+            }}
           >
             <option value="Dark Mode">Dark Mode</option>
             <option value="Light Mode">Light Mode</option>
           </select>
-
         </div>
+
         <button className="setting-item btn" onClick={handleChangePassword}>
-          Đổi Mật Khẩu
+          {t.changePassword}
         </button>
         <button className="setting-item btn" onClick={handleLogout}>
-          Đăng xuất
+          {t.logout}
         </button>
       </div>
       {showModal && (
