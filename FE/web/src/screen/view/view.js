@@ -884,6 +884,7 @@ function View({ setIsLoggedIn }) {
         chatRoomId,
         participants: sortedPhones,
       };
+      console.log("Conversation data:", conversationData);
 
       const conversationRes = await fetch(
         "http://localhost:3618/createConversation",
@@ -1350,7 +1351,11 @@ function View({ setIsLoggedIn }) {
               </div>
             ))
           ) : (
-            <p style={{ padding: "0 50px" }}>
+            <p
+              style={{
+                padding: "0 50px",
+              }}
+            >
               Hãy tìm bạn bè bằng số điện thoại và trò chuyện với họ ngay nào!
             </p>
           )}

@@ -163,7 +163,6 @@ module.exports = (io) => {
         TableName: TABLE_NAME,
         Item: conversationData,
       };
-
       // Lưu dữ liệu vào DynamoDB
       await dynamoDB.put(conversationParams).promise();
 

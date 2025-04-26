@@ -23,26 +23,58 @@ export default function App({ navigation, route }) {
   const [thisUser, setThisUser] = useState();
   const { hideSearch } = useSearch(); // Lấy hàm hideSearch từ đối tượng trả về
 
+  const fetchData = async () => {
+    try {
+      const userJson = await AsyncStorage.getItem("user");
+      const user = userJson ? JSON.parse(userJson) : null;
+      setThisUser(user);
+      if (!user || !user.phoneNumber) {
+        console.error("Không tìm thấy thông tin user hoặc số điện thoại!");
+        return;
+      }
+
+      setCurrentUserPhone(user.phoneNumber);
+      const data = await getConversations();
+      if (data) {
+        setConversations(data);
+
+        const phonesToFetch = data.map(c => c.participants.find(p => p !== user.phoneNumber));
+        const uniquePhones = [...new Set(phonesToFetch)];
+        const fetchedUsers = {};
+
+        for (const phone of uniquePhones) {
+          const result = await getUserbySearch(phone, phone);
+          if (result && result.length > 0) {
+            fetchedUsers[phone] = result[0];
+          }
+        }
+
+        setUsersInfo(fetchedUsers);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy dữ liệu:", error);
+    }
+  };
+
+  // Lắng nghe socket cho conversation mới
   useEffect(() => {
-    const newSocket = io(`http://${BASE_URL}:3618`);
-    setSocket(newSocket);
+    if (!thisUser?.phoneNumber) return;
 
-    newSocket.on("receiveMessage", (newMessage) => {
-      console.log("Nhận tin nhắn mới trong list chat:", newMessage);
-      updateConversationWithNewMessage(newMessage);
-    });
+    // Join socket với số điện thoại của user
+    socket.emit('joinUser', thisUser.phoneNumber);
 
-    newSocket.on("messageRevoked", (revokedMessage) => {
-      console.log("Tin nhắn đã bị thu hồi:", revokedMessage);
-      updateConversationWithRevokedMessage(revokedMessage);
+    // Lắng nghe khi có conversation mới được tạo
+    socket.on('newConversation', async (data) => {
+      // Kiểm tra xem user hiện tại có trong conversation không
+      if (data.participants.includes(thisUser.phoneNumber)) {
+        await fetchData(); // Load lại toàn bộ danh sách
+      }
     });
 
     return () => {
-      if (newSocket) {
-        newSocket.disconnect();
-      }
+      socket.off('newConversation');
     };
-  }, []);
+  }, [thisUser?.phoneNumber]);
 
   const updateConversationWithNewMessage = (newMessage) => {
     setConversations(prevConversations => {
@@ -79,85 +111,10 @@ export default function App({ navigation, route }) {
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const userJson = await AsyncStorage.getItem("user");
-        const user = userJson ? JSON.parse(userJson) : null;
-        setThisUser(user);
-        if (!user || !user.phoneNumber) {
-          console.error("Không tìm thấy thông tin user hoặc số điện thoại!");
-          return;
-        }
-
-        setCurrentUserPhone(user.phoneNumber);
-        const data = await getConversations();
-        if (data) {
-          // Thêm lastMessageTime để có thể so sánh khi tin nhắn bị thu hồi
-          const conversationsWithTime = data.map(conv => ({
-            ...conv,
-            lastMessageTime: conv.lastMessageTime || Date.now()
-          }));
-          setConversations(conversationsWithTime);
-
-          if (socket) {
-            conversationsWithTime.forEach(conv => {
-              socket.emit("joinRoom", conv.chatRoomId);
-            });
-          }
-
-          const phonesToFetch = data.map(c => c.participants.find(p => p !== user.phoneNumber));
-          const uniquePhones = [...new Set(phonesToFetch)];
-          const fetchedUsers = {};
-
-          for (const phone of uniquePhones) {
-            const result = await getUserbySearch(phone, phone);
-            if (result && result.length > 0) {
-              fetchedUsers[phone] = result[0];
-            }
-          }
-
-          setUsersInfo(fetchedUsers);
-        }
-      } catch (error) {
-        console.error("Lỗi khi lấy dữ liệu:", error);
-      }
-    };
-
-    fetchData();
-  }, [socket]);
-
-  const fetchData = async () => {
-    try {
-      const userJson = await AsyncStorage.getItem("user");
-      const user = userJson ? JSON.parse(userJson) : null;
-      setThisUser(user);
-      if (!user || !user.phoneNumber) {
-        console.error("Không tìm thấy thông tin user hoặc số điện thoại!");
-        return;
-      }
-
-      setCurrentUserPhone(user.phoneNumber);
-      const data = await getConversations();
-      if (data) {
-        setConversations(data);
-
-        const phonesToFetch = data.map(c => c.participants.find(p => p !== user.phoneNumber));
-        const uniquePhones = [...new Set(phonesToFetch)];
-        const fetchedUsers = {};
-
-        for (const phone of uniquePhones) {
-          const result = await getUserbySearch(phone, phone);
-          if (result && result.length > 0) {
-            fetchedUsers[phone] = result[0];
-          }
-        }
-
-        setUsersInfo(fetchedUsers);
-      }
-    } catch (error) {
-      console.error("Lỗi khi lấy dữ liệu:", error);
+    if (route.params?.refresh) {
+      fetchData();
     }
-  };
+  }, [route.params?.refresh, route.params?.timestamp]);
 
   // Lắng nghe socket cho conversation mới
   useEffect(() => {
