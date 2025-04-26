@@ -850,7 +850,7 @@ function View({ setIsLoggedIn }) {
 
       const checkChatRoomData = await checkChatRoomRes.json();
 
-      console.log("checkChatRoomData",checkChatRoomData)
+      console.log("checkChatRoomData", checkChatRoomData);
 
       let chatRoomId;
 
@@ -1107,6 +1107,10 @@ function View({ setIsLoggedIn }) {
         prevList.filter((user) => user.chatRoomId !== chatRoomId)
       );
 
+      // Reset màn hình chat
+      setChatRoom({});
+      setUserChatting([]);
+
       toast.success("Xóa hội thoại thành công!");
     } catch (error) {
       console.error("Lỗi khi xóa hội thoại:", error);
@@ -1280,52 +1284,76 @@ function View({ setIsLoggedIn }) {
         </div>
 
         {/* User List */}
+        {/* User List */}
         <div className="user-list">
-          {userChatList.map((user) => (
-            <div
-              className="user d-flex align-items-center justify-content-between"
-              key={user.chatRoomId}
-            >
-              <div className="d-flex align-items-center">
-                <img className="user-avt" src={user.avatar || a3} alt="User" />
-                <div>
-                  <strong>
-                    {user.isGroup
-                      ? user.name || "Loading..."
-                      : user.fullName || "Loading..."}
-                  </strong>
-                  <br />
-                  <small className={user.isUnreadBy ? "bold-message" : ""}>
-                    {renderLastMessage(user.lastMessage)}
-                  </small>
+          {userChatList.length > 0 ? (
+            userChatList.map((user) => (
+              <div
+                className="user d-flex align-items-center justify-content-between"
+                key={user.chatRoomId}
+                onClick={async () => {
+                  if (user.isGroup) {
+                    await checkGroup(user.chatRoomId);
+                  } else if (user.phoneNumber) {
+                    await check(
+                      userInfo.phoneNumber,
+                      user.phoneNumber,
+                      user.chatRoomId
+                    );
+                  }
+
+                  setReloadConversations((prev) => !prev);
+                }}
+              >
+                <div className="d-flex align-items-center">
+                  <img
+                    className="user-avt"
+                    src={user.avatar || a3}
+                    alt="User"
+                  />
+                  <div>
+                    <strong>
+                      {user.isGroup
+                        ? user.name || "Loading..."
+                        : user.fullName || "Loading..."}
+                    </strong>
+                    <br />
+                    <small className={user.isUnreadBy ? "bold-message" : ""}>
+                      {renderLastMessage(user.lastMessage)}
+                    </small>
+                  </div>
+                </div>
+                <div className="options">
+                  <button
+                    className="btn btn-link options-btn"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
+                      toggleOptions(user.chatRoomId);
+                    }}
+                  >
+                    <i className="bi bi-three-dots-vertical"></i>
+                  </button>
+                  {selectedChatRoomId === user.chatRoomId && (
+                    <div className="options-menu">
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
+                          handleDeleteConversation(user.chatRoomId);
+                        }}
+                      >
+                        Xóa hội thoại
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="options">
-                <button
-                  className="btn btn-link options-btn"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
-                    toggleOptions(user.chatRoomId);
-                  }}
-                >
-                  <i className="bi bi-three-dots-vertical"></i>
-                </button>
-                {selectedChatRoomId === user.chatRoomId && (
-                  <div className="options-menu">
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={(e) => {
-                        e.stopPropagation(); // Ngăn sự kiện click lan sang phần tử cha
-                        handleDeleteConversation(user.chatRoomId);
-                      }}
-                    >
-                      Xóa hội thoại
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p style={{ padding: "0 50px" }}>
+              Hãy tìm bạn bè bằng số điện thoại và trò chuyện với họ ngay nào!
+            </p>
+          )}
         </div>
 
         <div className="sidebar-bottom d-flex justify-content-around align-items-center">
