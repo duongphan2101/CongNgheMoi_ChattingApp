@@ -109,6 +109,42 @@ export default function App({ navigation, route }) {
       });
     });
   };
+
+  useEffect(() => {
+    if (route.params?.refresh) {
+      fetchData();
+    }
+  }, [route.params?.refresh, route.params?.timestamp]);
+
+  // Lắng nghe socket cho conversation mới
+  useEffect(() => {
+    if (!thisUser?.phoneNumber) return;
+
+    // Join socket với số điện thoại của user
+    socket.emit('joinUser', thisUser.phoneNumber);
+
+    // Lắng nghe khi có conversation mới được tạo
+    socket.on('newConversation', async (data) => {
+      // Kiểm tra xem user hiện tại có trong conversation không
+      if (data.participants.includes(thisUser.phoneNumber)) {
+        await fetchData(); // Load lại toàn bộ danh sách
+      }
+    });
+
+    // Lắng nghe khi có nhóm mới được tạo
+    socket.on('groupCreated', async (data) => {
+      if (data.participants.includes(thisUser.phoneNumber)) {
+        console.log(`Nhóm mới được tạo: ${data.nameGroup}`);
+        await fetchData(); // Load lại toàn bộ danh sách
+      }
+    });
+
+    return () => {
+      socket.off('newConversation');
+      socket.off('groupCreated');
+    };
+  }, [thisUser?.phoneNumber]);
+
   // Vẫn giữ useFocusEffect để load lại khi focus vào màn hình
   useFocusEffect(
     React.useCallback(() => {

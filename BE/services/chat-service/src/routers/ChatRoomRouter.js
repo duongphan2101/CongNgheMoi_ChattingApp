@@ -394,6 +394,7 @@ module.exports = (io, redisPublisher) => {
       const chatRoom = result.Item;
       const updatedParticipants = chatRoom.participants.filter(p => p !== phoneNumber);
 
+return router;
 
       // Cập nhật lại danh sách thành viên
       const updateParams = {
