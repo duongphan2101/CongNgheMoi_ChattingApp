@@ -16,6 +16,7 @@ import checkGroup from "../../API/api_checkGroup.js";
 import getChatId from "../../API/api_getChatIdbyChatRoomId.js";
 import deleteMember from "../../API/api_deleteMember.js";
 import disbandGroup from "../../API/api_disbandGroup.js";
+import ShowModal from "../showModal/showModal.js";
 
 const socket = io("http://localhost:3618");
 const notificationSocket = io("http://localhost:3515");
@@ -34,7 +35,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [showReactions, setShowReactions] = useState(null);
   const [messageReactions, setMessageReactions] = useState({});
   const [activeReactionTooltip, setActiveReactionTooltip] = useState(null);
-  // console.log(revokedMessages);
   const [listAddtoGroup, setListAddtoGroup] = useState([]);
   const [nameGroup, setNameGroup] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
@@ -46,18 +46,28 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [modalListFriends, setModalListFriends] = useState(false);
   const [listFriends, setListFriends] = useState([]);
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false); // State mới để điều khiển modal thông tin
 
   // === BỔ SUNG: State cho tính năng tag tên ===
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionList, setSuggestionList] = useState([]);
   const [tagQuery, setTagQuery] = useState("");
   const [userMap, setUserMap] = useState({});
+
   const handleOpenOptionsModal = () => {
     if (chatRoom.status === "DISBANDED") {
       toast.error("Nhóm đã bị giải tán. Thao tác này đã bị khóa");
       return;
     }
     setIsOptionsModalOpen(true);
+  };
+
+  const handleOpenInfoModal = () => {
+    if (chatRoom.status === "DISBANDED") {
+      toast.error("Nhóm đã bị giải tán. Thao tác này đã bị khóa");
+      return;
+    }
+    setIsInfoModalOpen(true);
   };
 
   const messagesEndRef = useRef(null);
@@ -887,13 +897,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
             key={reaction}
             className={`reaction-badge ${activeReactionTooltip === `${reaction}-${users.join(",")}` ? "active" : ""
               }`}
-          // onClick={() =>
-          //   setActiveReactionTooltip(
-          //     activeReactionTooltip === `${reaction}-${users.join(",")}`
-          //       ? null
-          //       : `${reaction}-${users.join(",")}`
-          //   )
-          // }
           >
             {reaction} {users.length}
             <div className="reaction-tooltip">
@@ -933,7 +936,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [currentChatRoom, setCurrentChatRoom] = useState(chatRoom);
-  // console.log("current chat room ", currentChatRoom);
 
   const handleOpenFriendsModal = async () => {
     if (chatRoom.isGroup) {
@@ -1147,6 +1149,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                     <button className="btn" onClick={handleOpenOptionsModal}>
                       <i
                         className="bi bi-three-dots-vertical"
+                        style={{ fontSize: 25, color: "#fff" }}
+                      ></i>
+                    </button>
+                    <button className="btn" onClick={handleOpenInfoModal}>
+                      <i
+                        className="bi bi-blockquote-right"
                         style={{ fontSize: 25, color: "#fff" }}
                       ></i>
                     </button>
@@ -1704,6 +1712,16 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           </div>
         </div>
       )}
+
+      {/* Modal thông tin hội thoại mới */}
+      <ShowModal
+        isOpen={isInfoModalOpen}
+        onClose={() => setIsInfoModalOpen(false)}
+        chatRoom={chatRoom}
+        userChatting={userChatting}
+        currentUserPhone={currentUserPhone}
+        userMap={userMap}
+      />
     </>
   );
 }

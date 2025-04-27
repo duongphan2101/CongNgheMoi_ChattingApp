@@ -1,0 +1,159 @@
+.modal-container {
+    display: block;
+  }
+  
+  .modal-content-custom {
+    border-radius: 8px;
+    width: 110%;
+    height: 100vh;
+    
+  }
+  
+  .modal-header-custom h5 {
+    margin: 0;
+  }
+  
+  .contact-info {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    
+  }
+  
+  .avatar-circle {
+    width: 48px;
+    height: 48px;
+    background-color: #6c757d;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+  }
+  
+  .contact-name {
+    margin-left: 1rem;
+  }
+  
+  .contact-name h6 {
+    margin: 0;
+  }
+  
+  .edit-button {
+    margin-left: auto;
+    color: #007bff;
+    text-decoration: none;
+    padding: 0;
+    font-size: 14px;
+  }
+  
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .section-label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #dee2e6;
+  }
+
+  
+  .view-all-button {
+    color: #007bff;
+    text-decoration: none;
+    padding: 0;
+    font-size: 14px;
+    margin-left: 290px;
+  }
+  .view-all-buttonfile {
+    color: #007bff;
+    text-decoration: none;
+    padding: 0;
+    font-size: 14px;
+    margin-left: 340px;
+  }
+  .view-all-buttonlink {
+    color: #007bff;
+    text-decoration: none;
+    padding: 0;
+    font-size: 14px;
+    margin-left: 340px;
+  }
+  
+  .media-gallery {
+    display: flex;
+    margin-top: 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .media-placeholder {
+    width: 80px;
+    height: 80px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+  }
+  
+  .no-files-text {
+    color: #6c757d;
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+  }
+  
+  .link-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .link-icon {
+    width: 40px;
+    height: 40px;
+    background-color: #e3f2fd;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .link-details {
+    margin-left: 0.5rem;
+  }
+  
+  .link-details p {
+    margin: 0;
+    font-size: 14px;
+  }
+  
+  .link-meta {
+    color: #6c757d;
+    font-size: 12px;
+    margin-bottom: 0;
+  }
+  
+  .security-setting {
+    display: flex;
+    align-items: center;
+    margin-top: 0.5rem;
+  }
+  
+  .security-icon {
+    color: #6c757d;
+    margin-right: 0.5rem;
+  }
+  
+  .security-label {
+    margin: 0;
+  }
+  
+  .security-value {
+    margin-left: auto;
+    color: #6c757d;
+  }
