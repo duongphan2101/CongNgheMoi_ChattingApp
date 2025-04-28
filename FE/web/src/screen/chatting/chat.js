@@ -17,6 +17,7 @@ import getChatId from "../../API/api_getChatIdbyChatRoomId.js";
 import deleteMember from "../../API/api_deleteMember.js";
 import disbandGroup from "../../API/api_disbandGroup.js";
 import { LanguageContext, locales } from "../../contexts/LanguageContext";
+import ShowModal from "../showModal/showModal.js";
 
 const socket = io("http://localhost:3618");
 console.log("connected to socket server", socket.connect);
@@ -36,7 +37,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [showReactions, setShowReactions] = useState(null);
   const [messageReactions, setMessageReactions] = useState({});
   const [activeReactionTooltip, setActiveReactionTooltip] = useState(null);
-  // console.log(revokedMessages);
   const [listAddtoGroup, setListAddtoGroup] = useState([]);
   const [nameGroup, setNameGroup] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
@@ -50,18 +50,28 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [modalListFriends, setModalListFriends] = useState(false);
   const [listFriends, setListFriends] = useState([]);
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
   // === BỔ SUNG: State cho tính năng tag tên ===
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionList, setSuggestionList] = useState([]);
   const [tagQuery, setTagQuery] = useState("");
   const [userMap, setUserMap] = useState({});
+
   const handleOpenOptionsModal = () => {
     if (chatRoom.status === "DISBANDED") {
       toast.error("Nhóm đã bị giải tán. Thao tác này đã bị khóa");
       return;
     }
     setIsOptionsModalOpen(true);
+  };
+
+  const handleOpenInfoModal = () => {
+    if (chatRoom.status === "DISBANDED") {
+      toast.error("Nhóm đã bị giải tán. Thao tác này đã bị khóa");
+      return;
+    }
+    setIsInfoModalOpen(true);
   };
 
   const messagesEndRef = useRef(null);
@@ -451,29 +461,23 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
     // Phát hiện ký tự @
     const lastAt = value.lastIndexOf("@");
-    if (
-      lastAt !== -1 &&
-      (value.length === lastAt + 1 || !value[lastAt + 1].match(/\s/))
-    ) {
-      const query = value
-        .slice(lastAt + 1)
-        .toLowerCase()
-        .normalize("NFC");
-      setTagQuery(query);
-      setShowSuggestions(true);
+    if (lastAt !== -1 && (value.length === lastAt + 1 || !value[lastAt + 1].match(/\s/))) {
+        const query = value.slice(lastAt + 1).toLowerCase().normalize("NFC");
+        setTagQuery(query);
+        setShowSuggestions(true);
 
-      const suggestions = [];
-      if (chatRoom.isGroup && "all".includes(query)) {
-        suggestions.push({ fullName: "All", phoneNumber: "all" });
-      }
-      // Lọc danh sách thành viên
-      const filteredMembers = members.filter((member) =>
-        member.fullName.toLowerCase().includes(query)
-      );
-      setSuggestionList([...suggestions, ...filteredMembers]);
+        const suggestions = [];
+        if (chatRoom.isGroup && "all".includes(query)) {
+            suggestions.push({ fullName: "All", phoneNumber: "all" });
+        }
+
+        const filteredMembers = members.filter((member) =>
+            member.fullName.toLowerCase().includes(query)
+        );
+        setSuggestionList([...suggestions, ...filteredMembers]);
     } else {
-      setShowSuggestions(false);
-      setSuggestionList([]);
+        setShowSuggestions(false);
+        setSuggestionList([]);
     }
 
     socket.emit("typing", chatRoom?.chatRoomId);
@@ -602,7 +606,7 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           sender: replyingTo.sender,
         }
         : null,
-      taggedUsers, // Thêm danh sách người được tag
+      taggedUsers, 
     };
 
     setMessage("");
@@ -729,7 +733,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     }
   };
 
-  // === BỔ SUNG: Sửa đổi renderMessageContent để hiển thị tag ===
   const renderMessageContent = (msg) => {
     const isRevoked = msg.isRevoked;
     const isAudio = msg.type === "audio" || msg.originalType === "audio";
@@ -762,31 +765,20 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       );
     } else {
       // Xử lý tag trong tin nhắn
-      const tagRegex = /@([\p{L}\s]+|All)/gu;
+      const tagRegex = /@([\p{L}\s]+)/gu;
       const parts = msg.message.split(tagRegex);
       const renderedMessage = parts.map((part, index) => {
         if (index % 2 === 1) {
           const name = part.trim();
-          if (name.toLowerCase() === "all") {
-            return (
-              <span
-                key={index}
-                style={{ color: "#007bff", fontWeight: "bold" }}
-              >
-                @All
-              </span>
-            );
-          }
           const member = members.find((m) => m.fullName === name);
           if (member) {
-            const tagName = removeAccentsAndSpaces(member.fullName);
             return (
               <a
                 key={index}
                 href={`/user/${member.phoneNumber}`}
-                style={{ color: "#007bff", fontWeight: "bold" }}
+                className="chat-tag-member"
               >
-                @{tagName}
+                @{member.fullName}
               </a>
             );
           }
@@ -950,7 +942,6 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [currentChatRoom, setCurrentChatRoom] = useState(chatRoom);
-  // console.log("current chat room ", currentChatRoom);
 
   const handleOpenFriendsModal = async () => {
     if (chatRoom.isGroup) {
@@ -1217,6 +1208,12 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                     <button className="btn" onClick={handleOpenOptionsModal}>
                       <i
                         className="bi bi-three-dots-vertical"
+                        style={{ fontSize: 25, color: "#fff" }}
+                      ></i>
+                    </button>
+                    <button className="btn" onClick={handleOpenInfoModal}>
+                      <i
+                        className="bi bi-blockquote-right"
                         style={{ fontSize: 25, color: "#fff" }}
                       ></i>
                     </button>
@@ -1846,6 +1843,15 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
           </div>
         </div>
       )}
+      <ShowModal
+        isOpen={isInfoModalOpen}
+        onClose={() => setIsInfoModalOpen(false)}
+        chatRoom={{ ...chatRoom, messages }}
+        userChatting={userChatting}
+        currentUserPhone={currentUserPhone}
+        userMap={userMap}
+        onDisbandGroup={handleDisbandGroup} // giải tán nhóm
+      />
     </>
   );
 }
