@@ -589,6 +589,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       chatRoom?.participants?.filter((phone) => phone !== currentUserPhone) ||
       [];
     const chatId = await getChatId(chatRoom.chatRoomId);
+    console.log("ChatId from chatjs:", chatId);
+
     const newMsg = {
       chatRoomId: chatRoom?.chatRoomId || "",
       sender: currentUserPhone,
