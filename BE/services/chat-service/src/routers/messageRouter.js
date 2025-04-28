@@ -12,8 +12,8 @@ const TABLE_MESSAGE_NAME = "Message";
 const TABLE_CONVERSATION_NAME = "Conversations";
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "lab2s3aduong";
 
-const ffmpegPath = require('ffmpeg-static');
-const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require("ffmpeg-static");
+const ffmpeg = require("fluent-ffmpeg");
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 // Cấu hình multer để lưu tệp tạm trên disk
@@ -40,16 +40,19 @@ module.exports = (io, redisPublisher) => {
   router.post("/sendMessage", async (req, res) => {
     try {
       const { chatRoomId, sender, receiver, message, chatId, replyTo } = req.body;
-  
       if (!chatRoomId || !sender || !receiver || !message) {
         console.error("❌ Thiếu dữ liệu từ client:", req.body);
         return res.status(400).json({ error: "Thiếu trường bắt buộc!" });
       }
-  
-      const newMessage = new Message(chatRoomId, sender, receiver, message, "text");
 
-      console.log("🔍 newMessage before save:", newMessage);
-  
+      const newMessage = new Message(
+        chatRoomId,
+        sender,
+        receiver,
+        message,
+        "text",
+      );
+
       if (replyTo) {
         const repliedMessageParams = {
           TableName: TABLE_MESSAGE_NAME,
@@ -60,7 +63,7 @@ module.exports = (io, redisPublisher) => {
         };
         const repliedMessageData = await dynamoDB.get(repliedMessageParams).promise();
         const repliedMessage = repliedMessageData.Item;
-  
+
         newMessage.replyTo = {
           timestamp: replyTo.timestamp,
           message:
@@ -72,34 +75,30 @@ module.exports = (io, redisPublisher) => {
           sender: replyTo.sender,
         };
       }
-  
       const params = {
         TableName: TABLE_MESSAGE_NAME,
-        Item: {...newMessage},
+        Item: newMessage,
       };
-  
+
       await dynamoDB.put(params).promise();
-      console.log("✅ Tin nhắn đã lưu vào DB:", newMessage);
-  
+      console.log("Tin nhắn đã lưu vào DB:", newMessage);
+
       const getConversationParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
       };
-  
+
       const conversationData = await dynamoDB.get(getConversationParams).promise();
-  
+
       if (!conversationData.Item || !conversationData.Item.participants) {
         return res.status(404).json({ error: "Không tìm thấy cuộc trò chuyện!" });
       }
-  
+
       const participants = conversationData.Item.participants;
       const unreadFor = participants.filter((p) => p !== sender);
-      const currentUnreadList = new Set(conversationData.Item.isUnreadBy || []);
+      const currentUnreadList = conversationData.Item.isUnreadBy || [];
       const updatedUnreadList = Array.from(new Set([...currentUnreadList, ...unreadFor]));
-  
-      console.log("Danh sách isUnreadBy hiện tại:", currentUnreadList);
-      console.log("Danh sách isUnreadBy sau khi cập nhật:", updatedUnreadList);
-  
+
       const updateParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
@@ -118,11 +117,11 @@ module.exports = (io, redisPublisher) => {
         },
         ReturnValues: "UPDATED_NEW",
       };
-  
+
       await dynamoDB.update(updateParams).promise();
-  
+
       io.to(chatRoomId).emit("receiveMessage", newMessage);
-  
+
       const notifyPayload = JSON.stringify({
         type: "new_message",
         to: receiver,
@@ -130,10 +129,10 @@ module.exports = (io, redisPublisher) => {
         message,
         timestamp: newMessage.timestamp,
       });
-  
+
       redisPublisher.publish("notifications", notifyPayload);
-      console.log("✅ Đã publish thông báo:", notifyPayload);
-  
+      console.log("Đã publish thông báo:", notifyPayload);
+
       res.status(200).json({ message: "Gửi tin nhắn thành công!" });
     } catch (error) {
       console.error("❌ Lỗi khi lưu tin nhắn:", error);
@@ -151,7 +150,9 @@ module.exports = (io, redisPublisher) => {
       const { chatRoomId, messageId } = req.body;
 
       if (!chatRoomId || !messageId) {
-        return res.status(400).json({ error: "Thiếu chatRoomId hoặc messageId!" });
+        return res
+          .status(400)
+          .json({ error: "Thiếu chatRoomId hoặc messageId!" });
       }
 
       const getParams = {
@@ -200,23 +201,28 @@ module.exports = (io, redisPublisher) => {
           chatRoomId: chatRoomId,
           timestamp: messageId,
         },
-        UpdateExpression: "SET #msg = :newMsg, #isRevoked = :isRevoked, #originalType = :originalType, #reactions = :emptyReactions",
+        UpdateExpression:
+          "SET #msg = :newMsg, #isRevoked = :isRevoked, #originalType = :originalType, #reactions = :emptyReactions",
         ExpressionAttributeNames: {
           "#msg": "message",
           "#isRevoked": "isRevoked",
           "#originalType": "originalType",
-          "#reactions": "reactions"
+          "#reactions": "reactions",
         },
         ExpressionAttributeValues: {
           ":newMsg": "Tin nhắn đã được thu hồi",
           ":isRevoked": true,
           ":originalType": message.type,
-          ":emptyReactions": {}
+          ":emptyReactions": {},
         },
-        ReturnValues: "ALL_NEW"
+        ReturnValues: "ALL_NEW",
       };
 
-      if (message.type == "text" || message.type == "file" || message.type == "audio") {
+      if (
+        message.type == "text" ||
+        message.type == "file" ||
+        message.type == "audio"
+      ) {
         updateParams.UpdateExpression += ", #type = :type";
         updateParams.ExpressionAttributeNames["#type"] = "type";
         updateParams.ExpressionAttributeValues[":type"] = "revoked";
@@ -229,7 +235,7 @@ module.exports = (io, redisPublisher) => {
       const messagesParams = {
         TableName: TABLE_MESSAGE_NAME,
         FilterExpression: "chatRoomId = :chatRoomId",
-        ExpressionAttributeValues: { ":chatRoomId": chatRoomId }
+        ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
       };
 
       const messagesResult = await dynamoDB.scan(messagesParams).promise();
@@ -258,28 +264,34 @@ module.exports = (io, redisPublisher) => {
         const updateConversationParams = {
           TableName: TABLE_CONVERSATION_NAME,
           Key: { chatId },
-          UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
+          UpdateExpression:
+            "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
           ExpressionAttributeValues: {
             ":lastMessage": lastMessageContent,
-            ":lastMessageAt": lastMessageAt
-          }
+            ":lastMessageAt": lastMessageAt,
+          },
         };
 
         await dynamoDB.update(updateConversationParams).promise();
         console.log(`✅ Đã cập nhật lastMessage cho chatId: ${chatId}`);
       } else if (messages.length > 1) {
         // Có tin nhắn khác, lấy tin nhắn mới nhất không bị thu hồi
-        const latestNonRevoked = messages.find(msg => !msg.isRevoked);
+        const latestNonRevoked = messages.find((msg) => !msg.isRevoked);
         if (latestNonRevoked) {
-          lastMessageContent = latestNonRevoked.type === "audio" ? "Tin nhắn thoại" :
-            latestNonRevoked.type === "file" ? JSON.stringify({
-              name: latestNonRevoked.fileInfo?.name || "File",
-              url: latestNonRevoked.fileInfo?.url || "",
-              size: latestNonRevoked.fileInfo?.size || 0,
-              type: latestNonRevoked.fileInfo?.type || "file"
-            }) :
-              latestNonRevoked.message;
-          lastMessageAt = new Date(parseInt(latestNonRevoked.timestamp)).toLocaleDateString("vi-VN", {
+          lastMessageContent =
+            latestNonRevoked.type === "audio"
+              ? "Tin nhắn thoại"
+              : latestNonRevoked.type === "file"
+              ? JSON.stringify({
+                  name: latestNonRevoked.fileInfo?.name || "File",
+                  url: latestNonRevoked.fileInfo?.url || "",
+                  size: latestNonRevoked.fileInfo?.size || 0,
+                  type: latestNonRevoked.fileInfo?.type || "file",
+                })
+              : latestNonRevoked.message;
+          lastMessageAt = new Date(
+            parseInt(latestNonRevoked.timestamp)
+          ).toLocaleDateString("vi-VN", {
             year: "numeric",
             month: "2-digit",
             day: "2-digit",
@@ -291,11 +303,12 @@ module.exports = (io, redisPublisher) => {
           const updateConversationParams = {
             TableName: TABLE_CONVERSATION_NAME,
             Key: { chatId },
-            UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
+            UpdateExpression:
+              "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
             ExpressionAttributeValues: {
               ":lastMessage": lastMessageContent,
-              ":lastMessageAt": lastMessageAt
-            }
+              ":lastMessageAt": lastMessageAt,
+            },
           };
 
           await dynamoDB.update(updateConversationParams).promise();
@@ -309,7 +322,7 @@ module.exports = (io, redisPublisher) => {
         lastMessage: lastMessageContent,
         lastMessageAt: lastMessageAt,
         sender,
-        receiver
+        receiver,
       });
 
       res.status(200).json({ message: "Thu hồi tin nhắn thành công!" });
@@ -324,7 +337,9 @@ module.exports = (io, redisPublisher) => {
       const { chatId, phoneNumber } = req.body;
 
       if (!chatId || !phoneNumber) {
-        return res.status(400).json({ error: "Thiếu chatId hoặc phoneNumber!" });
+        return res
+          .status(400)
+          .json({ error: "Thiếu chatId hoặc phoneNumber!" });
       }
 
       const getParams = {
@@ -335,17 +350,25 @@ module.exports = (io, redisPublisher) => {
       const conversationData = await dynamoDB.get(getParams).promise();
 
       if (!conversationData.Item) {
-        return res.status(404).json({ error: "Không tìm thấy cuộc trò chuyện!" });
+        return res
+          .status(404)
+          .json({ error: "Không tìm thấy cuộc trò chuyện!" });
       }
 
       const currentUnreadList = conversationData.Item.isUnreadBy || [];
 
       if (!currentUnreadList.includes(phoneNumber)) {
-        console.log(`Số ${phoneNumber} không có trong isUnreadBy => không cần xóa.`);
-        return res.status(200).json({ message: "Đã đọc hoặc không có gì để cập nhật!" });
+        console.log(
+          `Số ${phoneNumber} không có trong isUnreadBy => không cần xóa.`
+        );
+        return res
+          .status(200)
+          .json({ message: "Đã đọc hoặc không có gì để cập nhật!" });
       }
 
-      const updatedUnreadList = currentUnreadList.filter((user) => user !== phoneNumber);
+      const updatedUnreadList = currentUnreadList.filter(
+        (user) => user !== phoneNumber
+      );
 
       const updateParams = {
         TableName: TABLE_CONVERSATION_NAME,
@@ -358,8 +381,76 @@ module.exports = (io, redisPublisher) => {
       };
 
       const result = await dynamoDB.update(updateParams).promise();
-      console.log(`✅ Đã xóa ${phoneNumber} khỏi isUnreadBy cho chatId:`, chatId);
+      console.log(
+        `✅ Đã xóa ${phoneNumber} khỏi isUnreadBy cho chatId:`,
+        chatId
+      );
 
+      res.status(200).json({
+        message: "Đã đánh dấu là đã đọc!",
+        updatedAttributes: result.Attributes,
+      });
+    } catch (error) {
+      console.error("❌ Lỗi khi cập nhật isUnreadBy:", error);
+      res.status(500).json({ error: "Lỗi server!" });
+    }
+  });
+
+  // Backend: API markAsReadGroup
+  router.post("/markAsReadGroup", async (req, res) => {
+    try {
+      const { chatRoomId, phoneNumber } = req.body;
+  
+      if (!chatRoomId || !phoneNumber) {
+        return res
+          .status(400)
+          .json({ error: "Thiếu chatRoomId hoặc phoneNumber!" });
+      }
+  
+      const getParams = {
+        TableName: TABLE_CONVERSATION_NAME,
+        Key: { chatId: chatRoomId },
+      };
+  
+      const conversationData = await dynamoDB.get(getParams).promise();
+  
+      if (!conversationData.Item) {
+        return res
+          .status(404)
+          .json({ error: "Không tìm thấy cuộc trò chuyện nhóm!" });
+      }
+  
+      const currentUnreadList = conversationData.Item.isUnreadBy || [];
+  
+      if (!currentUnreadList.includes(phoneNumber)) {
+        console.log(
+          `Số ${phoneNumber} không có trong isUnreadBy => không cần xóa.`
+        );
+        return res
+          .status(200)
+          .json({ message: "Đã đọc hoặc không có gì để cập nhật!" });
+      }
+  
+      const updatedUnreadList = currentUnreadList.filter(
+        (user) => user !== phoneNumber
+      );
+  
+      const updateParams = {
+        TableName: TABLE_CONVERSATION_NAME,
+        Key: { chatId: chatRoomId },
+        UpdateExpression: "SET isUnreadBy = :updatedUnreadList",
+        ExpressionAttributeValues: {
+          ":updatedUnreadList": updatedUnreadList,
+        },
+        ReturnValues: "UPDATED_NEW",
+      };
+  
+      const result = await dynamoDB.update(updateParams).promise();
+      console.log(
+        `✅ Đã xóa ${phoneNumber} khỏi isUnreadBy cho chatRoomId:`,
+        chatRoomId
+      );
+  
       res.status(200).json({
         message: "Đã đánh dấu là đã đọc!",
         updatedAttributes: result.Attributes,
@@ -379,16 +470,23 @@ module.exports = (io, redisPublisher) => {
       }
 
       const inputPath = req.file.path;
-      const outputPath = path.join(__dirname, "..", "uploads", `converted-${Date.now()}.mp3`);
+      const outputPath = path.join(
+        __dirname,
+        "..",
+        "uploads",
+        `converted-${Date.now()}.mp3`
+      );
 
       await new Promise((resolve, reject) => {
         ffmpeg(inputPath)
-          .toFormat('mp3')
+          .toFormat("mp3")
           .audioBitrate(128)
           .audioChannels(2)
           .audioFrequency(44100)
-          .on('end', resolve)
-          .on('error', (err) => reject(new Error(`Lỗi chuyển đổi MP3: ${err.message}`)))
+          .on("end", resolve)
+          .on("error", (err) =>
+            reject(new Error(`Lỗi chuyển đổi MP3: ${err.message}`))
+          )
           .save(outputPath);
       });
 
@@ -407,13 +505,21 @@ module.exports = (io, redisPublisher) => {
       await fs.unlink(outputPath);
 
       const audioUrl = uploadResult.Location;
-      const audioMessage = new Message(chatRoomId, sender, receiver, "Tin nhắn thoại", "audio");
+      const audioMessage = new Message(
+        chatRoomId,
+        sender,
+        receiver,
+        "Tin nhắn thoại",
+        "audio"
+      );
       audioMessage.fileInfo = { url: audioUrl };
 
-      await dynamoDB.put({
-        TableName: TABLE_MESSAGE_NAME,
-        Item: audioMessage,
-      }).promise();
+      await dynamoDB
+        .put({
+          TableName: TABLE_MESSAGE_NAME,
+          Item: audioMessage,
+        })
+        .promise();
 
       console.log("✅ Tin nhắn ghi âm đã lưu vào DB:", audioMessage);
 
@@ -422,31 +528,41 @@ module.exports = (io, redisPublisher) => {
         Key: { chatId },
       };
 
-      const conversationData = await dynamoDB.get(getConversationParams).promise();
+      const conversationData = await dynamoDB
+        .get(getConversationParams)
+        .promise();
 
       if (!conversationData.Item || !conversationData.Item.participants) {
-        return res.status(404).json({ error: "Không tìm thấy cuộc trò chuyện!" });
+        return res
+          .status(404)
+          .json({ error: "Không tìm thấy cuộc trò chuyện!" });
       }
 
       const participants = conversationData.Item.participants;
       const unreadFor = participants.filter((p) => p !== sender);
       const currentUnreadList = conversationData.Item.isUnreadBy || [];
-      const updatedUnreadList = Array.from(new Set([...currentUnreadList, ...unreadFor]));
+      const updatedUnreadList = Array.from(
+        new Set([...currentUnreadList, ...unreadFor])
+      );
 
       const updateParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
-        UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnreadBy = :updatedUnreadList",
+        UpdateExpression:
+          "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt, isUnreadBy = :updatedUnreadList",
         ExpressionAttributeValues: {
           ":lastMessage": "Tin Nhắn Thoại",
-          ":lastMessageAt": new Date(audioMessage.timestamp).toLocaleString("vi-VN", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          }),
+          ":lastMessageAt": new Date(audioMessage.timestamp).toLocaleString(
+            "vi-VN",
+            {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            }
+          ),
           ":updatedUnreadList": updatedUnreadList,
         },
         ReturnValues: "UPDATED_NEW",
@@ -476,71 +592,71 @@ module.exports = (io, redisPublisher) => {
     }
   });
 
-  router.post('/addReaction', async (req, res) => {
+  router.post("/addReaction", async (req, res) => {
     try {
-        const { chatRoomId, messageId, user, reaction } = req.body;
-        if (!chatRoomId || !messageId || !user || !reaction) {
-            return res.status(400).json({ error: "Thiếu dữ liệu!" });
+      const { chatRoomId, messageId, user, reaction } = req.body;
+      if (!chatRoomId || !messageId || !user || !reaction) {
+        return res.status(400).json({ error: "Thiếu dữ liệu!" });
+      }
+
+      const getParams = {
+        TableName: TABLE_MESSAGE_NAME,
+        Key: {
+          chatRoomId: chatRoomId,
+          timestamp: messageId,
+        },
+      };
+
+      const messageData = await dynamoDB.get(getParams).promise();
+      if (!messageData.Item) {
+        return res.status(404).json({ error: "Không tìm thấy tin nhắn!" });
+      }
+
+      const message = messageData.Item;
+      if (!message.reactions) {
+        message.reactions = {};
+      }
+
+      if (!message.reactions[reaction]) {
+        message.reactions[reaction] = [];
+      }
+
+      const userIndex = message.reactions[reaction].indexOf(user);
+      if (userIndex !== -1) {
+        message.reactions[reaction].splice(userIndex, 1);
+        if (message.reactions[reaction].length === 0) {
+          delete message.reactions[reaction];
         }
+      } else {
+        message.reactions[reaction].push(user);
+      }
 
-        const getParams = {
-            TableName: TABLE_MESSAGE_NAME,
-            Key: {
-                chatRoomId: chatRoomId,
-                timestamp: messageId,
-            },
-        };
+      const updateParams = {
+        TableName: TABLE_MESSAGE_NAME,
+        Key: {
+          chatRoomId: chatRoomId,
+          timestamp: messageId,
+        },
+        UpdateExpression: "SET reactions = :reactions",
+        ExpressionAttributeValues: {
+          ":reactions": message.reactions,
+        },
+        ReturnValues: "ALL_NEW",
+      };
 
-        const messageData = await dynamoDB.get(getParams).promise();
-        if (!messageData.Item) {
-            return res.status(404).json({ error: "Không tìm thấy tin nhắn!" });
-        }
+      const updatedMessage = await dynamoDB.update(updateParams).promise();
 
-        const message = messageData.Item;
-        if (!message.reactions) {
-            message.reactions = {};
-        }
+      io.to(chatRoomId).emit("messageReacted", {
+        messageId: messageId,
+        reactions: message.reactions,
+      });
 
-        if (!message.reactions[reaction]) {
-            message.reactions[reaction] = [];
-        }
-
-        const userIndex = message.reactions[reaction].indexOf(user);
-        if (userIndex !== -1) {
-            message.reactions[reaction].splice(userIndex, 1);
-            if (message.reactions[reaction].length === 0) {
-                delete message.reactions[reaction];
-            }
-        } else {
-            message.reactions[reaction].push(user);
-        }
-
-        const updateParams = {
-            TableName: TABLE_MESSAGE_NAME,
-            Key: {
-                chatRoomId: chatRoomId,
-                timestamp: messageId,
-            },
-            UpdateExpression: "SET reactions = :reactions",
-            ExpressionAttributeValues: {
-                ":reactions": message.reactions,
-            },
-            ReturnValues: "ALL_NEW",
-        };
-
-        const updatedMessage = await dynamoDB.update(updateParams).promise();
-
-        io.to(chatRoomId).emit('messageReacted', {
-            messageId: messageId,
-            reactions: message.reactions,
-        });
-
-        res.status(200).json({ success: true, reactions: message.reactions });
+      res.status(200).json({ success: true, reactions: message.reactions });
     } catch (error) {
-        console.error('Lỗi khi thêm reaction:', error);
-        res.status(500).json({ error: 'Lỗi server!' });
+      console.error("Lỗi khi thêm reaction:", error);
+      res.status(500).json({ error: "Lỗi server!" });
     }
-});
+  });
 
   return router;
 };
