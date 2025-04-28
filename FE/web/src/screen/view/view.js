@@ -427,6 +427,10 @@ function View({ setIsLoggedIn }) {
         fetchFriends();
       }, 2000);
 
+      return () => clearInterval(interval); // Cleanup interval on component unmount
+    }
+  }, [currentView, fetchFriendRequests, fetchFriends]);
+
       return () => clearInterval(interval);
     }
   }, [currentView, fetchFriendRequests, fetchFriends]);
@@ -894,8 +898,6 @@ function View({ setIsLoggedIn }) {
 
       console.log("checkChatRoomData", checkChatRoomData);
 
-      let chatRoomId;
-
       if (checkChatRoomData?.chatRoomId) {
         console.log(
           "ChatRoom đã tồn tại với chatRoomId:",
@@ -904,9 +906,9 @@ function View({ setIsLoggedIn }) {
         chatRoomId = checkChatRoomData.chatRoomId; // Sử dụng ChatRoom đã tồn tại
       } else {
         // Tạo mới ChatRoom nếu chưa tồn tại
-        chatRoomId = `C${Math.floor(100 + Math.random() * 90000)}`;
+        const newChatRoomId = `C${Math.floor(100 + Math.random() * 90000)}`;
         const chatRoomData = {
-          chatRoomId,
+          chatRoomId: newChatRoomId,
           isGroup: false,
           participants: [currentUserPhone, targetUserPhone],
         };
@@ -917,7 +919,8 @@ function View({ setIsLoggedIn }) {
           throw new Error("Tạo ChatRoom thất bại!");
         }
 
-        console.log("ChatRoom mới đã được tạo với chatRoomId:", chatRoomId);
+        console.log("ChatRoom mới đã được tạo với chatRoomId:", newChatRoomId);
+        chatRoomId = newChatRoomId; // Assign the new chatRoomId
       }
 
       // Tạo mới Conversation
