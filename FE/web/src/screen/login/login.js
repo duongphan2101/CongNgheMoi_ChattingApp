@@ -18,10 +18,10 @@ function Login({ setIsLoggedIn }) {
     const data = await login(phoneNumber, password);
     if (data) {
       setIsLoggedIn(true);
-      toast.success("Đăng nhập thành công!", { position: "top-right" });
+      toast.success(t.loginSuccess, { position: "top-right" });
       navigate("/");
     } else {
-      toast.error("Đăng nhập thất bại, Vui lòng thử lại!", { position: "top-right" });
+      toast.error(t.loginError, { position: "top-right" });
     }
   };
 

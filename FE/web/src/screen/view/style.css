@@ -324,3 +324,53 @@ body.dark .sidebar-header_search {
     border-radius: 10px;
     padding: 10px;
 }
+
+/* Định dạng dấu ba chấm dọc */
+.options {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end; /* Đẩy dấu ba chấm về phía bên phải */
+  }
+  
+  .options-btn {
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .options-btn:hover {
+    color: #495057; /* Màu khi hover */
+  }
+  
+  /* Menu tùy chọn hiển thị khi nhấn vào dấu ba chấm */
+  .options-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    min-width: 150px;
+  }
+  
+  .options-menu button {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    text-align: left;
+    background: none;
+    border: none;
+    color: #dc3545;
+    cursor: pointer;
+  }
+  
+  .options-menu button:hover {
+    background: #f8d7da;
+  }

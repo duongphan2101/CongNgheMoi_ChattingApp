@@ -4,6 +4,7 @@ const AWS = require("aws-sdk");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const socketIO = require('socket.io');
+const User = require('../models/user');
 require("dotenv").config();
 
 const router = express.Router();
@@ -574,6 +575,36 @@ router.post("/unfriend", async (req, res) => {
   } catch (error) {
     console.error("Lỗi hủy kết bạn:", error);
     res.status(500).json({ message: "Lỗi server!", error: error.message });
+  }
+});
+
+// Trong file router của bạn (ví dụ: userRoutes.js)
+router.post('/checkFriendship', async (req, res) => {
+  try {
+    const { currentPhone, targetPhone } = req.body;
+
+    // Tìm user hiện tại trong DynamoDB
+    const params = {
+      TableName: "Users",
+      Key: {
+        phoneNumber: currentPhone
+      }
+    };
+
+    const dynamoDB = new AWS.DynamoDB.DocumentClient();
+    const result = await dynamoDB.get(params).promise();
+
+    if (!result.Item) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Kiểm tra xem targetPhone có trong mảng friends không
+    const isFriend = result.Item.friends.includes(targetPhone);
+
+    return res.json({ isFriend });
+  } catch (error) {
+    console.error('Error checking friendship:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

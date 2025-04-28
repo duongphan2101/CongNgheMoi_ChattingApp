@@ -86,8 +86,8 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
           >
-            <option value="vi">Tiếng Việt</option>
-            <option value="en">Tiếng Anh</option>
+            <option value="vi">{t.vi}</option>
+            <option value="en">{t.en}</option>
           </select>
         </div>
         <div className="setting-item">
@@ -105,8 +105,8 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
               }
             }}
           >
-            <option value="Dark Mode">Dark Mode</option>
-            <option value="Light Mode">Light Mode</option>
+            <option value="Dark Mode">{t.dark}</option>
+            <option value="Light Mode">{t.light}</option>
           </select>
         </div>
 
@@ -125,10 +125,10 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
               className="btn-close"
               onClick={() => setShowModal(false)}
             ></button>
-            <h2>Đổi Mật Khẩu</h2>
+            <h2>{t.resetPassword}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Mật khẩu cũ</label>
+                <label>{t.oldPassword}</label>
                 <input
                   type="password"
                   value={oldPassword}
@@ -137,7 +137,7 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
                 />
               </div>
               <div className="form-group">
-                <label>Mật khẩu mới</label>
+                <label>{t.newPassword}</label>
                 <input
                   type="password"
                   value={newPassword}
@@ -146,7 +146,7 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
                 />
               </div>
               <div className="form-group">
-                <label>Xác nhận mật khẩu</label>
+                <label>{t.replatePassword}</label>
                 <input
                   type="password"
                   value={confirmPassword}
@@ -154,7 +154,7 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
                   required
                 />
               </div>
-              <button type="submit" className="btn1">Xác Nhận</button>
+              <button type="submit" className="btn1">{t.save}</button>
             </form>
           </div>
         </div>

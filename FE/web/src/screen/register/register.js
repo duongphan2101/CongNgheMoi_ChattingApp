@@ -22,22 +22,22 @@ function Register() {
   const validateInputs = () => {
 
     if (!/^\d{10}$/.test(phoneNumber)) {
-      toast.error("Số điện thoại phải có đúng 10 chữ số.");
+      toast.error(t.invalidPhone);
       return false;
     }
 
     if (!/^(?!.*\.\.)[a-zA-Z0-9](\.?[a-zA-Z0-9_%+-])*@[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/.test(email)) {
-      toast.error("Email không hợp lệ.");
+      toast.error(t.invalidEmail);
       return false;
     }
 
     if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/.test(password)) {
-      toast.error("Mật khẩu phải có ít nhất 6 ký tự, bao gồm ít nhất một chữ cái và một số.");
+      toast.error(t);
       return false;
     }
 
     if (!/^[a-zA-Z0-9][a-zA-Z0-9 ]{2,}$/.test(userName)) {
-      toast.error("Tên người dùng phải có ít nhất 3 ký tự, không có khoảng trắng ở đầu, và chỉ chứa chữ cái hoặc số.");
+      toast.error(t.invalidUsername);
       return false;
     }
     return true;
@@ -49,7 +49,7 @@ function Register() {
 
     if (!validateInputs()) return;
     if (password !== repassword) {
-      toast.error("Mật khẩu không khớp.");
+      toast.error(t.rePass);
       return;
     }
     setLoading(true);

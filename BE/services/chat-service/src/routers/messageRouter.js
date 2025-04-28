@@ -40,19 +40,16 @@ module.exports = (io, redisPublisher) => {
   router.post("/sendMessage", async (req, res) => {
     try {
       const { chatRoomId, sender, receiver, message, chatId, replyTo } = req.body;
+  
       if (!chatRoomId || !sender || !receiver || !message) {
         console.error("❌ Thiếu dữ liệu từ client:", req.body);
         return res.status(400).json({ error: "Thiếu trường bắt buộc!" });
       }
+  
+      const newMessage = new Message(chatRoomId, sender, receiver, message, "text");
 
-      const newMessage = new Message(
-        chatRoomId,
-        sender,
-        receiver,
-        message,
-        "text",
-      );
-
+      console.log("🔍 newMessage before save:", newMessage);
+  
       if (replyTo) {
         const repliedMessageParams = {
           TableName: TABLE_MESSAGE_NAME,
@@ -63,7 +60,7 @@ module.exports = (io, redisPublisher) => {
         };
         const repliedMessageData = await dynamoDB.get(repliedMessageParams).promise();
         const repliedMessage = repliedMessageData.Item;
-
+  
         newMessage.replyTo = {
           timestamp: replyTo.timestamp,
           message:
@@ -75,30 +72,34 @@ module.exports = (io, redisPublisher) => {
           sender: replyTo.sender,
         };
       }
+  
       const params = {
         TableName: TABLE_MESSAGE_NAME,
-        Item: newMessage,
+        Item: {...newMessage},
       };
-
+  
       await dynamoDB.put(params).promise();
-      console.log("Tin nhắn đã lưu vào DB:", newMessage);
-
+      console.log("✅ Tin nhắn đã lưu vào DB:", newMessage);
+  
       const getConversationParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
       };
-
+  
       const conversationData = await dynamoDB.get(getConversationParams).promise();
-
+  
       if (!conversationData.Item || !conversationData.Item.participants) {
         return res.status(404).json({ error: "Không tìm thấy cuộc trò chuyện!" });
       }
-
+  
       const participants = conversationData.Item.participants;
       const unreadFor = participants.filter((p) => p !== sender);
-      const currentUnreadList = conversationData.Item.isUnreadBy || [];
+      const currentUnreadList = new Set(conversationData.Item.isUnreadBy || []);
       const updatedUnreadList = Array.from(new Set([...currentUnreadList, ...unreadFor]));
-
+  
+      console.log("Danh sách isUnreadBy hiện tại:", currentUnreadList);
+      console.log("Danh sách isUnreadBy sau khi cập nhật:", updatedUnreadList);
+  
       const updateParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
@@ -117,11 +118,11 @@ module.exports = (io, redisPublisher) => {
         },
         ReturnValues: "UPDATED_NEW",
       };
-
+  
       await dynamoDB.update(updateParams).promise();
-
+  
       io.to(chatRoomId).emit("receiveMessage", newMessage);
-
+  
       const notifyPayload = JSON.stringify({
         type: "new_message",
         to: receiver,
@@ -129,10 +130,10 @@ module.exports = (io, redisPublisher) => {
         message,
         timestamp: newMessage.timestamp,
       });
-
+  
       redisPublisher.publish("notifications", notifyPayload);
-      console.log("Đã publish thông báo:", notifyPayload);
-
+      console.log("✅ Đã publish thông báo:", notifyPayload);
+  
       res.status(200).json({ message: "Gửi tin nhắn thành công!" });
     } catch (error) {
       console.error("❌ Lỗi khi lưu tin nhắn:", error);

@@ -1,7 +1,9 @@
-import React, { useState} from "react";
+import React, { useState, useContext } from "react";
 import "./contacts_style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import axios from "axios";
+import { LanguageContext, locales } from "../../contexts/LanguageContext";
+import { toast } from "react-toastify";
 
 const BASE_URL = "localhost";
 
@@ -11,9 +13,11 @@ function Contacts({
   handleAcceptFriendRequest,
   handleRejectFriendRequest,
   setFriends,
+  fetchFriends,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
-
+  const { language } = useContext(LanguageContext);
+  const t = locales[language];
   const contacts = [];
 
   const filteredContacts = contacts.filter((contact) =>
@@ -22,14 +26,11 @@ function Contacts({
 
   const handleUnfriend = async (friendPhone) => {
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem("accessToken");
       if (!token) {
-        alert("Vui lòng đăng nhập!");
+        toast.error("Vui lòng đăng nhập!");
         return;
       }
-
-      console.log("Đang gửi yêu cầu hủy kết bạn với:", friendPhone);
-      console.log("Token:", token);
 
       const response = await axios.post(
         `http://${BASE_URL}:3824/user/unfriend`,
@@ -37,26 +38,28 @@ function Contacts({
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
 
-      console.log("Response từ server:", response.data);
-
       if (response.data.message === "Đã hủy kết bạn thành công!") {
-        // Cập nhật UI bằng cách reload trang
-    
-        alert("Đã hủy kết bạn!");
+        // Cập nhật danh sách bạn bè
+        const updatedFriends = friends.filter(
+          (friend) => friend.phoneNumber !== friendPhone
+        );
+        setFriends([...updatedFriends]); // Đảm bảo tạo một mảng mới
+
+        // Gọi lại fetchFriends để đồng bộ hóa
+        if (updatedFriends.length === 0) {
+          await fetchFriends(); // Đồng bộ lại từ server nếu danh sách rỗng
+        }
+
+        toast.success(t.unfriendSuccess);
       }
     } catch (error) {
       console.error("Lỗi hủy kết bạn:", error);
-      if (error.response) {
-        console.error("Response data:", error.response.data);
-        console.error("Response status:", error.response.status);
-        console.error("Response headers:", error.response.headers);
-      }
-      alert("Không thể hủy kết bạn! Vui lòng thử lại sau.");
+      toast.error(t.unfriendFailed);
     }
   };
 
@@ -65,13 +68,13 @@ function Contacts({
       <div className="chat-header row">
         <div className="col-sm-3 d-flex align-items-center">
           <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i>
-          <p className="chat-header_name px-2 m-0">Contacts</p>
+          <p className="chat-header_name px-2 m-0">{t.contacts}</p>
         </div>
         <div className="col-sm-6">
           <div className="search-container w-100">
             <input
               type="text"
-              placeholder="Search contacts..."
+              placeholder={t.search}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
@@ -83,7 +86,7 @@ function Contacts({
 
       {/* Hiển thị danh sách lời mời kết bạn */}
       <div className="friend-requests">
-        <h5>Lời mời kết bạn</h5>
+        <h5>{t.friendRequest}</h5>
         {friendRequests && friendRequests.length > 0 ? (
           <ul className="list-group">
             {friendRequests.map((request) => (
@@ -97,26 +100,26 @@ function Contacts({
                     className="btn btn-success me-2"
                     onClick={() => handleAcceptFriendRequest(request.RequestId)}
                   >
-                    Chấp nhận
+                    {t.acceptFriendRequest}
                   </button>
                   <button
                     className="btn btn-danger"
                     onClick={() => handleRejectFriendRequest(request.RequestId)}
                   >
-                    Từ chối
+                    {t.cancel}
                   </button>
                 </div>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-light">Không có lời mời kết bạn nào.</p>
+          <p className="text-light">{t.notFriendRequest}</p>
         )}
       </div>
 
       {/* Hiển thị danh sách bạn bè */}
       <div className="friends-list mt-4">
-        <h5 className="text-light">Danh sách bạn bè</h5>
+        <h5 className="text-light">{t.listFriend}</h5>
         {friends.length > 0 ? (
           friends.map((friend) => (
             <div key={friend.phoneNumber} className="contact-item">
@@ -133,11 +136,11 @@ function Contacts({
                   <small>{friend.phoneNumber}</small>
                 </div>
               </div>
-              <button 
+              <button
                 className="unfriend-button"
                 onClick={() => handleUnfriend(friend.phoneNumber)}
               >
-                Hủy kết bạn
+                {t.unfriend}
               </button>
             </div>
           ))
@@ -149,7 +152,9 @@ function Contacts({
       {/* Hiển thị danh sách liên hệ */}
       <div className="contacts-list mt-4">
         {filteredContacts.map((contact, index) => (
-          <div key={index} className="contact-item"> {/* Sử dụng index làm key */}
+          <div key={index} className="contact-item">
+            {" "}
+            {/* Sử dụng index làm key */}
             <div className="d-flex align-items-center">
               <div className="contact-avatar">
                 <img
@@ -158,9 +163,8 @@ function Contacts({
                   className="user-avt"
                 />
                 <span
-                  className={`status-indicator ${
-                    contact.online ? "online" : "offline"
-                  }`}
+                  className={`status-indicator ${contact.online ? "online" : "offline"
+                    }`}
                 ></span>
               </div>
               <div className="contact-info">

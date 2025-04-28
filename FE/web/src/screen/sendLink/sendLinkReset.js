@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import sendLinkReset from "../../API/api_sendLinkReset"; // Import the sendLinkReset function
 import { LanguageContext, locales } from "../../contexts/LanguageContext";
+import { toast } from "react-toastify";
 function SendLinkReset() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,7 +15,7 @@ function SendLinkReset() {
   const validatePhoneNumber = () => {
     const phoneRegex = /^0[0-9]{9}$/;
     if (!phoneRegex.test(phoneNumber)) {
-      alert("⚠️ Vui lòng nhập số điện thoại hợp lệ.");
+      toast.error(t.invalidPhone);
       return false;
     }
     return true;
@@ -28,7 +29,7 @@ function SendLinkReset() {
       await sendLinkReset(phoneNumber); // Call the sendLinkReset function
       setSuccess(true);
     } catch (error) {
-      alert("Gửi link đặt lại mật khẩu thất bại. Vui lòng thử lại.");
+      toast.error(t.linkSetPassError);
     } finally {
       setLoading(false);
     }

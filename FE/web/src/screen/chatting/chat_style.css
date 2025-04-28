@@ -307,9 +307,9 @@ body.dark .chat-input {
 }
 
 .modal-header {
-    border-bottom: 1px solid #1d1a1a;
-    background-color: #252f41;
-    padding: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 15px 20px;
 }
 
 .modal-body {
@@ -325,6 +325,11 @@ body.dark .chat-input {
 .modal-content {
     background-color: #252f41;
     color: #fff;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    background-image: linear-gradient(135deg, #252f41 0%, #1e2536 100%);
 }
 
 .modal-body img {
@@ -333,9 +338,50 @@ body.dark .chat-input {
 }
 
 .modal-footer {
-    border-top: 1px solid #1b1616;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 15px 20px;
     background-color: #252f41;
     padding: 15px;
+}
+
+.modal-content .btn-primary {
+    background-image: linear-gradient(135deg, #3a4b6e 0%, #4c3a9c 100%);
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.modal-content .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    background-image: linear-gradient(135deg, #4055a8 0%, #5c46b8 100%);
+}
+
+.modal-content .btn-secondary {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.modal-content .btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.modal-content .form-control {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.modal-content .form-control:focus {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.1);
+}
+
+.modal-content .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .personal-info p {
@@ -722,9 +768,39 @@ audio {
 }
 
 .btn-edit {
-    position: absolute;
-    top: 65px;
-    left: 190px;
+    display: none; /* Ẩn nút mặc định */
+    position: relative; /* Sử dụng position relative thay vì absolute */
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+    transition: all 0.2s ease;
+    opacity: 0; /* Bắt đầu với độ mờ = 0 */
+    transform: scale(0.8); /* Bắt đầu với kích thước nhỏ hơn */
+}
+
+/* Hiển thị nút khi di chuột vào phần chat header hoặc tên */
+.chat-header_name:hover .btn-edit {
+    display: inline-flex;
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* CSS cho hiệu ứng hover trên chính nút */
+.btn-edit:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    transform: scale(1.1);
+}
+
+/* Hiển thị nút khi di chuột vào avatar trong modal info */
+.modal-body_content .d-flex:hover .btn-edit {
+    display: inline-flex;
+    opacity: 1;
+    transform: scale(1);
 }
 
 .suggestions-dropdown {
