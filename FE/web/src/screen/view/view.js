@@ -49,9 +49,27 @@ function View({ setIsLoggedIn }) {
   const [thisUser, setThisUser] = useState(null);
   const [selectedChatRoomId, setSelectedChatRoomId] = useState(null);
   const optionsRef = useRef(null);
+  const [chatRooms, setChatRooms] = useState([]);
 
   const toggleOptions = (chatRoomId) => {
     setSelectedChatRoomId((prev) => (prev === chatRoomId ? null : chatRoomId));
+  };
+
+  const handleUpdateChatRoom = (updatedChatRoom) => {
+    setUserChatList(prev => 
+      prev.map(chat => 
+        chat.chatRoomId === updatedChatRoom.chatRoomId 
+          ? { ...chat, avatar: updatedChatRoom.avatar }
+          : chat
+      )
+    );
+
+    if (chatRoom?.chatRoomId === updatedChatRoom.chatRoomId) {
+      setChatRoom(prev => ({
+        ...prev, 
+        avatar: updatedChatRoom.avatar
+      }));
+    }
   };
 
   useEffect(() => {
@@ -212,10 +230,35 @@ function View({ setIsLoggedIn }) {
 
     socket.on("newChatRoom", handleNewChatRoom);
 
+    socket.on("groupAvatarUpdated", (data) => {
+      setUserChatList(prevList => 
+        prevList.map(chat => {
+          if (chat.chatRoomId === data.chatRoomId || chat.chatId === data.chatId) {
+            return {
+              ...chat,
+              avatar: data.newAvatarUrl
+            };
+          }
+          return chat;
+        })
+      );
+
+      if (chatRoom?.chatRoomId === data.chatRoomId || chatRoom?.chatId === data.chatId) {
+        setChatRoom(prev => ({
+          ...prev,
+          avatar: data.newAvatarUrl
+        }));
+      }
+
+      localStorage.setItem(`chatRoom_${data.chatId}_avatar`, data.newAvatarUrl);
+      localStorage.setItem(`chatRoom_${data.chatRoomId}_avatar`, data.newAvatarUrl);
+    });
+
     return () => {
       socket.off("newChatRoom", handleNewChatRoom);
+      socket.off("groupAvatarUpdated");
     };
-  }, [thisUser?.phoneNumber]);
+  }, [thisUser?.phoneNumber, chatRoom?.chatRoomId, chatRoom?.chatId]);
 
   const handleTogglePhoneNumber = (phoneNumber) => {
     setListAddtoGroup((prev) => {
@@ -275,6 +318,7 @@ function View({ setIsLoggedIn }) {
             userChatting={userChatting || []}
             user={userInfo || {}}
             updateLastMessage={updateLastMessage}
+            onUpdateChatRoom={handleUpdateChatRoom}
           />
         );
       case "setting":
@@ -422,16 +466,16 @@ function View({ setIsLoggedIn }) {
   //   return () => clearInterval(interval); // Cleanup interval on component unmount
   // }, [fetchFriends]);
 
-  useEffect(() => {
-    if (currentView === "contacts") {
-      const interval = setInterval(() => {
-        fetchFriendRequests();
-        fetchFriends();
-      }, 2000);
+  // useEffect(() => {
+  //   if (currentView === "contacts") {
+  //     const interval = setInterval(() => {
+  //       fetchFriendRequests();
+  //       fetchFriends();
+  //     }, 2000);
 
-      return () => clearInterval(interval); // Cleanup interval on component unmount
-    }
-  }, [currentView, fetchFriendRequests, fetchFriends]);
+  //     return () => clearInterval(interval); // Cleanup interval on component unmount
+  //   }
+  // }, [currentView, fetchFriendRequests, fetchFriends]);
 
       return () => clearInterval(interval);
     }
@@ -1410,15 +1454,10 @@ function View({ setIsLoggedIn }) {
                 onClick={async () => {
                   if (user.isGroup) {
                     await checkGroup(user.chatRoomId);
-                  } else if (user.phoneNumber) {
-                    await check(
-                      userInfo.phoneNumber,
-                      user.phoneNumber,
-                      user.chatRoomId
-                    );
+                  } else {
+                    await check(userInfo.phoneNumber, user.phoneNumber, user.chatRoomId);
                   }
-
-                  setReloadConversations((prev) => !prev);
+                  setReloadConversations(prev => !prev);
                 }}
               >
                 <div className="d-flex align-items-center">
@@ -1426,12 +1465,11 @@ function View({ setIsLoggedIn }) {
                     className="user-avt"
                     src={user.avatar || a3}
                     alt="User"
+                    key={user.avatar}
                   />
                   <div>
                     <strong>
-                      {user.isGroup
-                        ? user.name || "Loading..."
-                        : user.fullName || "Loading..."}
+                      {user.isGroup ? user.name || "Loading..." : user.fullName || "Loading..."}
                     </strong>
                     <br />
                     <small className={user.isUnreadBy ? "bold-message" : ""}>

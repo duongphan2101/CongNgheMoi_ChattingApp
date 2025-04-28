@@ -31,6 +31,8 @@ import { Audio } from "expo-av";
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import sendFile from '../api/api_sendFile';
 import getChatIdFromRoom from '../api/api_getChatIdbyChatRoomId';
 import getChatRoom from '../api/api_getChatRoombyChatRoomId.js';
@@ -43,7 +45,6 @@ import updateChatRoom from '../api/api_updateChatRoomforGroup.js';
 import deleteMember from "../api/api_deleteMember.js";
 import disbandGroup from '../api/api_disbandGroup.js';
 
-// Danh sách emoji reaction, đồng bộ với web
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡"];
 
 // Component riêng cho item tin nhắn
@@ -508,11 +509,31 @@ export default function App({ navigation, route }) {
       );
     };
 
+    const groupAvatarUpdated = (data) => {
+      console.log("Received avatar update:", data);
+      if (data.chatRoomId === phongChat.chatRoomId) {
+        console.log("Updating avatar to:", data.newAvatarUrl);
+        // Cập nhật state
+        setPhongChat(prev => ({
+          ...prev,
+          avatar: data.newAvatarUrl
+        }));
+  
+        // Force re-render image
+        const timestamp = new Date().getTime();
+        setPhongChat(prev => ({
+          ...prev,
+          avatar: `${data.newAvatarUrl}?t=${timestamp}`
+        }));
+      }
+    };
+
     socket.on("receiveMessage", handleReceiveMessage);
     socket.on("userTyping", handleTyping);
     socket.on("userStopTyping", handleStopTyping);
     socket.on("messageRevoked", handleMessageRevoked);
     socket.on("messageReacted", handleMessageReacted);
+    socket.on("groupAvatarUpdated", groupAvatarUpdated);
 
     return () => {
       socket.off("receiveMessage", handleReceiveMessage);
@@ -520,6 +541,7 @@ export default function App({ navigation, route }) {
       socket.off("userStopTyping", handleStopTyping);
       socket.off("messageRevoked", handleMessageRevoked);
       socket.off("messageReacted", handleMessageReacted);
+      socket.off("groupAvatarUpdated");
     };
   }, [chatRoom.chatRoomId, thisUser?.phoneNumber]);
 
@@ -992,6 +1014,79 @@ export default function App({ navigation, route }) {
     }
   };
 
+  const downloadFile = async (fileUrl, fileName) => {
+    setIsDownloading(true); // Bật trạng thái tải
+    try {
+      // Kiểm tra quyền truy cập
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        setIsDownloading(false); // Tắt trạng thái tải nếu không có quyền
+        Alert.alert('Cần quyền truy cập', 'Ứng dụng cần quyền truy cập bộ nhớ để tải xuống file.');
+        return;
+      }
+  
+      // Tạo đường dẫn lưu file tạm thời
+      const tempFileUri = FileSystem.cacheDirectory + fileName;
+  
+      // Tải file xuống
+      const downloadResumable = FileSystem.createDownloadResumable(
+        fileUrl,
+        tempFileUri,
+        {},
+        (downloadProgress) => {
+          const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+          console.log(`Tiến độ tải: ${progress * 100}%`);
+        }
+      );
+  
+      const { uri } = await downloadResumable.downloadAsync();
+      console.log('File đã tải xuống tại:', uri);
+  
+      if (uri) {
+        // Kiểm tra loại file dựa trên phần mở rộng
+        const fileExt = fileName.split('.').pop().toLowerCase();
+        const mediaExts = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'mp3', 'wav', 'm4a'];
+  
+        if (mediaExts.includes(fileExt)) {
+          // Nếu là file media, lưu vào MediaLibrary
+          const asset = await MediaLibrary.createAssetAsync(uri);
+          console.log('Asset created:', asset);
+          setIsDownloading(false); // Tắt trạng thái tải
+          Alert.alert('Thành công', 'File media đã được lưu vào thư viện.');
+        } else {
+          // Nếu không phải file media, lưu vào thư mục Downloads
+          const downloadsDir = `${FileSystem.documentDirectory}Downloads/`;
+          await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
+          const finalUri = downloadsDir + fileName;
+          await FileSystem.moveAsync({
+            from: uri,
+            to: finalUri,
+          });
+          console.log('File đã được lưu tại:', finalUri);
+          setIsDownloading(false); // Tắt trạng thái tải
+          // Nếu muốn thông báo thành công, bạn có thể bật lại dòng này:
+          // Alert.alert('Thành công', `File đã được lưu tại: ${finalUri}`);
+  
+          // Nếu có thể chia sẻ, cung cấp tùy chọn chia sẻ file
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(finalUri);
+          }
+        }
+  
+        // Xóa file tạm nếu cần
+        try {
+          await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
+        } catch (deleteError) {
+          console.log('Lỗi khi xóa file tạm:', deleteError);
+        }
+      }
+    } catch (error) {
+      setIsDownloading(false); // Tắt trạng thái tải nếu có lỗi
+      console.error('Lỗi chi tiết khi tải file:', error);
+      Alert.alert('Lỗi', `Không thể tải xuống file: ${error.message}. Vui lòng thử lại sau.`);
+    }
+  };
+
   const handleSendFile = async (fileObjs) => {
     setIsUploading(true);
     try {
@@ -1238,6 +1333,69 @@ export default function App({ navigation, route }) {
     setShowModalAdd(false);
   };
 
+  const handleChangeGroupAvatar = async () => {
+    if (phongChat.status === 'DISBANDED') {
+      Alert.alert("Nhóm đã bị giải tán, không thể thay đổi avatar");
+      return;
+    }
+  
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert("Cần quyền truy cập", "Ứng dụng cần quyền truy cập thư viện ảnh để thay đổi avatar");
+        return;
+      }
+  
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+  
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImage = result.assets[0];
+        
+        const formData = new FormData();
+        formData.append('avatar', {
+          uri: selectedImage.uri,
+          type: 'image/jpeg',
+          name: `avatar-${Date.now()}.jpg`
+        });
+        formData.append('chatRoomId', phongChat.chatRoomId);
+  
+        const response = await fetch(`http://${BASE_URL}:3618/updateGroupAvatar`, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+  
+        const data = await response.json();
+  
+        if (!response.ok) {
+          throw new Error(data.message || 'Cập nhật avatar thất bại');
+        }
+  
+        // Cập nhật state với timestamp để force re-render image
+        const timestamp = new Date().getTime();
+        setPhongChat(prev => ({
+          ...prev,
+          avatar: `${data.avatarUrl}?t=${timestamp}`
+        }));
+  
+        handleCloseModalAdd();
+        
+        Alert.alert("Thành công", "Đã cập nhật avatar nhóm");
+      }
+    } catch (error) {
+      console.error('Lỗi khi đổi avatar:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể cập nhật avatar. Vui lòng thử lại sau.');
+    }
+  };
+
   useEffect(() => {
     if (phongChat.isGroup) {
       setGroupName(phongChat.nameGroup || "");
@@ -1258,7 +1416,7 @@ export default function App({ navigation, route }) {
               <TouchableOpacity onPress={() => navigation.goBack()}>
                 <Ionicons name="chevron-back" size={20} color="#fff" />
               </TouchableOpacity>
-              <Image source={{ uri: chatRoom.isGroup ? chatRoom.avatar : otherUser.avatar }} style={styles.avatar} />
+              <Image source={{ uri: chatRoom.isGroup ? `${phongChat.avatar}?t=${new Date().getTime()}` : otherUser.avatar }} style={styles.avatar}/>
               <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">{chatRoom.isGroup ? chatRoom.fullName : otherUser.fullName}</Text>
             </View>
             {phongChat.status === "DISBANDED" && (
@@ -1330,6 +1488,19 @@ export default function App({ navigation, route }) {
             activeOpacity={1}
             onPress={() => setShowMessageOptions(false)}
           >
+
+            <View style={styles.reactionPickerContainer}>
+              {REACTION_EMOJIS.map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  style={styles.reactionOption}
+                  onPress={() => handleAddReaction(emoji)}
+                >
+                  <Text style={styles.reactionEmoji}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <View style={styles.modalContent}>
               {selectedMessage?.sender === currentUserPhone && (
                 <TouchableOpacity
@@ -1354,15 +1525,6 @@ export default function App({ navigation, route }) {
                 />
                 <Text style={styles.modalOptionText}>Trả lời</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  setShowReactionPicker(true);
-                }}
-              >
-                <Ionicons name="heart" size={24} color={themeColors.text} />
-                <Text style={styles.modalOptionText}>Thêm reaction</Text>
-              </TouchableOpacity>
               {selectedMessage?.type === "text" && !selectedMessage?.isRevoked && (
                 <TouchableOpacity
                   style={styles.modalOption}
@@ -1383,31 +1545,6 @@ export default function App({ navigation, route }) {
                 />
                 <Text style={styles.modalOptionText}>Hủy</Text>
               </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        <Modal
-          transparent={true}
-          visible={showReactionPicker}
-          animationType="slide"
-          onRequestClose={() => setShowReactionPicker(false)}
-        >
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowReactionPicker(false)}
-          >
-            <View style={styles.reactionPicker}>
-              {REACTION_EMOJIS.map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={styles.reactionOption}
-                  onPress={() => handleAddReaction(emoji)}
-                >
-                  <Text style={styles.reactionEmoji}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
             </View>
           </TouchableOpacity>
         </Modal>
@@ -1524,12 +1661,27 @@ export default function App({ navigation, route }) {
               {phongChat.isGroup && (
                 <View style={{ marginBottom: 10, position: 'relative' }}>
                   <Image
-                    source={{ uri: phongChat.avatar }}
+                    source={{ 
+                      uri: `${phongChat.avatar}?t=${new Date().getTime()}` 
+                    }}
                     style={{ width: 80, height: 80, borderRadius: 50, alignSelf: 'center' }}
                   />
-                  <TouchableOpacity style={{ position: 'absolute', right: 100, top: 60 }}>
-                    <Feather name="edit" size={18} color={themeColors.icon2} />
-                  </TouchableOpacity>
+                  {/* {thisUser.phoneNumber === phongChat.admin && ( */}
+                    <TouchableOpacity 
+                      style={{ 
+                        position: 'absolute', 
+                        right: 100, 
+                        top: 60,
+                        backgroundColor: themeColors.primary,
+                        padding: 8,
+                        borderRadius: 15,
+                        elevation: 3
+                      }}
+                      onPress={handleChangeGroupAvatar}
+                    >
+                      <Feather name="edit" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  {/* )} */}
                   <View>
                     <TextInput
                       placeholder="Nhập tên nhóm"
@@ -1804,9 +1956,9 @@ const getStyles = (themeColors) =>
       alignItems: "center",
     },
     modalContent: {
-      width: "80%",
+      width: "85%",
       backgroundColor: themeColors.background,
-      borderRadius: 10,
+      borderRadius: 20,
       padding: 20,
       elevation: 5,
     },
@@ -2041,4 +2193,33 @@ const getStyles = (themeColors) =>
       textAlign: 'center',
       padding: 20,
     },
+    reactionPickerContainer: {
+      width: "85%",
+      flexDirection: 'row',
+      backgroundColor: themeColors.background,
+      borderRadius: 20,
+      padding: 10,
+      marginBottom: 10,
+      elevation: 5,
+      justifyContent: "center",
+    },
+    avatarContainer: {
+      marginBottom: 10,
+      position: 'relative',
+      alignItems: 'center'
+    },
+    groupAvatar: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+    },
+    editAvatarButton: {
+      position: 'absolute',
+      right: -20,
+      bottom: -5,
+      backgroundColor: themeColors.primary,
+      padding: 8,
+      borderRadius: 15,
+      elevation: 3,
+    }
   });

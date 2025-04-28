@@ -17,12 +17,13 @@ import getChatId from "../../API/api_getChatIdbyChatRoomId.js";
 import deleteMember from "../../API/api_deleteMember.js";
 import disbandGroup from "../../API/api_disbandGroup.js";
 import ShowModal from "../showModal/showModal.js";
+import updateGroupAvatar from "../../API/api_updateGroupAvatar";
 
 const socket = io("http://localhost:3618");
 console.log("connected to socket server", socket.connect);
 const notificationSocket = io("http://localhost:3515");
 
-function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
+function Chat({ chatRoom, userChatting = [], user, updateLastMessage, onUpdateChatRoom }) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [currentUserPhone, setCurrentUserPhone] = useState();
@@ -339,6 +340,34 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
 
   useEffect(() => {
     if (!chatRoom?.chatRoomId) return;
+    const chatId = chatRoom.chatId || `${chatRoom.participants.sort().join("_")}`;
+    socket.emit("joinRoom", chatId);
+    socket.emit("joinRoom", chatRoom.chatRoomId);
+
+    const handleAvatarUpdate = (data) => {
+      if (data.chatRoomId === chatRoom.chatRoomId || data.chatId === chatId) {
+        setCurrentChatRoom(prev => ({
+          ...prev,
+          avatar: data.newAvatarUrl
+        }));
+
+        localStorage.setItem(`chatRoom_${data.chatId}_avatar`, data.newAvatarUrl);
+        localStorage.setItem(`chatRoom_${data.chatRoomId}_avatar`, data.newAvatarUrl);
+
+        const avatarElements = document.querySelectorAll(`img[src="${chatRoom.avatar}"]`);
+        avatarElements.forEach(el => {
+          el.src = data.newAvatarUrl;
+        });
+
+        if (onUpdateChatRoom) {
+          onUpdateChatRoom({
+            ...chatRoom,
+            avatar: data.newAvatarUrl
+          });
+        }
+      }
+    };
+
     setCurrentUserPhone(user.phoneNumber);
     fetch(`http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}`, {
       method: "GET",
@@ -404,14 +433,31 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
       }));
     });
 
+    socket.on("groupAvatarUpdated", handleAvatarUpdate);
+
     return () => {
       socket.off("receiveMessage");
       socket.off("userTyping");
       socket.off("userStopTyping");
       socket.off("messageRevoked");
       socket.off("messageReacted");
+      socket.off("groupAvatarUpdated", handleAvatarUpdate);
+      socket.emit("leaveRoom", chatId);
+      socket.emit("leaveRoom", chatRoom.chatRoomId);
     };
-  }, [chatRoom?.chatRoomId, user.phoneNumber, updateLastMessage]);
+  }, [chatRoom?.chatRoomId, chatRoom?.chatId, user.phoneNumber, updateLastMessage, onUpdateChatRoom]);
+
+  useEffect(() => {
+    if (chatRoom?.chatId) {
+      const cachedAvatar = localStorage.getItem(`chatRoom_${chatRoom.chatId}_avatar`);
+      if (cachedAvatar) {
+        setCurrentChatRoom(prev => ({
+          ...prev,
+          avatar: cachedAvatar
+        }));
+      }
+    }
+  }, [chatRoom?.chatId]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -926,6 +972,55 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
     );
   };
 
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+  
+    try {
+      const result = await updateGroupAvatar(chatRoom.chatRoomId, file);
+      
+      setCurrentChatRoom(prev => ({
+        ...prev,
+        avatar: result.avatarUrl
+      }));
+  
+      if (onUpdateChatRoom) {
+        onUpdateChatRoom({
+          ...chatRoom,
+          avatar: result.avatarUrl
+        });
+      }
+  
+      const avatarElements = document.querySelectorAll(`img[src="${chatRoom.avatar}"]`);
+      avatarElements.forEach(el => {
+        el.src = result.avatarUrl;
+      });
+
+      localStorage.setItem(`chatRoom_${result.chatId}_avatar`, result.avatarUrl);
+  
+      toast.success("Cập nhật avatar thành công!");
+    } catch (error) {
+      console.error("Lỗi khi cập nhật avatar:", error);
+      toast.error(error.message || "Cập nhật avatar thất bại!");
+    }
+  };
+  
+  useEffect(() => {
+    if (chatRoom?.chatRoomId) {
+      const cachedAvatar = localStorage.getItem(`chatRoom_${chatRoom.chatRoomId}_avatar`);
+      if (cachedAvatar) {
+        setCurrentChatRoom(prev => ({
+          ...prev,
+          avatar: cachedAvatar
+        }));
+      }
+    }
+  }, [chatRoom?.chatRoomId]);
+
+  useEffect(() => {
+    setCurrentChatRoom(chatRoom);
+  }, [chatRoom]);
+
   const handleTogglePhoneNumber = (phoneNumber) => {
     setListAddtoGroup((prev) => {
       const mustHave = [user.phoneNumber, userChatting[0].phoneNumber];
@@ -1167,8 +1262,8 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                 <img
                   className="chat-header_avt"
                   src={
-                    chatRoom.isGroup
-                      ? chatRoom.avatar || a1
+                    currentChatRoom.isGroup
+                      ? currentChatRoom.avatar || a1
                       : userChatting?.[0]?.avatar || a1
                   }
                   alt="avatar"
@@ -1719,13 +1814,23 @@ function Chat({ chatRoom, userChatting = [], user, updateLastMessage }) {
                   >
                     <img
                       className="modal_avt me-2"
-                      src={chatRoom.avatar || a1}
+                      src={currentChatRoom.avatar || a1}
                       alt="avatar"
                       style={{ borderRadius: "50%" }}
                     />
-                    <button className="btn btn-edit">
+                    {/* Thay thế button cũ bằng label để trigger input file */}
+                    <label className="btn btn-edit" htmlFor="avatarInput">
                       <i className="bi bi-pencil-fill text-light"></i>
-                    </button>
+                    </label>
+                    
+                    {/* Thêm input file ẩn */}
+                    <input
+                      type="file"
+                      id="avatarInput"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleAvatarChange}
+                    />
                   </div>
 
                   <h6 className="text-white">Thành viên nhóm:</h6>
