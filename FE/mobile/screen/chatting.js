@@ -581,7 +581,13 @@ export default function App({ navigation, route }) {
         body: JSON.stringify(newMsg),
       });
 
-      if (!response.ok) throw new Error("Gửi tin nhắn thất bại!");
+      const responseData = await response.json();
+      console.log("Phản hồi từ API:", responseData);
+
+      if (!response.ok) {
+        throw new Error(responseData.message || "Gửi tin nhắn thất bại!");
+      }
+
       console.log("Tin nhắn gửi thành công:", newMsg);
       setMessage("");
     } catch (error) {

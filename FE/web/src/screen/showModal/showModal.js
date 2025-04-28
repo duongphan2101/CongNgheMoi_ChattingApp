@@ -1,97 +1,313 @@
-import React from "react";
-import "bootstrap/dist/css/bootstrap.min.css";
+import React, { useState } from "react";
 import "./ShowModal.css";
+import { toast } from "react-toastify";
+import deleteMember from "../../API/api_deleteMember.js";
+import getChatRoom from "../../API/api_getMessagebyChatRoomId.js";
+import getUserbySearch from "../../API/api_searchUSer";
 
-const ShowModal = ({ isOpen, onClose, chatRoom, userChatting, currentUserPhone, userMap }) => {
+const ShowModal = ({
+  isOpen,
+  onClose,
+  chatRoom,
+  userChatting,
+  currentUserPhone,
+  userMap,
+  onDisbandGroup,
+  onRemoveMember,
+  defaultAvatar,
+}) => {
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+  const [isImageZoomModalOpen, setIsImageZoomModalOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+
   if (!isOpen) return null;
 
-  // Lấy thông tin người dùng trong cuộc trò chuyện
   const displayName = chatRoom.isGroup
     ? chatRoom.nameGroup || userChatting.map((u) => u.fullName).join(", ")
     : userChatting?.[0]?.fullName || "Người lạ";
 
-  // Tạo tên viết tắt để hiển thị trong avatar
-  const initials = displayName
-    .split(" ")
-    .map(word => word[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 8);
+  const handleDisbandGroup = () => {
+    if (onDisbandGroup) {
+      const confirm = window.confirm("Bạn có chắc muốn giải tán nhóm này không?");
+      if (confirm) {
+        onDisbandGroup(chatRoom.chatRoomId);
+      }
+    }
+  };
+
+
+
+  const mediaMessages = chatRoom.messages
+    ? chatRoom.messages.filter((msg) => {
+        if (msg.type === "file") {
+          try {
+            const fileInfo = JSON.parse(msg.message);
+            return fileInfo.type.startsWith("image/");
+          } catch (error) {
+            console.error("Lỗi phân tích thông tin file:", error);
+            return false;
+          }
+        }
+        return false;
+      })
+    : [];
+
+  const fileMessages = chatRoom.messages
+    ? chatRoom.messages.filter((msg) => {
+        if (msg.type === "file") {
+          try {
+            const fileInfo = JSON.parse(msg.message);
+            return !fileInfo.type.startsWith("image/");
+          } catch (error) {
+            console.error("Lỗi phân tích thông tin file:", error);
+            return false;
+          }
+        }
+        return false;
+      })
+    : [];
+
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return bytes + " B";
+    else if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    else return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const downloadFile = (msg) => {
+    const fileInfo = JSON.parse(msg.message);
+    const downloadUrl = `http://localhost:3618/download/${chatRoom.chatRoomId}/${msg.timestamp}`;
+
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = fileInfo.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const displayedMedia = mediaMessages.slice(0, 3);
+
+  const handleImageClick = (imageUrl) => {
+    setSelectedImage(imageUrl);
+    setIsImageZoomModalOpen(true);
+  };
 
   return (
-    <div className="modal modal-container">
-      <div className="modal-dialog modal-dialog-centered">
-        <div className="modal-content modal-content-custom">
-          {/* Header */}
-          <div className="modal-header d-flex justify-content-between align-items-center modal-header-custom">
-            <h5 className="modal-title">Thông tin hội thoại</h5>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={onClose}
-            ></button>
-          </div>
-
-          {/* Body */}
-          <div className="modal-body">
-            {/* Contact Info */}
-            <div className="contact-info">
-              <div className="avatar-circle">
-                {initials}
-              </div>
-              <div className="contact-name">
-                <h6>{displayName}</h6>
-              </div>
-              <button className="btn btn-link edit-button">
-                ✎
+    <>
+      <div className="showmodal-container">
+        <div className="showmodal-dialog">
+          <div className="showmodal-content">
+            <div className="showmodal-header">
+              <h5 className="modal-title">Thông tin hội thoại</h5>
+              <button type="button" className="showmodal-btn-close" onClick={onClose}>
+                <i className="bi bi-x-lg"></i>
               </button>
             </div>
 
-            {/* Contact List */}
-            <div className="section-header">
-              <label className="section-label">Danh sách thành viên</label>
-              <button className="btn btn-link view-all-button">
-                ⌄
-              </button>
-            </div>
-
-            {/* Media */}
-            <div className="section-header">
-              <div className="d-flex justify-content-between align-items-center">
-                <label className="section-label">Ảnh/Video</label>
-                <button className="btn btn-link view-all-button">
-                  Xem tất cả
-                </button>
+            <div className="showmodal-body">
+              <div className="showmodal-contact-info">
+                <img
+                  src={
+                    chatRoom.isGroup
+                      ? chatRoom.avatar || defaultAvatar
+                      : userChatting?.[0]?.avatar || defaultAvatar
+                  }
+                  alt={displayName}
+                  className="showmodal-avatar"
+                />
+                <h6 className="showmodal-contact-name">{displayName}</h6>
+              
               </div>
-           
-            </div>
 
-            {/* Files */}
-            <div className="section-header">
-              <div className="d-flex justify-content-between align-items-center">
-                <label className="section-label">File</label>
-                <button className="btn btn-link view-all-buttonfile">
-                  Xem tất cả
-                </button>
+              <div className="showmodal-section-header">
+                <div className="showmodal-section-title">
+                  <span className="showmodal-section-icon">
+                    <i className="bi bi-people-fill"></i>
+                  </span>
+                  <span className="showmodal-section-label">Danh sách thành viên</span>
+                </div>
               </div>
-            
-            </div>
 
-            {/* Links */}
-            <div className="section-header">
-              <div className="d-flex justify-content-between align-items-center">
-                <label className="section-label">Link</label>
-                <button className="btn btn-link view-all-buttonlink">
-                  Xem tất cả
-                </button>
+              {chatRoom.isGroup && (
+                <div className="showmodal-members-list">
+                  <ul className="showmodal-list">
+                    {userChatting.map((member) => (
+                      <li
+                        key={member.phoneNumber}
+                        className="showmodal-list-item"
+                      >
+                        <div className="showmodal-member-info">
+                          <img
+                            src={member.avatar || defaultAvatar}
+                            alt={member.fullName}
+                            className="showmodal-member-avatar"
+                          />
+                          <span>{member.fullName || member.phoneNumber}</span>
+                          {member.phoneNumber === chatRoom.admin && (
+                            <span className="showmodal-badge-admin">Admin</span>
+                          )}
+                        </div>
+                       
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="showmodal-section-header">
+                <div className="showmodal-section-title">
+                  <span className="showmodal-section-label">Ảnh</span>
+                </div>
+                {mediaMessages.length > 0 && (
+                  <button
+                    className="showmodal-view-all-btn"
+                    onClick={() => setIsMediaModalOpen(true)}
+                  >
+                    Xem tất cả
+                  </button>
+                )}
               </div>
-            </div>
+              <div className="showmodal-media-gallery">
+                {mediaMessages.length > 0 ? (
+                  displayedMedia.map((msg, index) => (
+                    <div key={index} className="showmodal-media-item">
+                      <img
+                        src={`http://localhost:3618/view/${chatRoom.chatRoomId}/${msg.timestamp}`}
+                        alt={`Media ${index}`}
+                        className="showmodal-media"
+                        onError={(e) => (e.target.src = defaultAvatar)}
+                        onClick={() =>
+                          handleImageClick(
+                            `http://localhost:3618/view/${chatRoom.chatRoomId}/${msg.timestamp}`
+                          )
+                        }
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <div className="showmodal-media-placeholder"></div>
+                    <div className="showmodal-media-placeholder"></div>
+                    <div className="showmodal-media-placeholder"></div>
+                    <div className="showmodal-media-placeholder"></div>
+                  </>
+                )}
+              </div>
 
-         
+              <div className="showmodal-section-header">
+                <div className="showmodal-section-title">
+                  <span className="showmodal-section-label">File</span>
+                </div>
+              </div>
+              <div className="showmodal-files-list">
+                {fileMessages.length > 0 ? (
+                  <ul className="showmodal-list">
+                    {fileMessages.map((msg, index) => {
+                      const fileInfo = JSON.parse(msg.message);
+                      return (
+                        <li
+                          key={index}
+                          className="showmodal-list-item"
+                        >
+                          <div className="showmodal-file-info">
+                            <i className="bi bi-file-earmark"></i>
+                            <span>{fileInfo.name}</span>
+                            <span className="showmodal-file-size">
+                              ({formatFileSize(fileInfo.size)})
+                            </span>
+                          </div>
+                          <button
+                            className="showmodal-btn-download"
+                            onClick={() => downloadFile(msg)}
+                          >
+                            <i className="bi bi-download"></i>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="showmodal-text-muted">Không có file nào</p>
+                )}
+              </div>
+
+              {chatRoom.isGroup && currentUserPhone === chatRoom.admin && (
+                <div className="showmodal-footer">
+                  <button className="showmodal-btn-disband" onClick={handleDisbandGroup}>
+                    Giải tán nhóm
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {isMediaModalOpen && (
+        <div className="showmodal-container">
+          <div className="showmodal-media-modal">
+            <div className="showmodal-content">
+              <div className="showmodal-header">
+                <h5 className="modal-title">Tất cả ảnh</h5>
+                <button
+                  type="button"
+                  className="showmodal-btn-close"
+                  onClick={() => setIsMediaModalOpen(false)}
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div className="showmodal-body">
+                <div className="showmodal-media-gallery">
+                  {mediaMessages.map((msg, index) => (
+                    <div key={index} className="showmodal-media-item">
+                      <img
+                        src={`http://localhost:3618/view/${chatRoom.chatRoomId}/${msg.timestamp}`}
+                        alt={`Media ${index}`}
+                        className="showmodal-media"
+                        onError={(e) => (e.target.src = defaultAvatar)}
+                        onClick={() =>
+                          handleImageClick(
+                            `http://localhost:3618/view/${chatRoom.chatRoomId}/${msg.timestamp}`
+                          )
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isImageZoomModalOpen && (
+        <div className="showmodal-container">
+          <div className="showmodal-zoom-modal">
+            <div className="showmodal-content">
+              <div className="showmodal-header">
+                <h5 className="modal-title">Xem ảnh</h5>
+                <button
+                  type="button"
+                  className="showmodal-btn-close"
+                  onClick={() => setIsImageZoomModalOpen(false)}
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div className="showmodal-zoom-body">
+                <img
+                  src={selectedImage}
+                  alt="Ảnh trong cuộc trò chuyện"
+                  className="showmodal-zoom-image"
+                  onError={(e) => (e.target.src = defaultAvatar)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
