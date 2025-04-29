@@ -1,24 +1,31 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import "./ShowModal.css";
 import { toast } from "react-toastify";
 import deleteMember from "../../API/api_deleteMember.js";
-import getChatRoom from "../../API/api_getMessagebyChatRoomId.js";
-import getUserbySearch from "../../API/api_searchUSer";
-
+import updateGroupAvatar from "../../API/api_updateGroupAvatar";
+import disbandGroup from "../../API/api_disbandGroup.js";
+import Swal from 'sweetalert2';
+import setAdmin from "../../API/api_setAdmin.js";
+import outGroup from "../../API/api_outGroup.js";
+import { LanguageContext, locales } from "../../contexts/LanguageContext";
 const ShowModal = ({
   isOpen,
   onClose,
   chatRoom,
   userChatting,
   currentUserPhone,
-  userMap,
-  onDisbandGroup,
-  onRemoveMember,
+  members,
   defaultAvatar,
+  onUpdateChatRoom,
+  setIsInfoModalOpen
 }) => {
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [isImageZoomModalOpen, setIsImageZoomModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [currentChatRoom, setCurrentChatRoom] = useState(chatRoom);
+
+  const { language } = useContext(LanguageContext);
+  const t = locales[language];
 
   if (!isOpen) return null;
 
@@ -26,45 +33,36 @@ const ShowModal = ({
     ? chatRoom.nameGroup || userChatting.map((u) => u.fullName).join(", ")
     : userChatting?.[0]?.fullName || "Người lạ";
 
-  const handleDisbandGroup = () => {
-    if (onDisbandGroup) {
-      const confirm = window.confirm("Bạn có chắc muốn giải tán nhóm này không?");
-      if (confirm) {
-        onDisbandGroup(chatRoom.chatRoomId);
-      }
-    }
-  };
-
 
 
   const mediaMessages = chatRoom.messages
     ? chatRoom.messages.filter((msg) => {
-        if (msg.type === "file") {
-          try {
-            const fileInfo = JSON.parse(msg.message);
-            return fileInfo.type.startsWith("image/");
-          } catch (error) {
-            console.error("Lỗi phân tích thông tin file:", error);
-            return false;
-          }
+      if (msg.type === "file") {
+        try {
+          const fileInfo = JSON.parse(msg.message);
+          return fileInfo.type.startsWith("image/");
+        } catch (error) {
+          console.error("Lỗi phân tích thông tin file:", error);
+          return false;
         }
-        return false;
-      })
+      }
+      return false;
+    })
     : [];
 
   const fileMessages = chatRoom.messages
     ? chatRoom.messages.filter((msg) => {
-        if (msg.type === "file") {
-          try {
-            const fileInfo = JSON.parse(msg.message);
-            return !fileInfo.type.startsWith("image/");
-          } catch (error) {
-            console.error("Lỗi phân tích thông tin file:", error);
-            return false;
-          }
+      if (msg.type === "file") {
+        try {
+          const fileInfo = JSON.parse(msg.message);
+          return !fileInfo.type.startsWith("image/");
+        } catch (error) {
+          console.error("Lỗi phân tích thông tin file:", error);
+          return false;
         }
-        return false;
-      })
+      }
+      return false;
+    })
     : [];
 
   const formatFileSize = (bytes) => {
@@ -92,13 +90,134 @@ const ShowModal = ({
     setIsImageZoomModalOpen(true);
   };
 
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const result = await updateGroupAvatar(chatRoom.chatRoomId, file);
+
+      setCurrentChatRoom(prev => ({
+        ...prev,
+        avatar: result.avatarUrl
+      }));
+
+      if (onUpdateChatRoom) {
+        onUpdateChatRoom({
+          ...chatRoom,
+          avatar: result.avatarUrl
+        });
+      }
+
+      const avatarElements = document.querySelectorAll(`img[src="${chatRoom.avatar}"]`);
+      avatarElements.forEach(el => {
+        el.src = result.avatarUrl;
+      });
+
+      localStorage.setItem(`chatRoom_${result.chatId}_avatar`, result.avatarUrl);
+
+      toast.success(t.updateAvatarSuccess);
+    } catch (error) {
+      console.error("Lỗi khi cập nhật avatar:", error);
+      toast.error(t.updateAvatarError);
+    }
+  };
+
+  const handleRemoveMember = async (phoneNumberToRemove, fullName) => {
+    const result = await Swal.fire({
+      title: t.removeMemberNotification + fullName + t.removeMemberNotification2,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: t.oke,
+      cancelButtonText: t.cancel,
+      background: '#222',
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await deleteMember(
+          chatRoom.chatRoomId,
+          phoneNumberToRemove
+        );
+        toast.success(t.removeMemberSuccess);
+        setIsInfoModalOpen(false);
+      } catch (err) {
+        console.error("Lỗi khi xóa thành viên:", err.message);
+        toast.error(t.removeMemberError);
+      }
+    }
+  };
+
+  const handleDisbandGroup = async (chatRoomId) => {
+    const confirmResult = await Swal.fire({
+      title: t.disbandGroupNotification,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: t.oke,
+      cancelButtonText: t.cancel,
+      background: '#222',
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    try {
+      const response = await disbandGroup(chatRoomId);
+      toast.success(t.disbandGroupSuccess);
+      setIsInfoModalOpen(false);
+    } catch (error) {
+      console.error("Lỗi khi giải tán nhóm:", error.message);
+      toast.error(t.disbandGroupError);
+    }
+  };
+
+  const handleSetAdmin = async (phoneNumber, fullName) => {
+    const result = await Swal.fire({
+      title: t.setAdminNotification + fullName + t.setAdminNotification2,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: t.oke,
+      cancelButtonText: t.cancel,
+      background: '#222',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      const res = await setAdmin(chatRoom.chatRoomId, phoneNumber);
+      toast.success(t.setAdminSuccess);
+      setIsInfoModalOpen(false);
+    } catch (error) {
+      console.error("Lỗi khi chỉ định admin:", error.message);
+      toast.error(t.setAdminError);
+    }
+  };
+
+  const handleOutGroup = async (phoneNumber) => {
+    const result = await Swal.fire({
+      title: t.outGroupNotification,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: t.oke,
+      cancelButtonText: t.cancel,
+      background: '#222',
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      const res = await outGroup(chatRoom.chatRoomId, phoneNumber);
+      toast.success(res.message);
+      setIsInfoModalOpen(false);
+    } catch (error) {
+      console.error("Lỗi khi rời nhóm:", error.message);
+      toast.error("Đã xảy ra lỗi khi rời nhóm.");
+    }
+  };
+
   return (
     <>
       <div className="showmodal-container">
         <div className="showmodal-dialog">
           <div className="showmodal-content">
             <div className="showmodal-header">
-              <h5 className="modal-title">Thông tin hội thoại</h5>
+              <h5 className="modal-title">{t.groupInfor}</h5>
               <button type="button" className="showmodal-btn-close" onClick={onClose}>
                 <i className="bi bi-x-lg"></i>
               </button>
@@ -107,47 +226,70 @@ const ShowModal = ({
             <div className="showmodal-body">
               <div className="showmodal-contact-info">
                 <img
-                  src={
-                    chatRoom.isGroup
-                      ? chatRoom.avatar || defaultAvatar
-                      : userChatting?.[0]?.avatar || defaultAvatar
-                  }
-                  alt={displayName}
-                  className="showmodal-avatar"
+                  className="modal_avt me-2"
+                  src={chatRoom.avatar}
+                  alt="avatar"
+                  style={{ borderRadius: "50%" }}
                 />
-                <h6 className="showmodal-contact-name">{displayName}</h6>
-              
+                <div className="showmodal-contact-changeAvt">
+                  <label className="btn btn-edit" htmlFor="avatarInput">
+                    <i className="bi bi-pencil-fill text-light"></i>
+                  </label>
+                  <input
+                    type="file"
+                    id="avatarInput"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleAvatarChange}
+                  />
+                </div>
               </div>
-
+              <h6 className="showmodal-contact-name">{displayName}</h6>
               <div className="showmodal-section-header">
                 <div className="showmodal-section-title">
                   <span className="showmodal-section-icon">
                     <i className="bi bi-people-fill"></i>
                   </span>
-                  <span className="showmodal-section-label">Danh sách thành viên</span>
+                  <span className="showmodal-section-label">{t.MemberList}</span>
                 </div>
               </div>
 
               {chatRoom.isGroup && (
                 <div className="showmodal-members-list">
                   <ul className="showmodal-list">
-                    {userChatting.map((member) => (
+                    {members.map((member) => (
                       <li
                         key={member.phoneNumber}
                         className="showmodal-list-item"
                       >
                         <div className="showmodal-member-info">
-                          <img
-                            src={member.avatar || defaultAvatar}
-                            alt={member.fullName}
-                            className="showmodal-member-avatar"
-                          />
-                          <span>{member.fullName || member.phoneNumber}</span>
-                          {member.phoneNumber === chatRoom.admin && (
-                            <span className="showmodal-badge-admin">Admin</span>
-                          )}
+                          <div className="d-flex">
+                            <img
+                              src={member.avatar || defaultAvatar}
+                              alt={member.fullName}
+                              className="showmodal-member-avatar"
+                            />
+                            <span>{member.fullName}</span>
+                          </div>
+
+                          <div>
+                            {member.phoneNumber === chatRoom.admin && (
+                              <span className="showmodal-badge-admin">Admin</span>
+                            )}
+                            {chatRoom.admin === currentUserPhone && member.phoneNumber !== currentUserPhone && (
+                              <>
+                                <button className="btn btn-warning mx-2" onClick={() => handleSetAdmin(member.phoneNumber, member.fullName)}>
+                                  <i className="bi bi-arrow-up-right-circle-fill text-light"></i>
+                                </button>
+                                <button className="btn btn-danger" onClick={() => handleRemoveMember(member.phoneNumber, member.fullName)}>
+                                  <i className="bi bi-trash3-fill" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+
                         </div>
-                       
+
                       </li>
                     ))}
                   </ul>
@@ -156,14 +298,14 @@ const ShowModal = ({
 
               <div className="showmodal-section-header">
                 <div className="showmodal-section-title">
-                  <span className="showmodal-section-label">Ảnh</span>
+                  <span className="showmodal-section-label">{t.image}</span>
                 </div>
                 {mediaMessages.length > 0 && (
                   <button
                     className="showmodal-view-all-btn"
                     onClick={() => setIsMediaModalOpen(true)}
                   >
-                    Xem tất cả
+                    {t.showAll}
                   </button>
                 )}
               </div>
@@ -227,14 +369,21 @@ const ShowModal = ({
                     })}
                   </ul>
                 ) : (
-                  <p className="showmodal-text-muted">Không có file nào</p>
+                  <p className="showmodal-text-muted">{t.notFile}</p>
                 )}
               </div>
 
               {chatRoom.isGroup && currentUserPhone === chatRoom.admin && (
                 <div className="showmodal-footer">
-                  <button className="showmodal-btn-disband" onClick={handleDisbandGroup}>
-                    Giải tán nhóm
+                  <button className="showmodal-btn-disband" onClick={() => handleDisbandGroup(chatRoom.chatRoomId)}>
+                    {t.disbandGroup}
+                  </button>
+                </div>
+              )}
+              {chatRoom.isGroup && currentUserPhone !== chatRoom.admin && (
+                <div className="showmodal-footer">
+                  <button className="showmodal-btn-disband" onClick={() => handleOutGroup(currentUserPhone)}>
+                    {t.outGroup}
                   </button>
                 </div>
               )}

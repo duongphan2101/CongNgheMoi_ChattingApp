@@ -11,6 +11,8 @@ module.exports = (io, redisPublisher) => {
   router.get("/chatRoom", async (req, res) => {
     try {
       const { chatRoomId } = req.query;
+
+      // Kiểm tra xem chatRoomId có được cung cấp không
       if (!chatRoomId) {
         return res.status(400).json({ message: "Thiếu chatRoomId!" });
       }
@@ -20,17 +22,22 @@ module.exports = (io, redisPublisher) => {
         Key: { chatRoomId },
       };
 
+      // Lấy thông tin phòng chat từ DynamoDB
       const result = await dynamoDB.get(params).promise();
+
+      // Nếu không tìm thấy phòng chat, trả về lỗi 404
       if (!result.Item) {
         return res.status(404).json({ message: "Không tìm thấy phòng chat!" });
       }
 
+      // Trả về toàn bộ thông tin phòng chat
       res.json(result.Item);
     } catch (error) {
       console.error("Lỗi lấy thông tin phòng chat:", error);
       res.status(500).json({ message: "Lỗi server!" });
     }
   });
+
 
   //check chatRoom = 2 sdt (single chat)
   router.get("/checkChatRoom", async (req, res) => {
@@ -125,7 +132,7 @@ module.exports = (io, redisPublisher) => {
 
       if (result.Items && result.Items.length > 0) {
         const item = result.Items[0]; // Lấy mục đầu tiên từ kết quả
-  
+
         // Trả về toàn bộ đối tượng item
         res.json(item);
       } else {
@@ -468,8 +475,6 @@ module.exports = (io, redisPublisher) => {
         (p) => p !== phoneNumber
       );
 
-      return router;
-
       // Cập nhật lại danh sách thành viên
       const updateParams = {
         TableName: CHATROOM_TABLE,
@@ -518,6 +523,132 @@ module.exports = (io, redisPublisher) => {
       res.status(500).json({ message: "Lỗi server!" });
     }
   });
+
+  // Gán quyền admin cho thành viên trong nhóm  
+  router.post("/setAdmin", async (req, res) => {
+    const { chatRoomId, phoneNumber } = req.body;
+    if (!chatRoomId || !phoneNumber) {
+      return res.status(400).json({ message: "Thiếu chatRoomId hoặc phoneNumber." });
+    }
+
+    try {
+      const getParams = {
+        TableName: CHATROOM_TABLE,
+        Key: { chatRoomId },
+      };
+
+      const result = await dynamoDB.get(getParams).promise();
+
+      if (!result.Item) {
+        return res.status(404).json({ message: "Không tìm thấy phòng chat." });
+      }
+
+      const chatRoom = result.Item;
+
+      if (!chatRoom.participants.includes(phoneNumber)) {
+        return res.status(400).json({ message: "Thành viên không tồn tại trong nhóm." });
+      }
+
+      // Cập nhật trường admin thành phoneNumber
+      const updateParams = {
+        TableName: CHATROOM_TABLE,
+        Key: { chatRoomId },
+        UpdateExpression: "set admin = :admin",
+        ExpressionAttributeValues: {
+          ":admin": phoneNumber,
+        },
+        ReturnValues: "ALL_NEW",
+      };
+
+      const updateResult = await dynamoDB.update(updateParams).promise();
+
+      res.json({
+        message: "Đã gán quyền admin thành công!",
+        admin: updateResult.Attributes.admin,
+      });
+    } catch (error) {
+      console.error("Lỗi khi gán admin:", error);
+      res.status(500).json({ message: "Lỗi server!" });
+    }
+  });
+
+
+  // Rời khỏi nhóm
+  router.post("/outGroup", async (req, res) => {
+    const { chatRoomId, phoneNumber } = req.body;
+
+    if (!chatRoomId || !phoneNumber) {
+      return res.status(400).json({ message: "Thiếu chatRoomId hoặc phoneNumber." });
+    }
+
+    try {
+      // Lấy thông tin phòng chat
+      const getParams = {
+        TableName: CHATROOM_TABLE,
+        Key: { chatRoomId },
+      };
+
+      const result = await dynamoDB.get(getParams).promise();
+
+      if (!result.Item) {
+        return res.status(404).json({ message: "Không tìm thấy phòng chat." });
+      }
+
+      const chatRoom = result.Item;
+
+      const updatedParticipants = chatRoom.participants.filter(
+        (p) => p !== phoneNumber
+      );
+
+      // Cập nhật danh sách participants trong CHATROOM_TABLE
+      const updateParams = {
+        TableName: CHATROOM_TABLE,
+        Key: { chatRoomId },
+        UpdateExpression: "set participants = :participants",
+        ExpressionAttributeValues: {
+          ":participants": updatedParticipants,
+        },
+        ReturnValues: "ALL_NEW",
+      };
+
+      await dynamoDB.update(updateParams).promise();
+
+      // Đồng bộ participants với Conversations table (nếu có)
+      const scanParams = {
+        TableName: "Conversations",
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: {
+          ":chatRoomId": chatRoomId,
+        },
+      };
+
+      const convScanResult = await dynamoDB.scan(scanParams).promise();
+
+      if (convScanResult.Items.length > 0) {
+        const conversation = convScanResult.Items[0];
+
+        const updateConvParams = {
+          TableName: "Conversations",
+          Key: { chatId: conversation.chatId },
+          UpdateExpression: "set participants = :participants",
+          ExpressionAttributeValues: {
+            ":participants": updatedParticipants,
+          },
+        };
+
+        await dynamoDB.update(updateConvParams).promise();
+      }
+
+      res.json({
+        message: "Bạn đã rời khỏi nhóm.",
+        updatedParticipants,
+      });
+    } catch (error) {
+      console.error("Lỗi khi rời nhóm:", error);
+      res.status(500).json({ message: "Lỗi server!" });
+    }
+  });
+
 
   return router;
 };

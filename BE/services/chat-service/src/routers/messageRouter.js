@@ -658,5 +658,84 @@ module.exports = (io, redisPublisher) => {
     }
   });
 
+  router.post("/updateGroupAvatar", upload.single("avatar"), async (req, res) => {
+    try {
+      const { chatRoomId } = req.body;
+      
+      if (!req.file || !chatRoomId) {
+        return res.status(400).json({ error: "Thiếu file hoặc chatRoomId!" });
+      }
+
+      const fileContent = await fs.readFile(req.file.path);
+      const fileName = `group-avatar-${Date.now()}${path.extname(req.file.originalname)}`;
+      
+      const uploadParams = {
+        Bucket: BUCKET_NAME,
+        Key: `group-avatars/${fileName}`,
+        Body: fileContent,
+        ContentType: req.file.mimetype,
+        ACL: "public-read"
+      };
+  
+      const uploadResult = await s3.upload(uploadParams).promise();
+      const avatarUrl = uploadResult.Location;
+  
+      // lấy thông tin conversation để cập nhật cả 2 bảng
+      const conversationsResult = await dynamoDB.scan({
+        TableName: TABLE_CONVERSATION_NAME,
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: {
+          ":chatRoomId": chatRoomId
+        }
+      }).promise();
+
+      if (!conversationsResult.Items || conversationsResult.Items.length === 0) {
+        throw new Error("Không tìm thấy cuộc trò chuyện!");
+      }
+
+      const conversation = conversationsResult.Items[0];
+      const chatId = conversation.chatId;
+
+      await Promise.all([
+        dynamoDB.update({
+          TableName: TABLE_CONVERSATION_NAME,
+          Key: { chatId },
+          UpdateExpression: "SET avatar = :avatarUrl",
+          ExpressionAttributeValues: { ":avatarUrl": avatarUrl }
+        }).promise(),
+        
+        dynamoDB.update({
+          TableName: "ChatRooms",
+          Key: { chatRoomId },
+          UpdateExpression: "SET avatar = :avatarUrl",
+          ExpressionAttributeValues: { ":avatarUrl": avatarUrl }
+        }).promise()
+      ]);
+
+      await fs.unlink(req.file.path);
+
+      io.emit("groupAvatarUpdated", {
+        chatRoomId,
+        chatId,
+        newAvatarUrl: avatarUrl,
+        updatedAt: new Date().toISOString()
+      });
+
+      res.status(200).json({
+        message: "Cập nhật avatar thành công!",
+        avatarUrl,
+        chatId,
+        chatRoomId
+      });
+  
+    } catch (error) {
+      if (req.file) {
+        await fs.unlink(req.file.path).catch(console.error);
+      }
+      console.error("Lỗi khi cập nhật avatar:", error);
+      res.status(500).json({ error: "Lỗi server!" });
+    }
+  });
+
   return router;
 };

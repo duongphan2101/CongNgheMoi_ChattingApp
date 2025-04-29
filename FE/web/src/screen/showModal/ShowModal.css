@@ -80,7 +80,11 @@
 
 .showmodal-contact-info {
   text-align: center;
-  margin-bottom: 20px;
+  position: relative;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .showmodal-avatar {
@@ -91,9 +95,23 @@
   margin-bottom: 10px;
 }
 
+.showmodal-contact-changeAvt {
+  position: absolute;
+  bottom: 10px;
+  right: 250px;
+  background-color: #343a40;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .showmodal-contact-name {
   font-size: 1.1rem;
   font-weight: 500;
+  margin-bottom: 20px;
+  text-align: center;
 }
 
 .showmodal-edit-btn {
@@ -165,6 +183,8 @@
 .showmodal-member-info {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .showmodal-member-avatar {

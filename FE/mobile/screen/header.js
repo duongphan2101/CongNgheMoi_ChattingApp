@@ -298,26 +298,22 @@ const Header = ({}) => {
             <FlatList
               data={searchResults}
               keyExtractor={(item) => item.phoneNumber}
-              renderItem={({ item }) => {
-                console.log('Rendering item details:', {
-                  name: item.fullName,
-                  isFriend: item.isFriend,
-                  type: typeof item.isFriend
-                });
-                
-                return (
-                  <View style={styles.searchResultItem}>
-                    <TouchableOpacity
-                      style={styles.userInfo}
-                      onPress={() => handleChatNavigation(item)}
-                    >
-                      <Image
-                        source={{ uri: item.avatar }}
-                        style={styles.avatar}
-                      />
-                      <Text style={styles.text}>{item.fullName}</Text>
-                    </TouchableOpacity>
-                    {typeof item.isFriend === 'boolean' && !item.isFriend && (
+              renderItem={({ item }) => (
+                <View style={styles.searchResultItem}>
+                  <TouchableOpacity
+                    style={styles.userInfo}
+                    onPress={() => {
+                      navigation.navigate('chatting', { otherUser: item, chatRoom: null });
+                      hideSearch();
+                    }}
+                  >
+                    <Image
+                      source={{ uri: item.avatar }}
+                      style={styles.avatar}
+                    />
+                    <Text style={styles.text}>{item.fullName}</Text>
+                  </TouchableOpacity>
+                  {typeof item.isFriend === 'boolean' && !item.isFriend && (
                       <TouchableOpacity
                         style={styles.addFriendButton}
                         onPress={() => handleSendFriendRequest(item.phoneNumber)}
@@ -325,9 +321,8 @@ const Header = ({}) => {
                         <Text style={styles.addFriendText}>Thêm bạn</Text>
                       </TouchableOpacity>
                     )}
-                  </View>
-                );
-              }}
+                </View>
+              )}
             />
           </View>
         )}
