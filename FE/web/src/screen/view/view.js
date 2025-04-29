@@ -19,6 +19,9 @@ import "./style.css";
 import createChatRoomGroup from "../../API/api_createChatRoomforGroup";
 // import useFetchUserChatList from "../../hooks/refetch_Conversation.js";
 import { LanguageContext, locales } from "../../contexts/LanguageContext";
+// import useFetchUserChatList from "../../hooks/refetch_Conversation.js";
+// import getChatIdFromRoom from "../../API/api_getChatIdbyChatRoomId.js";
+import getDataFromRoom from "../../API/api_getDataByChatRoomId.js"
 
 const socket = io("http://localhost:3618");
 // const notificationSocket = io("http://localhost:3515");
@@ -739,26 +742,88 @@ function View({ setIsLoggedIn }) {
   };
 
   const checkGroup = async (chatRoomId) => {
-    const chatRoomInfo = await getChatRoom(chatRoomId);
-    setChatRoom(chatRoomInfo);
+    try {
+      // Lấy thông tin chatRoom
+      const chatRoomInfo = await getDataFromRoom(chatRoomId);
 
-    const otherUsers = chatRoomInfo.participants.filter(
-      (phone) => phone !== userInfo.phoneNumber
-    );
+      console.log("ChatRoom Info:", chatRoomInfo);
 
-    // Lấy thông tin user từ getUserbySearch
-    const users = await Promise.all(
-      otherUsers.map(async (phone) => {
-        const result = await getUserbySearch(phone, "");
-        // Lấy phần tử đầu tiên trong mảng trả về từ getUserbySearch
-        return result.length > 0 ? result[0] : null;
-      })
-    );
+      if (!chatRoomInfo.isGroup) {
+        console.error("Đây không phải là nhóm chat!");
+        return;
+      }
 
-    const usersData = users.filter((user) => user !== null); // Loại bỏ các phần tử null
+      chatRoomInfo.nameGroup = chatRoomInfo.nameGroup || chatRoomInfo.fullName || "Nhóm chưa đặt tên";
 
-    setUserChatting(usersData); // Dù là group, vẫn truyền danh sách còn lại
+      // Lọc ra các thành viên khác trong nhóm (không bao gồm người dùng hiện tại)
+      const otherUsers = chatRoomInfo.participants.filter(
+        (phone) => phone !== userInfo.phoneNumber
+      );
+
+      setChatRoom(chatRoomInfo);
+  
+      // Lấy thông tin user từ API
+      const users = await Promise.all(
+        otherUsers.map(async (phone) => {
+          const result = await getUserbySearch(phone, "");
+          return result.length > 0 ? result[0] : null;
+        })
+      );
+  
+      const usersData = users.filter((user) => user !== null);
+      setUserChatting(usersData);
+  
+      // Lấy chatId từ thông tin chatRoom (nếu có)
+      const chatId = chatRoomInfo.chatId; // Đảm bảo chatId được lấy từ dữ liệu chính xác
+  
+      if (!chatId) {
+        console.log("ChatId group:", chatId);
+        console.error("Không tìm thấy chatId trong thông tin chatRoom!");
+        return;
+      }
+  
+      // Gọi hàm markAsRead để đánh dấu tin nhắn trong nhóm là đã đọc
+      await markAsRead(chatId);
+  
+      // Cập nhật danh sách hội thoại
+      setUserChatList((prevList) =>
+        prevList.map((conversation) =>
+          conversation.chatRoomId === chatRoomId
+            ? {
+                ...conversation,
+                isUnreadBy: conversation.isUnreadBy.filter(
+                  (user) => user !== userInfo.phoneNumber
+                ),
+              }
+            : conversation
+        )
+      );
+    } catch (error) {
+      console.error("Lỗi trong checkGroup():", error.message);
+    }
   };
+
+  // const checkGroup = async (chatRoomId) => {
+  //   const chatRoomInfo = await getChatRoom(chatRoomId);
+  //   setChatRoom(chatRoomInfo);
+
+  //   const otherUsers = chatRoomInfo.participants.filter(
+  //     (phone) => phone !== userInfo.phoneNumber
+  //   );
+
+  //   // Lấy thông tin user từ getUserbySearch
+  //   const users = await Promise.all(
+  //     otherUsers.map(async (phone) => {
+  //       const result = await getUserbySearch(phone, "");
+  //       // Lấy phần tử đầu tiên trong mảng trả về từ getUserbySearch
+  //       return result.length > 0 ? result[0] : null;
+  //     })
+  //   );
+
+  //   const usersData = users.filter((user) => user !== null); // Loại bỏ các phần tử null
+
+  //   setUserChatting(usersData); // Dù là group, vẫn truyền danh sách còn lại
+  // };
 
   const updateLastMessage = (chatRoomId, message) => {
     setUserChatList((prevList) => {

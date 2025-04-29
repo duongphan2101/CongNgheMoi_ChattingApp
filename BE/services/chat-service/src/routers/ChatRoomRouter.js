@@ -17,7 +17,7 @@ module.exports = (io, redisPublisher) => {
 
       const params = {
         TableName: CHATROOM_TABLE,
-        Key: { chatRoomId }
+        Key: { chatRoomId },
       };
 
       const result = await dynamoDB.get(params).promise();
@@ -33,32 +33,35 @@ module.exports = (io, redisPublisher) => {
   });
 
   //check chatRoom = 2 sdt (single chat)
-  router.get('/checkChatRoom', async (req, res) => {
+  router.get("/checkChatRoom", async (req, res) => {
     const { myPhone, userPhone } = req.query;
 
     if (!myPhone || !userPhone) {
-      return res.status(400).json({ error: 'Missing phone numbers' });
+      return res.status(400).json({ error: "Missing phone numbers" });
     }
 
     try {
       const params = {
         TableName: CHATROOM_TABLE,
-        FilterExpression: 'isGroup = :isGroup AND contains(participants, :myPhone) AND contains(participants, :userPhone)',
+        FilterExpression:
+          "isGroup = :isGroup AND contains(participants, :myPhone) AND contains(participants, :userPhone)",
         ExpressionAttributeValues: {
-          ':isGroup': { BOOL: false },
-          ':myPhone': { S: myPhone },
-          ':userPhone': { S: userPhone }
-        }
+          ":isGroup": { BOOL: false },
+          ":myPhone": { S: myPhone },
+          ":userPhone": { S: userPhone },
+        },
       };
 
       const command = new ScanCommand(params);
       const result = await dynamoClient.send(command);
 
-      const exactMatch = result.Items.find(item => {
-        const phones = item.participants.L.map(p => p.S);
-        return phones.length === 2 &&
+      const exactMatch = result.Items.find((item) => {
+        const phones = item.participants.L.map((p) => p.S);
+        return (
+          phones.length === 2 &&
           phones.includes(myPhone) &&
-          phones.includes(userPhone);
+          phones.includes(userPhone)
+        );
       });
 
       if (exactMatch) {
@@ -67,8 +70,8 @@ module.exports = (io, redisPublisher) => {
         res.json({ chatRoomId: null });
       }
     } catch (error) {
-      console.error('Lỗi khi kiểm tra phòng chat:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error("Lỗi khi kiểm tra phòng chat:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -102,6 +105,38 @@ module.exports = (io, redisPublisher) => {
     }
   });
 
+  router.get("/getDataFromRoom", async (req, res) => {
+    const { chatRoomId } = req.query;
+
+    if (!chatRoomId) {
+      return res.status(400).json({ error: "Missing chatRoomId" });
+    }
+
+    try {
+      const params = {
+        TableName: "Conversations",
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: {
+          ":chatRoomId": chatRoomId,
+        },
+      };
+
+      const result = await dynamoDB.scan(params).promise();
+
+      if (result.Items && result.Items.length > 0) {
+        const item = result.Items[0]; // Lấy mục đầu tiên từ kết quả
+  
+        // Trả về toàn bộ đối tượng item
+        res.json(item);
+      } else {
+        res.status(404).json({ error: 'Không tìm thấy cuộc trò chuyện tương ứng' });
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy chatId từ chatRoomId:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Lấy tin nhắn theo chatRoomId
   router.get("/messages", async (req, res) => {
     try {
@@ -113,7 +148,7 @@ module.exports = (io, redisPublisher) => {
       const params = {
         TableName: MESSAGE_TABLE,
         FilterExpression: "chatRoomId = :chatRoomId",
-        ExpressionAttributeValues: { ":chatRoomId": chatRoomId }
+        ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
       };
 
       const result = await dynamoDB.scan(params).promise();
@@ -135,7 +170,11 @@ module.exports = (io, redisPublisher) => {
         participants.length !== 2 ||
         participants.some((p) => typeof p !== "string" || !p.trim())
       ) {
-        return res.status(400).json({ message: "participants phải là mảng gồm 2 số điện thoại hợp lệ!" });
+        return res
+          .status(400)
+          .json({
+            message: "participants phải là mảng gồm 2 số điện thoại hợp lệ!",
+          });
       }
 
       const chatRoomData = {
@@ -165,14 +204,20 @@ module.exports = (io, redisPublisher) => {
   router.post("/createChatRoomForGroup", async (req, res) => {
     try {
       const { nameGroup, createdBy, participants, admin } = req.body;
-      const avatar = 'https://lab2s3aduong.s3.ap-southeast-1.amazonaws.com/icon-vchat.png';
+      const avatar =
+        "https://lab2s3aduong.s3.ap-southeast-1.amazonaws.com/icon-vchat.png";
 
       if (
         !Array.isArray(participants) ||
         participants.length < 3 ||
         participants.some((p) => typeof p !== "string" || !p.trim())
       ) {
-        return res.status(400).json({ message: "participants phải là mảng gồm ít nhất 3 số điện thoại hợp lệ!" });
+        return res
+          .status(400)
+          .json({
+            message:
+              "participants phải là mảng gồm ít nhất 3 số điện thoại hợp lệ!",
+          });
       }
 
       if (!nameGroup || typeof nameGroup !== "string") {
@@ -180,7 +225,9 @@ module.exports = (io, redisPublisher) => {
       }
 
       if (!createdBy || typeof createdBy !== "string") {
-        return res.status(400).json({ message: "Trường createdBy là bắt buộc!" });
+        return res
+          .status(400)
+          .json({ message: "Trường createdBy là bắt buộc!" });
       }
 
       const generateUniqueChatRoomId = async () => {
@@ -214,13 +261,15 @@ module.exports = (io, redisPublisher) => {
         avatar,
         admin,
         createdAt: new Date().toISOString().split("T")[0],
-        status: "ACTIVE"
+        status: "ACTIVE",
       };
 
-      await dynamoDB.put({
-        TableName: CHATROOM_TABLE,
-        Item: chatRoomData,
-      }).promise();
+      await dynamoDB
+        .put({
+          TableName: CHATROOM_TABLE,
+          Item: chatRoomData,
+        })
+        .promise();
 
       const chatId = uuidv4();
 
@@ -233,14 +282,16 @@ module.exports = (io, redisPublisher) => {
         lastMessage: "",
         lastMessageAt: null,
         avatar,
-        fullName: nameGroup
+        fullName: nameGroup,
       };
 
       // Lưu conversation vào DynamoDB
-      await dynamoDB.put({
-        TableName: "Conversations",
-        Item: conversationData,
-      }).promise();
+      await dynamoDB
+        .put({
+          TableName: "Conversations",
+          Item: conversationData,
+        })
+        .promise();
 
       // Thông báo qua Redis và Socket.IO
       const notificationMessage = {
@@ -254,7 +305,11 @@ module.exports = (io, redisPublisher) => {
 
       // Phát thông báo đến tất cả thành viên trong nhóm chat qua Redis và Socket.IO
       participants.forEach((phoneNumber) => {
-        if (phoneNumber && typeof phoneNumber === 'string' && phoneNumber.trim()) {
+        if (
+          phoneNumber &&
+          typeof phoneNumber === "string" &&
+          phoneNumber.trim()
+        ) {
           // Đảm bảo rằng mỗi người dùng đã join phòng chat của mình
           io.to(phoneNumber).emit("newChatRoom", notificationMessage);
           console.log(`Notification sent to ${phoneNumber}`);
@@ -269,7 +324,6 @@ module.exports = (io, redisPublisher) => {
         chatRoomId,
         chatId,
       });
-
     } catch (error) {
       console.error("Lỗi khi tạo Group ChatRoom hoặc Conversation:", error);
       res.status(500).json({ message: "Lỗi server!" });
@@ -286,18 +340,26 @@ module.exports = (io, redisPublisher) => {
     }
 
     if (!Array.isArray(participants) || participants.length < 3) {
-      return res.status(400).json({ message: "Danh sách thành viên phải là mảng và có ít nhất 3 thành viên." });
+      return res
+        .status(400)
+        .json({
+          message:
+            "Danh sách thành viên phải là mảng và có ít nhất 3 thành viên.",
+        });
     }
 
-    if (participants.some(p => typeof p !== 'string')) {
-      return res.status(400).json({ message: "Danh sách thành viên phải chứa chuỗi hợp lệ." });
+    if (participants.some((p) => typeof p !== "string")) {
+      return res
+        .status(400)
+        .json({ message: "Danh sách thành viên phải chứa chuỗi hợp lệ." });
     }
 
     try {
       const updateChatRoomParams = {
         TableName: CHATROOM_TABLE,
         Key: { chatRoomId: roomId },
-        UpdateExpression: "set nameGroup = :nameGroup, participants = :newMembers",
+        UpdateExpression:
+          "set nameGroup = :nameGroup, participants = :newMembers",
         ExpressionAttributeValues: {
           ":nameGroup": nameGroup,
           ":newMembers": participants,
@@ -305,7 +367,9 @@ module.exports = (io, redisPublisher) => {
         ReturnValues: "ALL_NEW",
       };
 
-      const chatRoomUpdateResult = await dynamoDB.update(updateChatRoomParams).promise();
+      const chatRoomUpdateResult = await dynamoDB
+        .update(updateChatRoomParams)
+        .promise();
 
       const scanParams = {
         TableName: "Conversations",
@@ -318,7 +382,12 @@ module.exports = (io, redisPublisher) => {
       const scanResult = await dynamoDB.scan(scanParams).promise();
 
       if (scanResult.Items.length === 0) {
-        return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện tương ứng trong Conversations." });
+        return res
+          .status(404)
+          .json({
+            message:
+              "Không tìm thấy cuộc trò chuyện tương ứng trong Conversations.",
+          });
       }
 
       const chatId = scanResult.Items[0].chatId;
@@ -326,7 +395,8 @@ module.exports = (io, redisPublisher) => {
       const updateConvParams = {
         TableName: "Conversations",
         Key: { chatId },
-        UpdateExpression: "set fullName = :fullName, participants = :participants",
+        UpdateExpression:
+          "set fullName = :fullName, participants = :participants",
         ExpressionAttributeValues: {
           ":fullName": nameGroup,
           ":participants": participants,
@@ -375,7 +445,9 @@ module.exports = (io, redisPublisher) => {
     const { chatRoomId, phoneNumber } = req.body;
 
     if (!chatRoomId || !phoneNumber) {
-      return res.status(400).json({ message: "Thiếu chatRoomId hoặc phoneNumber." });
+      return res
+        .status(400)
+        .json({ message: "Thiếu chatRoomId hoặc phoneNumber." });
     }
 
     try {
@@ -392,9 +464,11 @@ module.exports = (io, redisPublisher) => {
       }
 
       const chatRoom = result.Item;
-      const updatedParticipants = chatRoom.participants.filter(p => p !== phoneNumber);
+      const updatedParticipants = chatRoom.participants.filter(
+        (p) => p !== phoneNumber
+      );
 
-return router;
+      return router;
 
       // Cập nhật lại danh sách thành viên
       const updateParams = {
@@ -447,6 +521,5 @@ return router;
 
   return router;
 };
-
 
 // module.exports = router;
