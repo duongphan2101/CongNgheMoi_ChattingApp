@@ -14,6 +14,7 @@ import colors from "../themeColors";
 import { useTranslation } from "react-i18next";
 import { TextInput } from "react-native";
 import changePassword from "../api/api_changePassSetting";
+import eventEmitter from "../utils/EventEmitter";
 
 const App = ({ navigation }) => {
   const { theme, toggleTheme } = useTheme();
@@ -44,6 +45,9 @@ const App = ({ navigation }) => {
   const logout = async () => {
     await AsyncStorage.removeItem("accessToken");
     await AsyncStorage.removeItem("user");
+
+    eventEmitter.emit("logout");
+
     console.log("Đăng xuất thành công");
     navigation.navigate("started");
   };

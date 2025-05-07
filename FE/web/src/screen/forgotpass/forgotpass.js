@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import changePassword from "../../API/api_changePass"; // Import the changePassword function
-
+import { LanguageContext, locales } from "../../contexts/LanguageContext";
 function ForgotPassword({ setIsForgotPassword }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState(null);
-
+  const { language } = useContext(LanguageContext);
+  const t = locales[language];
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -62,12 +63,12 @@ function ForgotPassword({ setIsForgotPassword }) {
   return (
     <div className="container chat-container blox">
       <form className="container-fluid chat-form" onSubmit={handleSubmit}>
-        <h1 className="text-center my-4 title">Quên mật khẩu</h1>
+        <h1 className="text-center my-4 title">{t.forgotPassword}</h1>
 
         <input
           className="form-control inp mt-4"
           type="password"
-          placeholder="Mật khẩu mới"
+          placeholder={t.newPassword}
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           disabled={!token}
@@ -76,7 +77,7 @@ function ForgotPassword({ setIsForgotPassword }) {
         <input
           className="form-control inp mt-4"
           type="password"
-          placeholder="Xác nhận mật khẩu mới"
+          placeholder={t.confirmPassword}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           disabled={!token}

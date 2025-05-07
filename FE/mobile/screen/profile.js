@@ -8,6 +8,7 @@ import getUser from '../api/api_getUser';
 import updateUserInfo from '../api/api_updateUserInfo';
 import updateUserAvatar from '../api/api_updateUserAvatar';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
+import { Platform } from 'react-native';
 
 export default function ProfileScreen({ navigation }) {
   const { theme } = useTheme();
@@ -121,25 +122,36 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handleDateConfirm = (date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    
-    // Kiểm tra ngày tương lai
-    const selectedDate = new Date(year, month - 1, day);
-    const now = new Date();
-    
-    if (selectedDate > now) {
-      Alert.alert("Lỗi", "Không thể chọn ngày trong tương lai");
+    try {
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+
+      const selectedDate = new Date(year, month - 1, day);
+      const now = new Date();
+      
+      if (selectedDate > now) {
+        Alert.alert("Lỗi", "Không thể chọn ngày trong tương lai");
+        hideDatePicker();
+        return;
+      }
+
+      if (year < 1900) {
+        Alert.alert("Lỗi", "Năm sinh không hợp lệ");
+        hideDatePicker();
+        return;
+      }
+
+      handleEditChange("year", year);
+      handleEditChange("month", month);
+      handleEditChange("day", day);
+
       hideDatePicker();
-      return;
+    } catch (error) {
+      console.error('Lỗi khi chọn ngày:', error);
+      Alert.alert('Lỗi', 'Không thể chọn ngày. Vui lòng thử lại.');
+      hideDatePicker();
     }
-    
-    handleEditChange("year", year);
-    handleEditChange("month", month);
-    handleEditChange("day", day);
-    
-    hideDatePicker();
   };
 
   const pickImage = async () => {
@@ -339,6 +351,25 @@ export default function ProfileScreen({ navigation }) {
               ? new Date(editInfo.year, editInfo.month - 1, editInfo.day) 
               : new Date()
           }
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          confirmTextIOS="Chọn"
+          cancelTextIOS="Hủy"
+          locale="vi"
+          headerTextIOS="Chọn ngày sinh"
+          customHeaderIOS={() => (
+            <Text style={{ 
+              color: themeColors.text,
+              fontSize: 18,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginVertical: 10
+            }}>
+              Chọn ngày sinh
+            </Text>
+          )}
+          modalStyleIOS={{
+            margin: 0
+          }}
         />
 
         {/* Thông tin liên hệ - chỉ hiển thị */}
@@ -432,7 +463,7 @@ const getStyles = (themeColors) => StyleSheet.create({
   },
   header: {
     width: '100%',
-    backgroundColor: '#2D5D7B',
+    backgroundColor: themeColors.primary,
     paddingBottom: 20,
   },
   headerContent: {
@@ -526,8 +557,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     marginHorizontal: 5,
   },
   genderButtonActive: {
-    backgroundColor: '#2D5D7B',
-    borderColor: '#2D5D7B',
+    backgroundColor: themeColors.primary,
   },
   genderText: {
     color: themeColors.text,
@@ -537,7 +567,7 @@ const getStyles = (themeColors) => StyleSheet.create({
     color: 'white',
   },
   saveButton: {
-    backgroundColor: '#2D5D7B',
+    backgroundColor: themeColors.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',

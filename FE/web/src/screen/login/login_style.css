@@ -1,10 +1,20 @@
-.blox {
+body.light .blox {
     width: 50%;
     height: auto;
     padding: 20px;
     margin-top: 100px;
     background-color: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
+}
+
+body.dark .blox {
+    width: 50%;
+    height: auto;
+    padding: 20px;
+    margin-top: 100px;
+    background-color: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    box-shadow: 0 0 20px #4a8dfd, 0 0 40px rgba(74, 141, 253, 0.6);
 }
 
 .inp {
@@ -14,9 +24,24 @@
     color: white;
 }
 
+.inp:focus {
+    border: 1px solid #2575fc;
+    background-color: transparent;
+    box-shadow: 0 0 5px #2575fc;
+    transition: all 0.3s ease;
+    color: white;
+}
+
+.inp::placeholder {
+    color: white;
+}
+
 .btn-login:hover {
     background-color: transparent;
     color: white;
+    box-shadow: 0 0 15px #2575fc;
+    transition: all 0.3s ease;
+    border: 1px solid #2575fc;
 }
 
 .link {

@@ -1,36 +1,80 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import "./contacts_style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
-import a1 from "../../assets/imgs/9306614.jpg";
-import a2 from "../../assets/imgs/9334176.jpg";
-import a3 from "../../assets/imgs/1.jpg";
+import axios from "axios";
+import { LanguageContext, locales } from "../../contexts/LanguageContext";
+import { toast } from "react-toastify";
 
-function Contacts() {
+const BASE_URL = "localhost";
+
+function Contacts({
+  friendRequests,
+  friends,
+  handleAcceptFriendRequest,
+  handleRejectFriendRequest,
+  setFriends,
+  fetchFriends,
+}) {
   const [searchTerm, setSearchTerm] = useState("");
-
-  const contacts = [
-    { id: 1, name: "J97", online: true, avatar: a1 },
-    { id: 2, name: "Trịnh Trần Phương Tuấn", online: false, avatar: a2 },
-    { id: 3, name: "Jack", online: true, avatar: a3 },
-    { id: 4, name: "Tinh Tú", online: true, avatar: a1 },
-  ];
+  const { language } = useContext(LanguageContext);
+  const t = locales[language];
+  const contacts = [];
 
   const filteredContacts = contacts.filter((contact) =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleUnfriend = async (friendPhone) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        toast.error("Vui lòng đăng nhập!");
+        return;
+      }
+
+      const response = await axios.post(
+        `http://${BASE_URL}:3824/user/unfriend`,
+        { friendPhone },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.data.message === "Đã hủy kết bạn thành công!") {
+        // Cập nhật danh sách bạn bè
+        const updatedFriends = friends.filter(
+          (friend) => friend.phoneNumber !== friendPhone
+        );
+        setFriends([...updatedFriends]); // Đảm bảo tạo một mảng mới
+
+        // Gọi lại fetchFriends để đồng bộ hóa
+        if (updatedFriends.length === 0) {
+          await fetchFriends(); // Đồng bộ lại từ server nếu danh sách rỗng
+        }
+
+        toast.success(t.unfriendSuccess);
+      }
+    } catch (error) {
+      console.error("Lỗi hủy kết bạn:", error);
+      toast.error(t.unfriendFailed);
+    }
+  };
 
   return (
     <div className="chat-box container">
       <div className="chat-header row">
         <div className="col-sm-3 d-flex align-items-center">
           <i className="sidebar-bottom_icon bi bi-person-rolodex text-light"></i>
-          <p className="chat-header_name px-2 m-0">Contacts</p>
+          <p className="chat-header_name px-2 m-0">{t.contacts}</p>
         </div>
         <div className="col-sm-6">
           <div className="search-container w-100">
             <input
               type="text"
-              placeholder="Search contacts..."
+              placeholder={t.search}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
@@ -40,9 +84,77 @@ function Contacts() {
         <div className="col-sm-3"></div>
       </div>
 
-      <div className="contacts-list">
-        {filteredContacts.map((contact) => (
-          <div key={contact.id} className="contact-item">
+      {/* Hiển thị danh sách lời mời kết bạn */}
+      <div className="friend-requests">
+        <h5>{t.friendRequest}</h5>
+        {friendRequests && friendRequests.length > 0 ? (
+          <ul className="list-group">
+            {friendRequests.map((request) => (
+              <li
+                key={request.RequestId} // Đảm bảo RequestId là duy nhất
+                className="list-group-item"
+              >
+                <span>{request.senderPhone}</span>
+                <div>
+                  <button
+                    className="btn btn-success me-2"
+                    onClick={() => handleAcceptFriendRequest(request.RequestId)}
+                  >
+                    {t.acceptFriendRequest}
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => handleRejectFriendRequest(request.RequestId)}
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-light">{t.notFriendRequest}</p>
+        )}
+      </div>
+
+      {/* Hiển thị danh sách bạn bè */}
+      <div className="friends-list mt-4">
+        <h5 className="text-light">{t.listFriend}</h5>
+        {friends.length > 0 ? (
+          friends.map((friend) => (
+            <div key={friend.phoneNumber} className="contact-item">
+              <div className="d-flex align-items-center">
+                <div className="contact-avatar">
+                  <img
+                    src={friend.avatar || "default-avatar.png"}
+                    alt={friend.fullName || "Unknown"}
+                    className="user-avt"
+                  />
+                </div>
+                <div className="contact-info">
+                  <h5 className="mb-0">{friend.fullName || "Không rõ"}</h5>
+                  <small>{friend.phoneNumber}</small>
+                </div>
+              </div>
+              <button
+                className="unfriend-button"
+                onClick={() => handleUnfriend(friend.phoneNumber)}
+              >
+                {t.unfriend}
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="text-light">Không có bạn bè nào.</p>
+        )}
+      </div>
+
+      {/* Hiển thị danh sách liên hệ */}
+      <div className="contacts-list mt-4">
+        {filteredContacts.map((contact, index) => (
+          <div key={index} className="contact-item">
+            {" "}
+            {/* Sử dụng index làm key */}
             <div className="d-flex align-items-center">
               <div className="contact-avatar">
                 <img
@@ -51,9 +163,8 @@ function Contacts() {
                   className="user-avt"
                 />
                 <span
-                  className={`status-indicator ${
-                    contact.online ? "online" : "offline"
-                  }`}
+                  className={`status-indicator ${contact.online ? "online" : "offline"
+                    }`}
                 ></span>
               </div>
               <div className="contact-info">
