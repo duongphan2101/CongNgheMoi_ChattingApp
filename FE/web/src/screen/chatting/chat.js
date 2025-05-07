@@ -1811,7 +1811,7 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
       <ShowModal
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}
-        chatRoom={chatRoom}
+        chatRoom={{ ...chatRoom, messages }}
         userChatting={userChatting}
         currentUserPhone={currentUserPhone}
         members={members}

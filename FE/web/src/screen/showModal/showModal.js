@@ -232,7 +232,7 @@ const ShowModal = ({
                   style={{ borderRadius: "50%" }}
                 />
                 <div className="showmodal-contact-changeAvt">
-                  <label className="btn btn-edit" htmlFor="avatarInput">
+                  <label className="btn" htmlFor="avatarInput">
                     <i className="bi bi-pencil-fill text-light"></i>
                   </label>
                   <input
