@@ -1,5 +1,4 @@
 const setAdmin = async (chatRoomId, phoneNumber) => {
-    console.log("setAdmin function called with:", { chatRoomId, phoneNumber });
     try {
         const response = await fetch("http://localhost:3618/setAdmin", {
             method: "POST",

@@ -230,6 +230,7 @@ body.dark .chat-input {
     height: 60px;
     width: 60px;
     border-radius: 50%;
+    border: 1px solid #fff;
 }
 
 .chat-message_avt {

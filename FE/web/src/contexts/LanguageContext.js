@@ -136,6 +136,12 @@ export const locales = {
     messageFrom: "Tin nhắn từ ",
     fileFrom: "Nhận được một file từ ",
     voiceFrom: "Nhận được một file âm thanh từ ",
+    updateGroupNotification: "Nhóm ",
+    updateGroupNotification2: " đã được cập nhật",
+    updateGroupNotification3: "Cập nhật nhóm thành công",
+    updateGroupNotification4: "Bạn đã được thêm vào nhóm ",
+    updateGroupNotificationRemoved: "Bạn đã bị xóa khỏi nhóm ",
+    
   },
   en: {
     setting: "Settings",
@@ -271,6 +277,11 @@ export const locales = {
     messageFrom: "Message from ",
     fileFrom: "Received a file from ",
     voiceFrom: "Received a voice file from ",
+    updateGroupNotification: "Group ",
+    updateGroupNotification2: " has been updated",
+    updateGroupNotification3: "Group updated successfully",
+    updateGroupNotification4: "You have been added to the group ",
+    updateGroupNotificationRemoved: "You have been removed from the group ",
   },
 };
 

@@ -1,4 +1,4 @@
-const updateChatRoom = async ({ roomId, nameGroup, participants }) => {
+const updateChatRoom = async ({ roomId, nameGroup, participants, phone }) => {
   try {
     const res = await fetch(`http://localhost:3618/updateChatRoom/${roomId}`, {
       method: "PUT",
@@ -7,7 +7,8 @@ const updateChatRoom = async ({ roomId, nameGroup, participants }) => {
       },
       body: JSON.stringify({
         nameGroup,
-        participants
+        participants,
+        phone
       })
     });
 
