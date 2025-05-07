@@ -89,6 +89,18 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Khi nhóm được cập nhật (ví dụ đổi tên hoặc thêm thành viên)
+  socket.on("groupUpdated", (data) => {
+    const { participants, chatRoomId, nameGroup } = data;
+    participants.forEach((phone) => {
+      io.to(phone).emit("groupUpdated", {
+        chatRoomId,
+        nameGroup,
+        participants,
+      });
+    });
+  });
+
   // Trong phần xử lý tạo conversation mới trên server
   socket.on("newConversation", (data) => {
     const { participants, chatRoomId } = data;

@@ -337,9 +337,9 @@ module.exports = (io, redisPublisher) => {
     }
   });
 
-  //update thanh vien + nameGroup
+  // update thành viên + nameGroup
   router.put("/updateChatRoom/:id", async (req, res) => {
-    const { nameGroup, participants } = req.body;
+    const { nameGroup, participants, phone } = req.body;
     const roomId = req.params.id;
 
     if (!nameGroup || typeof nameGroup !== "string") {
@@ -362,6 +362,7 @@ module.exports = (io, redisPublisher) => {
     }
 
     try {
+      // Cập nhật nhóm trong bảng CHATROOM
       const updateChatRoomParams = {
         TableName: CHATROOM_TABLE,
         Key: { chatRoomId: roomId },
@@ -378,6 +379,7 @@ module.exports = (io, redisPublisher) => {
         .update(updateChatRoomParams)
         .promise();
 
+      // Gọi API để lấy dữ liệu cuộc trò chuyện từ bảng Conversations
       const scanParams = {
         TableName: "Conversations",
         FilterExpression: "chatRoomId = :roomId",
@@ -399,6 +401,7 @@ module.exports = (io, redisPublisher) => {
 
       const chatId = scanResult.Items[0].chatId;
 
+      // Cập nhật thông tin nhóm trong bảng Conversations
       const updateConvParams = {
         TableName: "Conversations",
         Key: { chatId },
@@ -412,6 +415,46 @@ module.exports = (io, redisPublisher) => {
 
       await dynamoDB.update(updateConvParams).promise();
 
+      // Gọi API để lấy thông tin chi tiết phòng chat
+      const getDataFromRoomParams = {
+        TableName: "ChatRooms",
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: {
+          ":chatRoomId": roomId,
+        },
+      };
+
+      const roomDetailsResult = await dynamoDB.scan(getDataFromRoomParams).promise();
+
+      if (roomDetailsResult.Items.length === 0) {
+        return res.status(404).json({ error: "Không tìm thấy thông tin phòng chat." });
+      }
+
+      const roomDetails = roomDetailsResult.Items[0]; // Lấy phòng chat đầu tiên
+      // Thông báo qua Redis và Socket.IO
+      const notificationMessage = {
+        type: "GROUP_UPDATED",
+        groupName: nameGroup,
+        chatRoomId: roomId,
+        participants,
+        admin: roomDetails.admin,
+        roomDetails,
+      };
+
+      // Phát thông báo đến tất cả thành viên trong nhóm chat qua Redis và Socket.IO
+      participants.forEach((phoneNumber) => {
+        if (
+          phoneNumber &&
+          typeof phoneNumber === "string" &&
+          phoneNumber.trim()
+        ) {
+          io.to(phoneNumber).emit("updateChatRoom", notificationMessage);
+          console.log(`Notification sent to ${phoneNumber}`);
+        } else {
+          console.error(`Invalid phone number: ${phoneNumber}`);
+        }
+      });
+
       res.json(chatRoomUpdateResult.Attributes);
     } catch (err) {
       console.error("Lỗi cập nhật:", err);
@@ -422,8 +465,6 @@ module.exports = (io, redisPublisher) => {
   // Giải tán nhóm (chuyển status thành DISBANDED)
   router.put("/disbandGroup/:id", async (req, res) => {
     const roomId = req.params.id;
-    console.log("roomId ", roomId);
-
     try {
       const updateParams = {
         TableName: CHATROOM_TABLE,
@@ -439,6 +480,38 @@ module.exports = (io, redisPublisher) => {
       };
 
       await dynamoDB.update(updateParams).promise();
+
+      // Sử dụng scan thay vì query
+      const getDataFromRoomParams = {
+        TableName: "ChatRooms",
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: {
+          ":chatRoomId": roomId,
+        },
+      };
+
+      const roomDetailsResult = await dynamoDB.scan(getDataFromRoomParams).promise();
+      const roomDetails = roomDetailsResult.Items.length > 0 ? roomDetailsResult.Items[0] : {};
+
+      const notificationMessage = {
+        type: "GROUP_UPDATED_DISBANDED",
+        chatRoomId: roomId,
+        status: roomDetails.status,
+      };
+
+      roomDetails.participants.forEach((phoneNumber) => {
+        if (
+          phoneNumber &&
+          typeof phoneNumber === "string" &&
+          phoneNumber.trim()
+        ) {
+          io.to(phoneNumber).emit("updateChatRoom_disbanded", notificationMessage);
+          console.log(`Notification sent to ${phoneNumber}`);
+        } else {
+          console.error(`Invalid phone number: ${phoneNumber}`);
+        }
+      });
+
 
       res.json({ message: "Nhóm đã được giải tán." });
     } catch (error) {
@@ -513,6 +586,39 @@ module.exports = (io, redisPublisher) => {
 
         await dynamoDB.update(updateConvParams).promise();
       }
+      // Lấy thông tin phòng chat từ Conversations
+      const getDataFromRoomParams = {
+        TableName: "Conversations",
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: {
+          ":chatRoomId": chatRoomId,
+        },
+      };
+
+      const roomDetailsResult = await dynamoDB.scan(getDataFromRoomParams).promise();
+      const roomDetails = roomDetailsResult.Items.length > 0 ? roomDetailsResult.Items[0] : {};
+
+      const notificationMessage = {
+        type: "GROUP_UPDATED_REMOVED_MEMBER",
+        groupName: chatRoom.nameGroup,
+        chatRoomId: chatRoomId,
+        admin: chatRoom.admin,
+        participants: updatedParticipants,
+        roomDetails,
+      };
+
+      chatRoom.participants.forEach((phoneNumber) => {
+        if (
+          phoneNumber &&
+          typeof phoneNumber === "string" &&
+          phoneNumber.trim()
+        ) {
+          io.to(phoneNumber).emit("updateChatRoom_rmMem", notificationMessage);
+          console.log(`Notification sent to ${phoneNumber}`);
+        } else {
+          console.error(`Invalid phone number: ${phoneNumber}`);
+        }
+      });
 
       res.json({
         message: "Đã xóa thành viên khỏi nhóm thành công!",
@@ -524,7 +630,6 @@ module.exports = (io, redisPublisher) => {
     }
   });
 
-  // Gán quyền admin cho thành viên trong nhóm  
   router.post("/setAdmin", async (req, res) => {
     const { chatRoomId, phoneNumber } = req.body;
     if (!chatRoomId || !phoneNumber) {
@@ -562,6 +667,40 @@ module.exports = (io, redisPublisher) => {
 
       const updateResult = await dynamoDB.update(updateParams).promise();
 
+      // Sử dụng scan thay vì query
+      const getDataFromRoomParams = {
+        TableName: "Conversations",
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: {
+          ":chatRoomId": chatRoomId,
+        },
+      };
+
+      const roomDetailsResult = await dynamoDB.scan(getDataFromRoomParams).promise();
+      const roomDetails = roomDetailsResult.Items.length > 0 ? roomDetailsResult.Items[0] : {};
+
+      const notificationMessage = {
+        type: "GROUP_UPDATED_ADMIN",
+        groupName: chatRoom.nameGroup,
+        chatRoomId: chatRoomId,
+        participants: chatRoom.participants,
+        admin: phoneNumber,
+        roomDetails,
+      };
+
+      chatRoom.participants.forEach((phoneNumber) => {
+        if (
+          phoneNumber &&
+          typeof phoneNumber === "string" &&
+          phoneNumber.trim()
+        ) {
+          io.to(phoneNumber).emit("updateChatRoom_setAdmin", notificationMessage);
+          console.log(`Notification sent to ${phoneNumber}`);
+        } else {
+          console.error(`Invalid phone number: ${phoneNumber}`);
+        }
+      });
+
       res.json({
         message: "Đã gán quyền admin thành công!",
         admin: updateResult.Attributes.admin,
@@ -571,7 +710,6 @@ module.exports = (io, redisPublisher) => {
       res.status(500).json({ message: "Lỗi server!" });
     }
   });
-
 
   // Rời khỏi nhóm
   router.post("/outGroup", async (req, res) => {
@@ -638,6 +776,40 @@ module.exports = (io, redisPublisher) => {
 
         await dynamoDB.update(updateConvParams).promise();
       }
+
+      // Sử dụng scan thay vì query
+      const getDataFromRoomParams = {
+        TableName: "Conversations",
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: {
+          ":chatRoomId": chatRoomId,
+        },
+      };
+
+      const roomDetailsResult = await dynamoDB.scan(getDataFromRoomParams).promise();
+      const roomDetails = roomDetailsResult.Items.length > 0 ? roomDetailsResult.Items[0] : {};
+
+      const notificationMessage = {
+        type: "GROUP_UPDATED_OUT",
+        groupName: chatRoom.nameGroup,
+        chatRoomId: chatRoomId,
+        phoneNumber: phoneNumber,
+        participants: updatedParticipants,
+        roomDetails,
+      };
+
+      chatRoom.participants.forEach((phoneNumber) => {
+        if (
+          phoneNumber &&
+          typeof phoneNumber === "string" &&
+          phoneNumber.trim()
+        ) {
+          io.to(phoneNumber).emit("updateChatRoom_outGroup", notificationMessage);
+          console.log(`Notification sent to ${phoneNumber}`);
+        } else {
+          console.error(`Invalid phone number: ${phoneNumber}`);
+        }
+      });
 
       res.json({
         message: "Bạn đã rời khỏi nhóm.",

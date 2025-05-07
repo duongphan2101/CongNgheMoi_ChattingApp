@@ -1,4 +1,5 @@
 import React, { useState, useContext } from "react";
+import "bootstrap/dist/css/bootstrap.min.css";
 import "./ShowModal.css";
 import { toast } from "react-toastify";
 import deleteMember from "../../API/api_deleteMember.js";
@@ -8,6 +9,7 @@ import Swal from 'sweetalert2';
 import setAdmin from "../../API/api_setAdmin.js";
 import outGroup from "../../API/api_outGroup.js";
 import { LanguageContext, locales } from "../../contexts/LanguageContext";
+
 const ShowModal = ({
   isOpen,
   onClose,
@@ -17,13 +19,13 @@ const ShowModal = ({
   members,
   defaultAvatar,
   onUpdateChatRoom,
-  setIsInfoModalOpen
+  setIsInfoModalOpen,
+
 }) => {
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [isImageZoomModalOpen, setIsImageZoomModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [currentChatRoom, setCurrentChatRoom] = useState(chatRoom);
-
   const { language } = useContext(LanguageContext);
   const t = locales[language];
 
@@ -32,8 +34,6 @@ const ShowModal = ({
   const displayName = chatRoom.isGroup
     ? chatRoom.nameGroup || userChatting.map((u) => u.fullName).join(", ")
     : userChatting?.[0]?.fullName || "Người lạ";
-
-
 
   const mediaMessages = chatRoom.messages
     ? chatRoom.messages.filter((msg) => {
@@ -157,6 +157,7 @@ const ShowModal = ({
       cancelButtonText: t.cancel,
       background: '#222',
     });
+    console.log("hhhh ", chatRoomId);
 
     if (!confirmResult.isConfirmed) return;
 
@@ -232,7 +233,7 @@ const ShowModal = ({
                   style={{ borderRadius: "50%" }}
                 />
                 <div className="showmodal-contact-changeAvt">
-                  <label className="btn btn-edit" htmlFor="avatarInput">
+                  <label className="btn" htmlFor="avatarInput">
                     <i className="bi bi-pencil-fill text-light"></i>
                   </label>
                   <input
