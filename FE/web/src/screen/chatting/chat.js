@@ -22,7 +22,13 @@ import useFetchChatRoom from "../../hooks/getChatRoom.js";
 const socket = io("http://localhost:3618");
 const notificationSocket = io("http://localhost:3515");
 
-function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateChatRoom }) {
+function Chat({
+  phongChat,
+  userChatting = [],
+  user,
+  updateLastMessage,
+  onUpdateChatRoom,
+}) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [currentUserPhone, setCurrentUserPhone] = useState();
@@ -212,8 +218,8 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
         msg.type === "audio"
           ? "Tin nhắn thoại"
           : msg.type === "file"
-            ? "File đính kèm"
-            : msg.message,
+          ? "File đính kèm"
+          : msg.message,
     });
     setActiveMessageId(null);
     setHighlightedMessageId(msg.timestamp);
@@ -415,7 +421,8 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
     socket.on("tagged", (data) => {
       if (data.taggedUsers.includes(currentUserPhone)) {
         toast.info(
-          `Bạn được tag trong tin nhắn từ ${userMap[data.sender]?.fullName || data.sender
+          `Bạn được tag trong tin nhắn từ ${
+            userMap[data.sender]?.fullName || data.sender
           }`,
           {
             position: "bottom-right",
@@ -439,45 +446,62 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
 
   useEffect(() => {
     if (!chatRoom?.chatRoomId) return;
-    const chatId = chatRoom.chatId || `${chatRoom.participants.sort().join("_")}`;
+    const chatId =
+      chatRoom.chatId || `${chatRoom.participants.sort().join("_")}`;
     socket.emit("joinRoom", chatId);
     socket.emit("joinRoom", chatRoom.chatRoomId);
     socket.emit("join", user.phoneNumber);
 
     const handleAvatarUpdate = (data) => {
       if (data.chatRoomId === chatRoom.chatRoomId || data.chatId === chatId) {
-        setCurrentChatRoom(prev => ({
+        setCurrentChatRoom((prev) => ({
           ...prev,
-          avatar: data.newAvatarUrl
+          avatar: data.newAvatarUrl,
         }));
 
-        localStorage.setItem(`chatRoom_${data.chatId}_avatar`, data.newAvatarUrl);
-        localStorage.setItem(`chatRoom_${data.chatRoomId}_avatar`, data.newAvatarUrl);
+        localStorage.setItem(
+          `chatRoom_${data.chatId}_avatar`,
+          data.newAvatarUrl
+        );
+        localStorage.setItem(
+          `chatRoom_${data.chatRoomId}_avatar`,
+          data.newAvatarUrl
+        );
 
-        const avatarElements = document.querySelectorAll(`img[src="${chatRoom.avatar}"]`);
-        avatarElements.forEach(el => {
+        const avatarElements = document.querySelectorAll(
+          `img[src="${chatRoom.avatar}"]`
+        );
+        avatarElements.forEach((el) => {
           el.src = data.newAvatarUrl;
         });
 
         if (onUpdateChatRoom) {
           onUpdateChatRoom({
             ...chatRoom,
-            avatar: data.newAvatarUrl
+            avatar: data.newAvatarUrl,
           });
         }
       }
     };
 
     setCurrentUserPhone(user.phoneNumber);
-    fetch(`http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-      .then((res) => res.json())
+    fetch(
+      `http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}&currentUserPhone=${user.phoneNumber}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    )
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
-        setMessages(data);
+        setMessages(Array.isArray(data) ? data : []);
         const reactionsData = {};
         data.forEach((msg) => {
           if (msg.reactions) {
@@ -493,6 +517,7 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
       .catch((err) => {
         console.error("Lỗi khi lấy tin nhắn:", err);
         toast.error("Không thể lấy tin nhắn!");
+        setMessages([]);
       });
 
     socket.emit("joinRoom", chatRoom.chatRoomId);
@@ -545,15 +570,24 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
       socket.emit("leaveRoom", chatId);
       socket.emit("leaveRoom", chatRoom.chatRoomId);
     };
-  }, [chatRoom?.chatRoomId, chatRoom?.chatId, user.phoneNumber, updateLastMessage, onUpdateChatRoom, chatRoom]);
+  }, [
+    chatRoom?.chatRoomId,
+    chatRoom?.chatId,
+    user.phoneNumber,
+    updateLastMessage,
+    onUpdateChatRoom,
+    chatRoom,
+  ]);
 
   useEffect(() => {
     if (chatRoom?.chatId) {
-      const cachedAvatar = localStorage.getItem(`chatRoom_${chatRoom.chatId}_avatar`);
+      const cachedAvatar = localStorage.getItem(
+        `chatRoom_${chatRoom.chatId}_avatar`
+      );
       if (cachedAvatar) {
-        setCurrentChatRoom(prev => ({
+        setCurrentChatRoom((prev) => ({
           ...prev,
-          avatar: cachedAvatar
+          avatar: cachedAvatar,
         }));
       }
     }
@@ -605,8 +639,14 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
 
     // Phát hiện ký tự @
     const lastAt = value.lastIndexOf("@");
-    if (lastAt !== -1 && (value.length === lastAt + 1 || !value[lastAt + 1].match(/\s/))) {
-      const query = value.slice(lastAt + 1).toLowerCase().normalize("NFC");
+    if (
+      lastAt !== -1 &&
+      (value.length === lastAt + 1 || !value[lastAt + 1].match(/\s/))
+    ) {
+      const query = value
+        .slice(lastAt + 1)
+        .toLowerCase()
+        .normalize("NFC");
       setTagQuery(query);
       setShowSuggestions(true);
 
@@ -745,10 +785,10 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
       chatId,
       replyTo: replyingTo
         ? {
-          timestamp: replyingTo.timestamp,
-          message: replyingTo.message,
-          sender: replyingTo.sender,
-        }
+            timestamp: replyingTo.timestamp,
+            message: replyingTo.message,
+            sender: replyingTo.sender,
+          }
         : null,
       taggedUsers,
     };
@@ -860,7 +900,8 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
         const errorData = await response.json();
         console.error("Lỗi Server:", response.status, errorData);
         throw new Error(
-          `Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`
+          `Tải file lên thất bại: ${
+            errorData.error || `Mã lỗi: ${response.status}`
           }`
         );
       }
@@ -1033,17 +1074,18 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
         {Object.entries(reactions).map(([reaction, users]) => (
           <div
             key={reaction}
-            className={`reaction-badge ${activeReactionTooltip === `${reaction}-${users.join(",")}`
-              ? "active"
-              : ""
-              }`}
-          // onClick={() =>
-          //   setActiveReactionTooltip(
-          //     activeReactionTooltip === `${reaction}-${users.join(",")}`
-          //       ? null
-          //       : `${reaction}-${users.join(",")}`
-          //   )
-          // }
+            className={`reaction-badge ${
+              activeReactionTooltip === `${reaction}-${users.join(",")}`
+                ? "active"
+                : ""
+            }`}
+            // onClick={() =>
+            //   setActiveReactionTooltip(
+            //     activeReactionTooltip === `${reaction}-${users.join(",")}`
+            //       ? null
+            //       : `${reaction}-${users.join(",")}`
+            //   )
+            // }
           >
             {reaction} {users.length}
             <div className="reaction-tooltip">
@@ -1068,14 +1110,15 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
     );
   };
 
-
   useEffect(() => {
     if (chatRoom?.chatRoomId) {
-      const cachedAvatar = localStorage.getItem(`chatRoom_${chatRoom.chatRoomId}_avatar`);
+      const cachedAvatar = localStorage.getItem(
+        `chatRoom_${chatRoom.chatRoomId}_avatar`
+      );
       if (cachedAvatar) {
-        setCurrentChatRoom(prev => ({
+        setCurrentChatRoom((prev) => ({
           ...prev,
-          avatar: cachedAvatar
+          avatar: cachedAvatar,
         }));
       }
     }
@@ -1280,9 +1323,7 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
     <>
       <div className="chat-box container">
         {!chatRoom || !userChatting || userChatting.length === 0 ? (
-          <p className="text-center mt-3 centered-text">
-            {t.notConversation2}
-          </p>
+          <p className="text-center mt-3 centered-text">{t.notConversation2}</p>
         ) : (
           <>
             {/* ===== Chat Header ===== */}
@@ -1315,9 +1356,7 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
                     userChatting?.[0]?.fullName || "Người lạ"
                   )}
                   {chatRoom.status === "DISBANDED" && (
-                    <span className="badge bg-danger ms-2">
-                      {t.disbanded}
-                    </span>
+                    <span className="badge bg-danger ms-2">{t.disbanded}</span>
                   )}
                 </p>
               </div>
@@ -1353,8 +1392,9 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
                   <div
                     key={index}
                     id={`message-${msg.timestamp}`}
-                    className={`message ${isSentByCurrentUser ? "sent" : "received"
-                      } ${isHighlighted ? "highlighted" : ""}`}
+                    className={`message ${
+                      isSentByCurrentUser ? "sent" : "received"
+                    } ${isHighlighted ? "highlighted" : ""}`}
                     onMouseEnter={() => setHoveredMessageId(msg.timestamp)}
                     onMouseLeave={() => {
                       setHoveredMessageId(null);
@@ -1394,9 +1434,10 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
                             <span>
                               {msg.replyTo.sender === currentUserPhone
                                 ? "Bạn đã trả lời tin nhắn của mình"
-                                : `Đã trả lời tin nhắn của ${userMap[msg.replyTo.sender]?.fullName ||
-                                "người khác"
-                                }`}
+                                : `Đã trả lời tin nhắn của ${
+                                    userMap[msg.replyTo.sender]?.fullName ||
+                                    "người khác"
+                                  }`}
                             </span>
                             <p
                               style={{
@@ -1705,7 +1746,10 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
                 <div className="mb-3">
                   <p className="fw-bold">
                     {t.currentMember} (
-                    <span>{chatRoom.participants.length} {t.mem}</span>)
+                    <span>
+                      {chatRoom.participants.length} {t.mem}
+                    </span>
+                    )
                   </p>
                   <ul className="list-group">
                     {chatRoom.participants.map((phone) => {
@@ -1741,9 +1785,7 @@ function Chat({ phongChat, userChatting = [], user, updateLastMessage, onUpdateC
                   <p className="text-muted">{t.noFriends}</p>
                 ) : (
                   <div>
-                    <p className="fw-bold">
-                      {t.mems}
-                    </p>
+                    <p className="fw-bold">{t.mems}</p>
                     <ul className="list-group">
                       {listFriends
                         .filter((friend) => {
