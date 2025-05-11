@@ -13,7 +13,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "Ứng dụng cần quyền để gửi thông báo cho bạn.",
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "bundleIdentifier": "com.anonymous.mobile2"
+    }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,4 +32,3 @@
       "favicon": "./assets/favicon.png"
     }
   }
-}

@@ -19,6 +19,7 @@ const getIp = (service = 'auth') => {
   const PORT = {
     auth: 3721,
     user: 3824,
+    chat: 3618,
   };
 
   // Trả về URL với IP và cổng cho dịch vụ
