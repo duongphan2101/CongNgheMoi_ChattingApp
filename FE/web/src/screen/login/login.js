@@ -27,6 +27,10 @@ function Login({ setIsLoggedIn }) {
 
   return (
     <div className="container chat-container blox">
+      <div className="img-container">
+
+      </div>
+      
       <form className="container-fluid chat-form" onSubmit={handleSubmit}>
         <h1 className="text-center my-4 title">{t.login}</h1>
         <input

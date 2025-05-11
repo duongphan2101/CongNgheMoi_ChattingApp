@@ -10,7 +10,7 @@ const disbandGroup = async (chatRoomId) => {
   });
 
   const responseText = await response.text();
-  console.log("Raw response:", responseText);
+  // console.log("Raw response:", responseText);
 
   let data;
   try {

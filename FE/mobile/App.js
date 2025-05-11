@@ -14,7 +14,8 @@ import chat from "./screen/chat";
 import forgetpassword from "./screen/ForgetPassword/forgetPassword";
 import resetpassword from "./screen/ForgetPassword/resetPassword";
 import TabNavigator from "./screen/footer";
-import { setupNotifications } from "./utils/notifications";
+import AuthLoading from "./screen/authLoading";
+// import { setupNotifications } from "./utils/notifications";
 import colors from "./themeColors";
 
 const Stack = createNativeStackNavigator();
@@ -23,14 +24,15 @@ function AppWrapper() {
   const { theme } = useTheme();
   const themeColors = colors[theme];
 
-  useEffect(() => {
-    setupNotifications();
-  }, []);
+  // useEffect(() => {
+  //   setupNotifications();
+  // }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent'}}>
       <NavigationContainer>
-        <Stack.Navigator initialRouteName="started">
+        <Stack.Navigator initialRouteName="AuthLoading">
+          <Stack.Screen name="AuthLoading" component={AuthLoading} options={{ headerShown: false }} />
           <Stack.Screen name="started" component={started} options={{ headerShown: false }} />
           <Stack.Screen name="login" component={login} options={{ headerShown: false }} />
           <Stack.Screen name="register" component={register} options={{ headerShown: false }} />

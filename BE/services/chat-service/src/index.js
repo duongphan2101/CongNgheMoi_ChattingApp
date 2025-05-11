@@ -6,6 +6,7 @@ const socketIo = require("socket.io");
 const { createClient } = require("redis");
 const { createAdapter } = require("@socket.io/redis-adapter");
 require("dotenv").config({ path: "../.env" });
+const jwt = require("jsonwebtoken");
 
 const app = express();
 const server = http.createServer(app);
@@ -60,6 +61,27 @@ app.use("/", chatRoomRoutes);
 app.use("/", messageRoutes);
 app.use("/", uploadFileRouter);
 app.use("/", downloadRouter);
+
+// io.use((socket, next) => {
+//   const token = socket.handshake.auth.token; // Lấy token từ client gửi lên trong phần auth
+//   console.log("Nhận được Token: ", token);
+  
+//   if (!token) {
+//     return next(new Error("Lỗi xác thực: Cần có token"));
+//   }
+
+//   // Xác thực token bằng JWT
+//   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+//     if (err) {
+//       return next(new Error("Lỗi xác thực: Token không hợp lệ hoặc đã hết hạn"));
+//     }
+
+//     // Lưu thông tin người dùng vào socket để sử dụng trong các sự kiện sau
+//     socket.user = decoded; // Thông tin người dùng từ token
+
+//     next(); // Tiếp tục kết nối nếu token hợp lệ
+//   });
+// });
 
 // WebSocket handlers
 io.on("connection", (socket) => {

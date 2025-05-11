@@ -157,7 +157,6 @@ const ShowModal = ({
       cancelButtonText: t.cancel,
       background: '#222',
     });
-    console.log("hhhh ", chatRoomId);
 
     if (!confirmResult.isConfirmed) return;
 

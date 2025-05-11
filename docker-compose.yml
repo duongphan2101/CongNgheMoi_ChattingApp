@@ -1,0 +1,101 @@
+services:
+  auth-service:
+    build:
+      context: ./BE/services/auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "3721:3721"
+    env_file:
+      - ./BE/services/auth-service/.env
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./BE/services/auth-service:/app
+    restart: unless-stopped
+
+  chat-service:
+    build:
+      context: ./BE/services/chat-service
+      dockerfile: Dockerfile
+    container_name: chat-service
+    ports:
+      - "3618:3618"
+    env_file:
+      - ./BE/services/chat-service/.env
+    environment:
+      - NODE_ENV=development
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./BE/services/chat-service:/app
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ./BE/services/notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "3515:3515"
+    env_file:
+      - ./BE/services/notification-service/.env
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./BE/services/notification-service:/app
+    restart: unless-stopped
+
+  user-service:
+    build:
+      context: ./BE/services/user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "3824:3824"
+    env_file:
+      - ./BE/services/user-service/.env
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./BE/services/user-service:/app
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./FE/web
+      dockerfile: Dockerfile
+    container_name: vchat-web
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./FE/web:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped
+  mobile:
+    image: node:23-slim
+    container_name: vchat-mobile
+    working_dir: /app
+    volumes:
+      - ./FE/mobile:/app
+      - /app/node_modules
+    command: sh -c "npm install && EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0 npx expo start --tunnel"
+    environment:
+      - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+      - EXPO_NO_DEV=false
+    network_mode: host  # Chia sẻ mạng với host
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+

@@ -603,6 +603,7 @@ module.exports = (io, redisPublisher) => {
         groupName: chatRoom.nameGroup,
         chatRoomId: chatRoomId,
         admin: chatRoom.admin,
+        phoneNumber: phoneNumber,
         participants: updatedParticipants,
         roomDetails,
       };

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList, Alert } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { useTheme } from "../contexts/themeContext";
 import colors from "../themeColors";
@@ -123,25 +123,27 @@ export default function App({ navigation, route }) {
     // Join socket với số điện thoại của user
     socket.emit('joinUser', thisUser.phoneNumber);
 
-    // Lắng nghe khi có conversation mới được tạo
-    socket.on('newConversation', async (data) => {
-      // Kiểm tra xem user hiện tại có trong conversation không
-      if (data.participants.includes(thisUser.phoneNumber)) {
-        await fetchData(); // Load lại toàn bộ danh sách
-      }
-    });
-
     // Lắng nghe khi có nhóm mới được tạo
-    socket.on('groupCreated', async (data) => {
+    socket.on('groupCreated', al);
+
+    const al = async (data) => {
       if (data.participants.includes(thisUser.phoneNumber)) {
-        console.log(`Nhóm mới được tạo: ${data.nameGroup}`);
-        await fetchData(); // Load lại toàn bộ danh sách
+        // console.log(`Nhóm mới được tạo: ${data.groupName}`);
+        await fetchData();
       }
-    });
+    }
+
+    socket.on("groupAvatarUpdated", al);
+
+    socket.on('newChatRoom', al);
+
+    socket.on("updateChatRoom", al);
 
     return () => {
-      socket.off('newConversation');
       socket.off('groupCreated');
+      socket.off('newChatRoom');
+      socket.off('updateChatRoom');
+      socket.off('groupAvatarUpdated')
     };
   }, [thisUser?.phoneNumber]);
 
@@ -206,7 +208,7 @@ export default function App({ navigation, route }) {
                 <View style={styles.userInfo}>
                   <Text style={styles.text}>{item.isGroup ? item.fullName : otherUser?.fullName || 'Đang tải...'}</Text>
                   <Text style={styles.mess} numberOfLines={1} ellipsizeMode="tail">
-                    {lastMessageDisplay} 
+                    {lastMessageDisplay}
                   </Text>
                 </View>
                 {/* <Text style={styles.time}>{lastMessageTime}</Text> */}
@@ -235,6 +237,8 @@ const getStyles = (themeColors) => StyleSheet.create({
     height: 60,
     marginRight: 10,
     borderRadius: 30,
+    borderWidth: 1.5,
+    borderColor: themeColors.text
   },
   user: {
     paddingHorizontal: 10,
