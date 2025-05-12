@@ -23,9 +23,6 @@ module.exports = (io) => {
       const result = await dynamoDB.scan(params).promise();
   
       if (!result.Items || result.Items.length === 0) {
-        return res
-          .status(404)
-          .json({ message: "Không tìm thấy cuộc trò chuyện nào!" });
       }
   
       // Lọc các cuộc trò chuyện mà phoneNumber không nằm trong isDeletedBy
