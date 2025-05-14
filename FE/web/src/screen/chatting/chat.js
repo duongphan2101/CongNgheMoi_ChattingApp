@@ -21,13 +21,7 @@ import useFetchChatRoom from "../../hooks/getChatRoom.js";
 const socket = io("http://localhost:3618");
 const notificationSocket = io("http://localhost:3515");
 
-function Chat({
-  phongChat,
-  userChatting = [],
-  user,
-  updateLastMessage,
-  onUpdateChatRoom,
-}) {
+
 function Chat({
   phongChat,
   userChatting = [],
@@ -238,8 +232,6 @@ function Chat({
         msg.type === "audio"
           ? "Tin nhắn thoại"
           : msg.type === "file"
-          ? "File đính kèm"
-          : msg.message,
           ? "File đính kèm"
           : msg.message,
     });
