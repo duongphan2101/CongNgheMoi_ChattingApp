@@ -28,6 +28,13 @@ function Chat({
   updateLastMessage,
   onUpdateChatRoom,
 }) {
+function Chat({
+  phongChat,
+  userChatting = [],
+  user,
+  updateLastMessage,
+  onUpdateChatRoom,
+}) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [currentUserPhone, setCurrentUserPhone] = useState();
@@ -231,6 +238,8 @@ function Chat({
         msg.type === "audio"
           ? "Tin nhắn thoại"
           : msg.type === "file"
+          ? "File đính kèm"
+          : msg.message,
           ? "File đính kèm"
           : msg.message,
     });
@@ -494,15 +503,23 @@ function Chat({
     };
 
     setCurrentUserPhone(user.phoneNumber);
-    fetch(`http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-      .then((res) => res.json())
+    fetch(
+      `http://localhost:3618/messages?chatRoomId=${chatRoom.chatRoomId}&currentUserPhone=${user.phoneNumber}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    )
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
-        setMessages(data);
+        setMessages(Array.isArray(data) ? data : []);
         const reactionsData = {};
         data.forEach((msg) => {
           if (msg.reactions) {
@@ -518,6 +535,7 @@ function Chat({
       .catch((err) => {
         console.error("Lỗi khi lấy tin nhắn:", err);
         toast.error("Không thể lấy tin nhắn!");
+        setMessages([]);
       });
 
     socket.emit("joinRoom", chatRoom.chatRoomId);
@@ -1072,6 +1090,13 @@ function Chat({
                 ? "active"
                 : ""
             }`}
+            // onClick={() =>
+            //   setActiveReactionTooltip(
+            //     activeReactionTooltip === `${reaction}-${users.join(",")}`
+            //       ? null
+            //       : `${reaction}-${users.join(",")}`
+            //   )
+            // }
           >
             {reaction} {users.length}
             <div className="reaction-tooltip">

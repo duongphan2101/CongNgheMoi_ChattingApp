@@ -9,7 +9,7 @@ import { useSearch } from '../contexts/searchContext';
 import { useFocusEffect } from '@react-navigation/native';
 import io from "socket.io-client";
 import getIp from "../utils/getIp_notPORT";
-
+import eventEmitter from "../utils/EventEmitter";
 
 const BASE_URL = getIp();
 const socket = io(`http://${BASE_URL}:3618`);
@@ -160,6 +160,18 @@ export default function App({ navigation, route }) {
       fetchData();
     }
   }, [route.params?.refresh, route.params?.timestamp]);
+
+  useEffect(() => {
+    // Lắng nghe sự kiện "refreshConversations"
+    const listener = eventEmitter.on("refreshConversations", () => {
+      fetchData();
+    });
+
+    // Cleanup listener khi component unmount
+    return () => {
+      listener.remove();
+    };
+  }, []);
 
   const handlePress = (otherUser, chatRoom) => {
     hideSearch();

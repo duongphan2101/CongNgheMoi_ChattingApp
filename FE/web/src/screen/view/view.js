@@ -1347,6 +1347,9 @@ function View({ setIsLoggedIn }) {
 
   // Hàm xử lý xóa hội thoại
   const handleDeleteConversation = async (chatRoomId) => {
+
+    console.log("Phone nguoi yeu cau xoa: " , userInfo.phoneNumber);
+
     try {
       const response = await fetch(
         `http://localhost:3618/deleteConversation/${chatRoomId}`,
@@ -1355,6 +1358,9 @@ function View({ setIsLoggedIn }) {
           headers: {
             "Content-Type": "application/json",
           },
+          body: JSON.stringify({
+            phoneNumber: userInfo.phoneNumber, // Thay bằng số điện thoại của người dùng
+          }),
         }
       );
 
