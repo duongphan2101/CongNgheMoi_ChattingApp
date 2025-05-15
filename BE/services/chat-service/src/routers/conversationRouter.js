@@ -12,57 +12,28 @@ module.exports = (io) => {
 
   router.get("/conversations", verifyToken, async (req, res) => {
     try {
-      const phoneNumber = req.user.phoneNumber; // Lấy số điện thoại từ token
-  
+      const phoneNumber = req.user.phoneNumber;
+
       const params = {
         TableName: TABLE_NAME,
         FilterExpression: "contains(participants, :phoneNumber)",
         ExpressionAttributeValues: { ":phoneNumber": phoneNumber },
       };
-  
+
       const result = await dynamoDB.scan(params).promise();
-  
+
       if (!result.Items || result.Items.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "Không tìm thấy cuộc trò chuyện nào!" });
       }
-  
-      // Lọc các cuộc trò chuyện mà phoneNumber không nằm trong isDeletedBy
-      const filteredConversations = result.Items.filter(
-        (conversation) =>
-          !conversation.isDeletedBy ||
-          !conversation.isDeletedBy.includes(phoneNumber)
-      );
-  
-      res.json(filteredConversations);
+
+      res.json(result.Items);
     } catch (error) {
       console.error("Lỗi lấy danh sách conversations:", error);
       res.status(500).json({ message: "Lỗi server!" });
     }
   });
-  
-  // router.get("/conversations", verifyToken, async (req, res) => {
-  //   try {
-  //     const phoneNumber = req.user.phoneNumber;
-
-  //     const params = {
-  //       TableName: TABLE_NAME,
-  //       FilterExpression: "contains(participants, :phoneNumber)",
-  //       ExpressionAttributeValues: { ":phoneNumber": phoneNumber },
-  //     };
-
-  //     const result = await dynamoDB.scan(params).promise();
-
-  //     if (!result.Items || result.Items.length === 0) {
-  //       return res
-  //         .status(404)
-  //         .json({ message: "Không tìm thấy cuộc trò chuyện nào!" });
-  //     }
-
-  //     res.json(result.Items);
-  //   } catch (error) {
-  //     console.error("Lỗi lấy danh sách conversations:", error);
-  //     res.status(500).json({ message: "Lỗi server!" });
-  //   }
-  // });
 
   router.get("/checkChatRoom", async (req, res) => {
     try {
@@ -153,26 +124,54 @@ module.exports = (io) => {
   });
 
   router.get("/messages", async (req, res) => {
-    try {
-      const { chatRoomId } = req.query;
-      if (!chatRoomId) {
-        return res.status(400).json({ message: "Thiếu chatRoomId!" });
-      }
+  try {
+    const { chatRoomId, currentUserPhone } = req.query;
 
-      const params = {
-        TableName: MESSAGE_TABLE,
-        FilterExpression: "chatRoomId = :chatRoomId",
-        ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
-      };
-
-      const result = await dynamoDB.scan(params).promise();
-      console.log("result:", result.Items);
-      res.json(result.Items);
-    } catch (error) {
-      console.error("Lỗi lấy tin nhắn:", error);
-      res.status(500).json({ message: "Lỗi server!" });
+    if (!chatRoomId || !currentUserPhone) {
+      return res.status(400).json({ message: "Thiếu chatRoomId hoặc currentUserPhone!" });
     }
-  });
+
+    const params = {
+      TableName: MESSAGE_TABLE,
+      FilterExpression: "chatRoomId = :chatRoomId",
+      ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
+    };
+
+    const result = await dynamoDB.scan(params).promise();
+
+    // Lọc tin nhắn không bị xóa bởi currentUserPhone
+    const filteredMessages = result.Items.filter(
+      (message) => !message.isDeletedBy || !message.isDeletedBy.includes(currentUserPhone)
+    );
+
+    res.json(filteredMessages);
+  } catch (error) {
+    console.error("Lỗi lấy tin nhắn:", error);
+    res.status(500).json({ message: "Lỗi server!" });
+  }
+});
+
+  // router.get("/messages", async (req, res) => {
+  //   try {
+  //     const { chatRoomId } = req.query;
+  //     if (!chatRoomId) {
+  //       return res.status(400).json({ message: "Thiếu chatRoomId!" });
+  //     }
+
+  //     const params = {
+  //       TableName: MESSAGE_TABLE,
+  //       FilterExpression: "chatRoomId = :chatRoomId",
+  //       ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
+  //     };
+
+  //     const result = await dynamoDB.scan(params).promise();
+  //     console.log("result:", result.Items);
+  //     res.json(result.Items);
+  //   } catch (error) {
+  //     console.error("Lỗi lấy tin nhắn:", error);
+  //     res.status(500).json({ message: "Lỗi server!" });
+  //   }
+  // });
 
   router.post("/createConversation", async (req, res) => {
     try {
@@ -183,7 +182,6 @@ module.exports = (io) => {
         chatRoomId,
         isGroup: false,
         participants,
-        isDeletedBy: [],
         isUnreadBy: [],
         lastMessage: "",
         lastMessageAt: null,
@@ -253,60 +251,53 @@ module.exports = (io) => {
       res.status(500).json({ message: "Lỗi server!" });
     }
   });
-  
-  router.put("/deleteConversation/:chatRoomId" , async (req, res) => {
+
+  router.put("/deleteConversation/:chatRoomId", async (req, res) => {
     const chatRoomId = req.params.chatRoomId;
-    const phoneNumber = req.body.phoneNumber; // Lấy số điện thoại từ body request
-  
-    if (!chatRoomId) {
-      return res.status(400).json({ message: "Thiếu chatRoomId!" });
+    const userPhone = req.body.userPhone; // Người dùng thực hiện xóa
+
+    if (!chatRoomId || !userPhone) {
+      return res.status(400).json({ message: "Thiếu chatRoomId hoặc userPhone!" });
     }
-  
-    if (!phoneNumber) {
-      return res.status(400).json({ message: "Thiếu số điện thoại!" });
-    }
-  
+
     try {
-      // Kiểm tra xem hội thoại có tồn tại không
-      const scanParams = {
-        TableName: "Conversations",
+      // Lấy tất cả tin nhắn liên quan đến chatRoomId
+      const queryMsgParams = {
+        TableName: MESSAGE_TABLE,
         FilterExpression: "chatRoomId = :chatRoomId",
-        ExpressionAttributeValues: {
-          ":chatRoomId": chatRoomId,
-        },
+        ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
       };
-  
-      const scanResult = await dynamoDB.scan(scanParams).promise();
-  
-      if (scanResult.Items.length === 0) {
-        return res
-          .status(404)
-          .json({ message: "Không tìm thấy hội thoại tương ứng!" });
+
+      const messagesResult = await dynamoDB.scan(queryMsgParams).promise();
+
+      if (messagesResult.Items.length > 0) {
+        // Cập nhật cột isDeletedBy cho từng tin nhắn
+        const updateMessagePromises = messagesResult.Items.map((message) => {
+          const updateParams = {
+            TableName: MESSAGE_TABLE,
+            Key: {
+              chatRoomId: message.chatRoomId, // Partition key
+              timestamp: message.timestamp, // Sort key
+            },
+            UpdateExpression: "SET isDeletedBy = list_append(if_not_exists(isDeletedBy, :emptyList), :userPhone)",
+            ExpressionAttributeValues: {
+              ":emptyList": [],
+              ":userPhone": [userPhone],
+            },
+          };
+
+          return dynamoDB.update(updateParams).promise();
+        });
+
+        await Promise.all(updateMessagePromises);
       }
-  
-      // Lấy hội thoại
-      const conversation = scanResult.Items[0];
-      const chatId = conversation.chatId;
-  
-      // Cập nhật số điện thoại vào isDeletedBy
-      const updateParams = {
-        TableName: "Conversations",
-        Key: { chatId },
-        UpdateExpression: "SET isDeletedBy = list_append(if_not_exists(isDeletedBy, :emptyList), :phoneNumber)",
-        ExpressionAttributeValues: {
-          ":phoneNumber": [phoneNumber],
-          ":emptyList": [],
-        },
-      };
-  
-      await dynamoDB.update(updateParams).promise();
-  
+
       res.json({
         message: "Đã cập nhật trạng thái xóa hội thoại thành công!",
         chatRoomId,
       });
     } catch (error) {
-      console.error("Lỗi khi xóa hội thoại:", error);
+      console.error("Lỗi khi cập nhật trạng thái xóa hội thoại:", error);
       res.status(500).json({ message: "Lỗi server!" });
     }
   });

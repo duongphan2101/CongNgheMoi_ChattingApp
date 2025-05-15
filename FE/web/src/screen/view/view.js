@@ -777,7 +777,6 @@ function View({ setIsLoggedIn }) {
         toast.warning("Không tìm thấy user!");
         setUserSearch([]);
       } else {
-        // Lọc bỏ chính số điện thoại của người dùng
         const filteredResult = result.filter(
           (user) => user.phoneNumber !== userInfo.phoneNumber
         );
@@ -787,13 +786,46 @@ function View({ setIsLoggedIn }) {
         }
 
         setUserSearch(filteredResult);
-        setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
+        setIsSearchVisible(true);
       }
     } catch (error) {
       console.error("Lỗi khi gọi API:", error);
       toast.warning("Lỗi khi tìm kiếm user!");
     }
   };
+
+  // const handleGetUserbyKey = async (e) => {
+  //   e.preventDefault();
+
+  //   if (!keyWord.trim()) {
+  //     toast.warning("Vui lòng nhập từ khóa tìm kiếm.");
+  //     return;
+  //   }
+
+  //   try {
+  //     const result = await getUserbySearch(keyWord, keyWord);
+
+  //     if (!result || result.length === 0) {
+  //       toast.warning("Không tìm thấy user!");
+  //       setUserSearch([]);
+  //     } else {
+  //       // Lọc bỏ chính số điện thoại của người dùng
+  //       const filteredResult = result.filter(
+  //         (user) => user.phoneNumber !== userInfo.phoneNumber
+  //       );
+
+  //       if (filteredResult.length === 0) {
+  //         toast.warning("Không tìm thấy user phù hợp!");
+  //       }
+
+  //       setUserSearch(filteredResult);
+  //       setIsSearchVisible(true); // Hiển thị danh sách khi có kết quả
+  //     }
+  //   } catch (error) {
+  //     console.error("Lỗi khi gọi API:", error);
+  //     toast.warning("Lỗi khi tìm kiếm user!");
+  //   }
+  // };
 
   useEffect(() => {
     if (!userInfo?.phoneNumber) return;
@@ -1010,6 +1042,80 @@ function View({ setIsLoggedIn }) {
     return lastMessage;
   };
 
+  // const renderLastMessage = (lastMessage) => {
+  //   if (!lastMessage) return "Chưa Có";
+
+  //   try {
+  //     const parsed = JSON.parse(lastMessage);
+  //     if (parsed.name && parsed.url && parsed.size && parsed.type) {
+  //       return "Vừa gửi một file";
+  //     }
+  //   } catch (e) { }
+
+  //   if (lastMessage.endsWith(".mp3")) {
+  //     return "Tin nhắn thoại";
+  //   }
+
+  //   return lastMessage;
+  // };
+
+  const loadConversations = async (phoneNumber) => {
+    const data = await getConversations();
+    if (!data?.length) return;
+
+    const myPhone = phoneNumber;
+    const userData = await Promise.all(
+      data.map(async (convo) => {
+        if (convo.isGroup) {
+          return {
+            name: convo.fullName,
+            avatar: convo.avatar,
+            isUnreadBy:
+              Array.isArray(convo.isUnreadBy) &&
+              convo.isUnreadBy.includes(myPhone),
+            lastMessage: convo.lastMessage,
+            lastMessageAt: convo.lastMessageAt,
+            isGroup: true,
+            chatRoomId: convo.chatRoomId || null,
+          };
+        }
+
+        const partnerPhone = convo.participants.find((p) => p !== myPhone);
+        if (!partnerPhone) return null;
+        const userArray = await getUserbySearch(partnerPhone, "");
+        const user = Array.isArray(userArray) ? userArray[0] : userArray;
+        return user
+          ? {
+            ...user,
+            lastMessage: convo.lastMessage,
+            lastMessageAt: convo.lastMessageAt,
+            isUnreadBy:
+              Array.isArray(convo.isUnreadBy) &&
+              convo.isUnreadBy.includes(myPhone),
+            isGroup: false,
+            chatRoomId: convo.chatRoomId || null,
+          }
+          : null;
+      })
+    );
+
+    const filteredList = userData.filter((u) => u !== null);
+
+    const sortedList = filteredList.sort((a, b) => {
+      const parseTime = (str) => {
+        if (!str) return new Date(0);
+        const [time, date] = str.split(" ");
+        const [h, m, s] = time.split(":").map(Number);
+        const [d, mo, y] = date.split("/").map(Number);
+        return new Date(y, mo - 1, d, h, m, s);
+      };
+
+      return parseTime(b.lastMessageAt) - parseTime(a.lastMessageAt);
+    });
+
+    setUserChatList(sortedList);
+  };
+
   const markAsRead = async (chatId) => {
     try {
       const res = await fetch("http://localhost:3618/markAsRead", {
@@ -1078,7 +1184,9 @@ function View({ setIsLoggedIn }) {
 
       if (checkData.exists) {
         console.log("Conversation đã tồn tại với chatId:", checkData.chatId);
-        return; // không tạo lại nữa
+        // Gọi lại API để load danh sách Conversations giống khi đăng nhập
+        await loadConversations(currentUserPhone);
+        return; // Không tạo lại nữa
       }
 
       const chatRoomId = `C${Math.floor(100 + Math.random() * 90000)}`;
@@ -1181,6 +1289,10 @@ function View({ setIsLoggedIn }) {
       targetUserPhone
     );
     if (chatRoomId) {
+      // Nếu tạo mới hoặc đã tồn tại, gọi lại API để load danh sách Conversations
+      const updatedConversations = await getConversations();
+      setUserChatList(updatedConversations);
+
       await check(currentUserPhone, targetUserPhone, chatRoomId); // Truyền chatRoomId vào hàm check
     }
   };
@@ -1348,7 +1460,7 @@ function View({ setIsLoggedIn }) {
   // Hàm xử lý xóa hội thoại
   const handleDeleteConversation = async (chatRoomId) => {
 
-    console.log("Phone nguoi yeu cau xoa: " , userInfo.phoneNumber);
+    console.log("Phone nguoi yeu cau xoa: ", userInfo.phoneNumber);
 
     try {
       const response = await fetch(
@@ -1359,7 +1471,7 @@ function View({ setIsLoggedIn }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            phoneNumber: userInfo.phoneNumber, // Thay bằng số điện thoại của người dùng
+            userPhone: userInfo.phoneNumber, // Thay bằng số điện thoại của người dùng
           }),
         }
       );
@@ -1431,6 +1543,17 @@ function View({ setIsLoggedIn }) {
       socket.off("newConversation");
     };
   }, [userInfo?.phoneNumber]);
+
+  useEffect(() => {
+    if (!userInfo?.phoneNumber) return;
+    let isMounted = true;
+    (async () => {
+      if (isMounted) await loadConversations(userInfo.phoneNumber);
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [userInfo?.phoneNumber, reloadConversations]);
 
   return (
     <div className="wrapper">
