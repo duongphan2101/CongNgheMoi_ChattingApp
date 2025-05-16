@@ -111,15 +111,15 @@ function Chat({
         return updated;
       });
 
-      if (isNewMember) {
-        toast.info(t.updateGroupNotification4 + data.groupName);
-      } else {
-        toast.success(
-          t.updateGroupNotification +
-            data.groupName +
-            t.updateGroupNotification2
-        );
-      }
+      // if (isNewMember) {
+      //   toast.info(t.updateGroupNotification4 + data.groupName);
+      // } else {
+      //   toast.success(
+      //     t.updateGroupNotification +
+      //       data.groupName +
+      //       t.updateGroupNotification2
+      //   );
+      // }
     };
 
     const handleOutGroup = (data) => {
@@ -232,8 +232,8 @@ function Chat({
         msg.type === "audio"
           ? "Tin nhắn thoại"
           : msg.type === "file"
-          ? "File đính kèm"
-          : msg.message,
+            ? "File đính kèm"
+            : msg.message,
     });
     setActiveMessageId(null);
     setHighlightedMessageId(msg.timestamp);
@@ -431,8 +431,7 @@ function Chat({
     socket.on("tagged", (data) => {
       if (data.taggedUsers.includes(currentUserPhone)) {
         toast.info(
-          `Bạn được tag trong tin nhắn từ ${
-            userMap[data.sender]?.fullName || data.sender
+          `Bạn được tag trong tin nhắn từ ${userMap[data.sender]?.fullName || data.sender
           }`,
           {
             position: "bottom-right",
@@ -744,78 +743,89 @@ function Chat({
     );
   };
 
- const handleSendMessage = async () => {
-  if (chatRoom.status === "DISBANDED") {
-    toast.error(t.disbandedNotification);
-    return;
-  }
-  if (!message.trim()) return;
+  const handleSendMessage = async () => {
+    if (chatRoom.status === "DISBANDED") {
+      toast.error(t.disbandedNotification);
+      return;
+    }
+    if (!message.trim()) return;
 
-  // Bỏ logic chuẩn hóa tag, giữ nguyên tin nhắn gốc
-  const normalizedMessage = message.trim();
+    let taggedUsers = [];
+    let normalizedMessage = message;
+    const lowerMessage = message.toLowerCase();
 
-  // Xử lý taggedUsers (danh sách người được tag)
-  const tagRegex = /@([\p{L}\s]+)(?=\s|$)/gu;
-  const tags = normalizedMessage.match(tagRegex) || [];
-  let taggedUsers = [];
-  tags.forEach((tag) => {
-    const name = tag.slice(1).trim();
-    if (name.toLowerCase() === "all" && chatRoom.isGroup) {
+    members.forEach((member) => {
+      const fullName = member.fullName?.trim();
+      if (!fullName) return;
+
+      const regex = new RegExp(`@${fullName}`, "i"); // không phân biệt hoa thường
+      if (regex.test(lowerMessage)) {
+        // Thêm user vào danh sách tag
+        taggedUsers.push(member.phoneNumber);
+
+        // Thay thế @Tên thành [@Tên]
+        const safeName = fullName.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'); // escape regex special chars
+        const exactTagRegex = new RegExp(`@${safeName}`, "g");
+        normalizedMessage = normalizedMessage.replace(exactTagRegex, `[@${fullName}]`);
+      }
+    });
+
+    // Trường hợp tag all
+    if (normalizedMessage.toLowerCase().includes("@all") && chatRoom.isGroup) {
       taggedUsers = [
         ...taggedUsers,
         ...chatRoom.participants.filter((phone) => phone !== currentUserPhone),
       ];
-    } else {
-      const member = members.find((m) => m.fullName === name);
-      if (member) {
-        taggedUsers.push(member.phoneNumber);
-      }
+      normalizedMessage = normalizedMessage.replace(/@all/gi, "[@all]");
     }
-  });
 
-  taggedUsers = [...new Set(taggedUsers)];
+    // Xóa trùng số điện thoại
+    taggedUsers = [...new Set(taggedUsers)];
 
-  const receivers =
-    chatRoom?.participants?.filter((phone) => phone !== currentUserPhone) || [];
-  const chatId = await getChatId(chatRoom.chatRoomId);
-  const newMsg = {
-    chatRoomId: chatRoom?.chatRoomId || "",
-    sender: currentUserPhone,
-    receiver: receivers,
-    message: normalizedMessage,
-    timestamp: Date.now(),
-    type: "text",
-    chatId,
-    replyTo: replyingTo
-      ? {
+    // Tạo message object
+    const receivers =
+      chatRoom?.participants?.filter((phone) => phone !== currentUserPhone) || [];
+    const chatId = await getChatId(chatRoom.chatRoomId);
+
+    const newMsg = {
+      chatRoomId: chatRoom?.chatRoomId || "",
+      sender: currentUserPhone,
+      receiver: receivers,
+      message: normalizedMessage,
+      timestamp: Date.now(),
+      type: "text",
+      chatId,
+      replyTo: replyingTo
+        ? {
           timestamp: replyingTo.timestamp,
           message: replyingTo.message,
           sender: replyingTo.sender,
         }
-      : null,
-    taggedUsers,
+        : null,
+      taggedUsers,
+    };
+
+    setMessage("");
+    setReplyingTo(null);
+    setShowSuggestions(false);
+
+    try {
+      const response = await fetch("http://localhost:3618/sendMessage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMsg),
+      });
+
+      if (!response.ok) throw new Error("Gửi tin nhắn thất bại!");
+
+      receivers.forEach((phone) => {
+        updateLastMessage(currentUserPhone, phone, newMsg.message);
+      });
+    } catch (error) {
+      console.error("Lỗi gửi tin nhắn:", error);
+    }
   };
 
-  setMessage("");
-  setReplyingTo(null);
-  setShowSuggestions(false);
-
-  try {
-    const response = await fetch("http://localhost:3618/sendMessage", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newMsg),
-    });
-
-    if (!response.ok) throw new Error("Gửi tin nhắn thất bại!");
-
-    receivers.forEach((phone) => {
-      updateLastMessage(currentUserPhone, phone, newMsg.message);
-    });
-  } catch (error) {
-    console.error("Lỗi gửi tin nhắn:", error);
-  }
-};
 
   const handleCopyMessage = (message) => {
     if (message.isRevoked) return;
@@ -903,8 +913,7 @@ function Chat({
         const errorData = await response.json();
         console.error("Lỗi Server:", response.status, errorData);
         throw new Error(
-          `Tải file lên thất bại: ${
-            errorData.error || `Mã lỗi: ${response.status}`
+          `Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`
           }`
         );
       }
@@ -923,71 +932,92 @@ function Chat({
 
 
   const renderMessageContent = (msg) => {
-  const isRevoked = msg.isRevoked;
-  const isAudio = msg.type === "audio" || msg.originalType === "audio";
-  const isFile = msg.type === "file" || msg.originalType === "file";
+    const isRevoked = msg.isRevoked;
+    const isAudio = msg.type === "audio" || msg.originalType === "audio";
+    const isFile = msg.type === "file" || msg.originalType === "file";
 
-  if (isRevoked) {
-    return (
-      <p className="revoked-message">
-        <i className="bi bi-clock-history"></i> {msg.message}
-      </p>
-    );
-  } else if (isFile) {
-    return renderFileMessage(msg);
-  } else if (isAudio) {
-    return (
-      <div className="audio-message">
-        <audio
-          controls
-          src={msg.fileInfo?.url || msg.message}
-          type="audio/mpeg"
-          style={{ marginTop: 5 }}
-          onError={(e) => {
-            console.error("Lỗi phát audio:", e.nativeEvent.error);
-            alert("Không thể phát tin nhắn thoại: " + e.nativeEvent.error.message);
+    if (isRevoked) {
+      return (
+        <p className="revoked-message">
+          <i className="bi bi-clock-history"></i> {msg.message}
+        </p>
+      );
+    } else if (isFile) {
+      return renderFileMessage(msg);
+    } else if (isAudio) {
+      return (
+        <div className="audio-message">
+          <audio
+            controls
+            src={msg.fileInfo?.url || msg.message}
+            type="audio/mpeg"
+            style={{ marginTop: 5 }}
+            onError={(e) => {
+              console.error("Lỗi phát audio:", e.nativeEvent.error);
+              alert("Không thể phát tin nhắn thoại: " + e.nativeEvent.error.message);
+            }}
+          />
+        </div>
+      );
+    } else {
+      const parts = msg.message.split(/(\[@[^\]]+\])/g);
+
+      const renderedParts = parts.map((part, index) => {
+        if (part.startsWith('[@') && part.endsWith(']')) {
+          const tagName = part.slice(2, -1); // bỏ [@ và ]
+          return (
+            <span
+              key={`tag-${index}`}
+              style={{
+                color: "#007bff",
+                fontWeight: "bold",
+                marginRight: "0px",
+                wordBreak: "break-word",
+                display: "inline",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              @{tagName}
+            </span>
+
+          );
+        } else {
+          return (
+            <span
+              key={`text-${index}`}
+              style={{
+                color: "black",
+                wordBreak: "break-word",
+                display: "inline",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {part}
+            </span>
+
+
+          );
+        }
+      });
+
+      return (
+        <p
+          style={{
+            borderRadius: "25px",
+            padding: "12px",
+            maxWidth: "200px",
+            wordWrap: "break-word",  // Có thể thay bằng overflowWrap
+            overflowWrap: "break-word",
+            display: "inline-block",
+            whiteSpace: "normal",     // Cho phép xuống dòng
           }}
-        />
-      </div>
-    );
-  } else {
-    // Tách tin nhắn thành các phần dựa trên ký tự @
-    const parts = msg.message.split(/(@[\p{L}\s]+(?=\s|$))/gu);
-    const renderedParts = parts.map((part, index) => {
-      if (part.startsWith("@")) {
-        // Đây là tag tên, hiển thị màu xanh dương và in đậm
-        return (
-          <span
-            key={`tag-${index}`}
-            style={{ color: "black" ,marginRight: "6px" }}
-          >
-            {part}
-          </span>
-        );
-      } else {
-        // Đây là phần text thông thường, hiển thị màu đen
-        return (
-          <span key={`text-${index}`} style={{ color: "black" }}>
-            {part}
-          </span>
-        );
-      }
-    });
+        >
+          {renderedParts}
+        </p>
 
-    return (
-      <p
-        style={{
-          borderRadius: "25px",
-          padding: "12px",
-          width: "95%",
-          wordWrap: "break-word",
-        }}
-      >
-        {renderedParts}
-      </p>
-    );
-  }
-};
+      );
+    }
+  };
 
   const openImageModal = (src, name) => {
     setCurrentImage({ src, name });
@@ -1077,18 +1107,17 @@ function Chat({
         {Object.entries(reactions).map(([reaction, users]) => (
           <div
             key={reaction}
-            className={`reaction-badge ${
-              activeReactionTooltip === `${reaction}-${users.join(",")}`
-                ? "active"
-                : ""
-            }`}
-            // onClick={() =>
-            //   setActiveReactionTooltip(
-            //     activeReactionTooltip === `${reaction}-${users.join(",")}`
-            //       ? null
-            //       : `${reaction}-${users.join(",")}`
-            //   )
-            // }
+            className={`reaction-badge ${activeReactionTooltip === `${reaction}-${users.join(",")}`
+              ? "active"
+              : ""
+              }`}
+          // onClick={() =>
+          //   setActiveReactionTooltip(
+          //     activeReactionTooltip === `${reaction}-${users.join(",")}`
+          //       ? null
+          //       : `${reaction}-${users.join(",")}`
+          //   )
+          // }
           >
             {reaction} {users.length}
             <div className="reaction-tooltip">
@@ -1368,14 +1397,14 @@ function Chat({
                         style={{ fontSize: 25, color: "#fff" }}
                       ></i>
                     </button>
-                    <button className="btn" onClick={handleOpenInfoModal}>
-                      <i
-                        className="bi bi-three-dots-vertical"
-                        style={{ fontSize: 25, color: "#fff" }}
-                      ></i>
-                    </button>
                   </>
                 )}
+                <button className="btn" onClick={handleOpenInfoModal}>
+                  <i
+                    className="bi bi-three-dots-vertical"
+                    style={{ fontSize: 25, color: "#fff" }}
+                  ></i>
+                </button>
               </div>
             </div>
 
@@ -1389,9 +1418,8 @@ function Chat({
                   <div
                     key={index}
                     id={`message-${msg.timestamp}`}
-                    className={`message ${
-                      isSentByCurrentUser ? "sent" : "received"
-                    } ${isHighlighted ? "highlighted" : ""}`}
+                    className={`message ${isSentByCurrentUser ? "sent" : "received"
+                      } ${isHighlighted ? "highlighted" : ""}`}
                     onMouseEnter={() => setHoveredMessageId(msg.timestamp)}
                     onMouseLeave={() => {
                       setHoveredMessageId(null);
@@ -1431,18 +1459,15 @@ function Chat({
                             <span>
                               {msg.sender === currentUserPhone
                                 ? msg.replyTo.sender === currentUserPhone
-                                  ? "Bạn đã trả lời tin nhắn của mình"
-                                  : `Bạn đã trả lời tin nhắn của ${
-                                      userMap[msg.replyTo.sender]?.fullName ||
-                                      "người khác"
-                                    }`
-                                : `${
-                                    userMap[msg.sender]?.fullName ||
-                                    "Người khác"
-                                  } đã trả lời tin nhắn của ${
-                                    userMap[msg.replyTo.sender]?.fullName ||
-                                    "người khác"
-                                  }`}
+                                  ? "trả lời chính mình"
+                                  : `trả lời ${userMap[msg.replyTo.sender]?.fullName ||
+                                  "người khác"
+                                  }`
+                                : `${userMap[msg.sender]?.fullName ||
+                                "Người khác"
+                                } đã trả lời ${userMap[msg.replyTo.sender]?.fullName ||
+                                "người khác"
+                                }`}
                             </span>
                             <p
                               style={{
