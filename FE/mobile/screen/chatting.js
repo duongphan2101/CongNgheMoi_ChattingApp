@@ -51,6 +51,7 @@ import outGroup from "../api/api_outGroup.js";
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡"];
 
+
 // Component riêng cho item tin nhắn
 const MessageItem = memo(
   ({
