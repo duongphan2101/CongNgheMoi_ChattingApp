@@ -405,7 +405,7 @@ export default function App({ navigation, route }) {
   const [friendsNotInGroup, setFriendsNotInGroup] = useState([]);
   const [groupName, setGroupName] = useState("");
   const [newList, setNewList] = useState([]);
-  const [newName, setNewName] = useState(chatRoom.fullName);
+  const [newName, setNewName] = useState(chatRoom?.fullName || "chưa có");
   const [modalVisible, setModalVisible] = useState(false);
   const [mediaModalVisible, setMediaModalVisible] = useState(false);
   const [imageZoomModalVisible, setImageZoomModalVisible] = useState(false);
@@ -1794,15 +1794,15 @@ export default function App({ navigation, route }) {
               </TouchableOpacity>
               <Image
                 source={{
-                  uri: chatRoom.isGroup
-                    ? `${phongChat.avatar}?t=${new Date().getTime()}`
-                    : otherUser.avatar,
+                  uri: chatRoom?.isGroup
+                    ? `${phongChat?.avatar}?t=${new Date().getTime()}`
+                    : otherUser?.avatar,
                 }}
                 style={styles.avatar}
               />
               <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail" >
                 {/* {chatRoom.isGroup ? chatRoom.fullName : otherUser.fullName} */}
-                {chatRoom.isGroup ? newName : otherUser.fullName}
+                {chatRoom?.isGroup ? newName : otherUser?.fullName}
               </Text>
             </View>
             {phongChat.status === "DISBANDED" && (
@@ -2448,7 +2448,7 @@ const getStyles = (themeColors) =>
       marginHorizontal: 10,
       borderColor: "#ccc",
       borderWidth: 1,
-      color: themeColors.text,
+      color: '#fff',
     },
     contextChat: {
       paddingVertical: 20,
