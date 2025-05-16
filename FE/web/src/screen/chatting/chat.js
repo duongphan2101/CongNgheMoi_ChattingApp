@@ -218,8 +218,8 @@ function Chat({
         msg.type === "audio"
           ? "Tin nhắn thoại"
           : msg.type === "file"
-          ? "File đính kèm"
-          : msg.message,
+            ? "File đính kèm"
+            : msg.message,
     });
     setActiveMessageId(null);
     setHighlightedMessageId(msg.timestamp);
@@ -421,8 +421,7 @@ function Chat({
     socket.on("tagged", (data) => {
       if (data.taggedUsers.includes(currentUserPhone)) {
         toast.info(
-          `Bạn được tag trong tin nhắn từ ${
-            userMap[data.sender]?.fullName || data.sender
+          `Bạn được tag trong tin nhắn từ ${userMap[data.sender]?.fullName || data.sender
           }`,
           {
             position: "bottom-right",
@@ -785,10 +784,10 @@ function Chat({
       chatId,
       replyTo: replyingTo
         ? {
-            timestamp: replyingTo.timestamp,
-            message: replyingTo.message,
-            sender: replyingTo.sender,
-          }
+          timestamp: replyingTo.timestamp,
+          message: replyingTo.message,
+          sender: replyingTo.sender,
+        }
         : null,
       taggedUsers,
     };
@@ -900,8 +899,7 @@ function Chat({
         const errorData = await response.json();
         console.error("Lỗi Server:", response.status, errorData);
         throw new Error(
-          `Tải file lên thất bại: ${
-            errorData.error || `Mã lỗi: ${response.status}`
+          `Tải file lên thất bại: ${errorData.error || `Mã lỗi: ${response.status}`
           }`
         );
       }
@@ -1074,18 +1072,17 @@ function Chat({
         {Object.entries(reactions).map(([reaction, users]) => (
           <div
             key={reaction}
-            className={`reaction-badge ${
-              activeReactionTooltip === `${reaction}-${users.join(",")}`
+            className={`reaction-badge ${activeReactionTooltip === `${reaction}-${users.join(",")}`
                 ? "active"
                 : ""
-            }`}
-            // onClick={() =>
-            //   setActiveReactionTooltip(
-            //     activeReactionTooltip === `${reaction}-${users.join(",")}`
-            //       ? null
-            //       : `${reaction}-${users.join(",")}`
-            //   )
-            // }
+              }`}
+          // onClick={() =>
+          //   setActiveReactionTooltip(
+          //     activeReactionTooltip === `${reaction}-${users.join(",")}`
+          //       ? null
+          //       : `${reaction}-${users.join(",")}`
+          //   )
+          // }
           >
             {reaction} {users.length}
             <div className="reaction-tooltip">
@@ -1369,15 +1366,14 @@ function Chat({
                         style={{ fontSize: 25, color: "#fff" }}
                       ></i>
                     </button>
-
-                    <button className="btn" onClick={handleOpenInfoModal}>
-                      <i
-                        className="bi bi-three-dots-vertical"
-                        style={{ fontSize: 25, color: "#fff" }}
-                      ></i>
-                    </button>
                   </>
                 )}
+                <button className="btn" onClick={handleOpenInfoModal}>
+                  <i
+                    className="bi bi-three-dots-vertical"
+                    style={{ fontSize: 25, color: "#fff" }}
+                  ></i>
+                </button>
               </div>
             </div>
 
@@ -1392,9 +1388,8 @@ function Chat({
                   <div
                     key={index}
                     id={`message-${msg.timestamp}`}
-                    className={`message ${
-                      isSentByCurrentUser ? "sent" : "received"
-                    } ${isHighlighted ? "highlighted" : ""}`}
+                    className={`message ${isSentByCurrentUser ? "sent" : "received"
+                      } ${isHighlighted ? "highlighted" : ""}`}
                     onMouseEnter={() => setHoveredMessageId(msg.timestamp)}
                     onMouseLeave={() => {
                       setHoveredMessageId(null);
@@ -1434,10 +1429,9 @@ function Chat({
                             <span>
                               {msg.replyTo.sender === currentUserPhone
                                 ? "Bạn đã trả lời tin nhắn của mình"
-                                : `Đã trả lời tin nhắn của ${
-                                    userMap[msg.replyTo.sender]?.fullName ||
-                                    "người khác"
-                                  }`}
+                                : `Đã trả lời tin nhắn của ${userMap[msg.replyTo.sender]?.fullName ||
+                                "người khác"
+                                }`}
                             </span>
                             <p
                               style={{
