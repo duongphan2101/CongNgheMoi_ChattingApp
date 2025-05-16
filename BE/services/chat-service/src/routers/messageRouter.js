@@ -45,12 +45,15 @@ module.exports = (io, redisPublisher) => {
         return res.status(400).json({ error: "Thiếu trường bắt buộc!" });
       }
 
+      const isDeletedBy = [];
+
       const newMessage = new Message(
         chatRoomId,
         sender,
         receiver,
         message,
         "text",
+        isDeletedBy,
       );
 
       if (replyTo) {

@@ -224,35 +224,39 @@ const ShowModal = ({
             </div>
 
             <div className="showmodal-body">
-              <div className="showmodal-contact-info">
-                <img
-                  className="modal_avt me-2"
-                  src={chatRoom.avatar}
-                  alt="avatar"
-                  style={{ borderRadius: "50%" }}
-                />
-                <div className="showmodal-contact-changeAvt">
-                  <label className="btn" htmlFor="avatarInput">
-                    <i className="bi bi-pencil-fill text-light"></i>
-                  </label>
-                  <input
-                    type="file"
-                    id="avatarInput"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={handleAvatarChange}
-                  />
-                </div>
-              </div>
-              <h6 className="showmodal-contact-name">{displayName}</h6>
-              <div className="showmodal-section-header">
-                <div className="showmodal-section-title">
-                  <span className="showmodal-section-icon">
-                    <i className="bi bi-people-fill"></i>
-                  </span>
-                  <span className="showmodal-section-label">{t.MemberList}</span>
-                </div>
-              </div>
+              {chatRoom.isGroup && (
+                <>
+                  <div className="showmodal-contact-info">
+                    <img
+                      className="modal_avt me-2"
+                      src={chatRoom.avatar}
+                      alt="avatar"
+                      style={{ borderRadius: "50%" }}
+                    />
+                    <div className="showmodal-contact-changeAvt">
+                      <label className="btn" htmlFor="avatarInput">
+                        <i className="bi bi-pencil-fill text-light"></i>
+                      </label>
+                      <input
+                        type="file"
+                        id="avatarInput"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={handleAvatarChange}
+                      />
+                    </div>
+                  </div>
+                  <h6 className="showmodal-contact-name">{displayName}</h6>
+                  <div className="showmodal-section-header">
+                    <div className="showmodal-section-title">
+                      <span className="showmodal-section-icon">
+                        <i className="bi bi-people-fill"></i>
+                      </span>
+                      <span className="showmodal-section-label">{t.MemberList}</span>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {chatRoom.isGroup && (
                 <div className="showmodal-members-list">
@@ -295,6 +299,8 @@ const ShowModal = ({
                   </ul>
                 </div>
               )}
+
+
 
               <div className="showmodal-section-header">
                 <div className="showmodal-section-title">

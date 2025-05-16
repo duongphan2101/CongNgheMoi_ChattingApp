@@ -227,15 +227,15 @@ const MessageItem = memo(
                 backgroundColor: item.isRevoked
                   ? isCurrentUser
                     ? "rgba(111, 211, 159, 0.2)"
-                    : "rgba(139, 185, 242, 0.2)"
+                    : "rgba(139, 185, 242, 0.0)"
                   : isCurrentUser
                     ? "#6fd39f"
                     : "#8bb9f2",
                 borderRadius: 15,
                 padding: item.isRevoked ? 0 : 10,
-                borderWidth: item.isRevoked ? 1 : 0,
-                borderColor: item.isRevoked ? "#a0a0a0" : "transparent",
-                borderStyle: item.isRevoked ? "dashed" : "solid",
+                // borderWidth: item.isRevoked ? 1 : 0,
+                // borderColor: item.isRevoked ? "#a0a0a0" : "transparent",
+                // borderStyle: item.isRevoked ? "dashed" : "solid",
               },
             ]}
           >
@@ -269,7 +269,7 @@ const MessageItem = memo(
               >
                 <Text style={styles.replyText}>
                   {item.replyTo.sender === thisUser.phoneNumber
-                    ? "Bạn"
+                    ? `trả lời`
                     : otherUser.fullName}
                 </Text>
                 <Text style={styles.replyMessage}>{item.replyTo.message}</Text>
@@ -405,7 +405,7 @@ export default function App({ navigation, route }) {
   const [friendsNotInGroup, setFriendsNotInGroup] = useState([]);
   const [groupName, setGroupName] = useState("");
   const [newList, setNewList] = useState([]);
-  const [newName, setNewName] = useState(chatRoom.fullName);
+  const [newName, setNewName] = useState(chatRoom?.fullName || "chưa có");
   const [modalVisible, setModalVisible] = useState(false);
   const [mediaModalVisible, setMediaModalVisible] = useState(false);
   const [imageZoomModalVisible, setImageZoomModalVisible] = useState(false);
@@ -1794,15 +1794,15 @@ export default function App({ navigation, route }) {
               </TouchableOpacity>
               <Image
                 source={{
-                  uri: chatRoom.isGroup
-                    ? `${phongChat.avatar}?t=${new Date().getTime()}`
-                    : otherUser.avatar,
+                  uri: chatRoom?.isGroup
+                    ? `${phongChat?.avatar}?t=${new Date().getTime()}`
+                    : otherUser?.avatar,
                 }}
                 style={styles.avatar}
               />
               <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail" >
                 {/* {chatRoom.isGroup ? chatRoom.fullName : otherUser.fullName} */}
-                {chatRoom.isGroup ? newName : otherUser.fullName}
+                {chatRoom?.isGroup ? newName : otherUser?.fullName}
               </Text>
             </View>
             {phongChat.status === "DISBANDED" && (
@@ -2448,7 +2448,7 @@ const getStyles = (themeColors) =>
       marginHorizontal: 10,
       borderColor: "#ccc",
       borderWidth: 1,
-      color: themeColors.text,
+      color: '#fff',
     },
     contextChat: {
       paddingVertical: 20,
@@ -2656,7 +2656,7 @@ const getStyles = (themeColors) =>
       width: "auto",
     },
     replyText: {
-      fontSize: 13,
+      fontSize: 10,
       color: "#fff",
       fontWeight: "bold",
     },

@@ -56,6 +56,7 @@
     "react-native-modal": "^14.0.0-rc.1",
     "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-network-info": "^5.2.1",
+    "react-native-toast-message": "^2.3.0",
     "react-native-web": "0.20.0",
     "socket.io-client": "^4.8.1"
   },

@@ -71,7 +71,6 @@ body.dark .chat-box {
     background-color: #6fd39f;
     padding: 15px;
     border-radius: 25px;
-    color: black;
     margin-right: 10px;
     word-break: break-word;
 }
@@ -95,7 +94,6 @@ body.dark .chat-box {
     background-color: #8bb9f2;
     padding: 15px;
     border-radius: 25px;
-    color: black;
     margin-left: 10px;
     word-break: break-word;
 }
