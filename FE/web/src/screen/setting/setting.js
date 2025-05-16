@@ -125,7 +125,7 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
               className="btn-close"
               onClick={() => setShowModal(false)}
             ></button>
-            <h2>{t.resetPassword}</h2>
+            <h2 className="h2">{t.resetPassword}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>{t.oldPassword}</label>

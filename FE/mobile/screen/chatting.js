@@ -227,15 +227,15 @@ const MessageItem = memo(
                 backgroundColor: item.isRevoked
                   ? isCurrentUser
                     ? "rgba(111, 211, 159, 0.2)"
-                    : "rgba(139, 185, 242, 0.2)"
+                    : "rgba(139, 185, 242, 0.0)"
                   : isCurrentUser
                     ? "#6fd39f"
                     : "#8bb9f2",
                 borderRadius: 15,
                 padding: item.isRevoked ? 0 : 10,
-                borderWidth: item.isRevoked ? 1 : 0,
-                borderColor: item.isRevoked ? "#a0a0a0" : "transparent",
-                borderStyle: item.isRevoked ? "dashed" : "solid",
+                // borderWidth: item.isRevoked ? 1 : 0,
+                // borderColor: item.isRevoked ? "#a0a0a0" : "transparent",
+                // borderStyle: item.isRevoked ? "dashed" : "solid",
               },
             ]}
           >
@@ -269,7 +269,7 @@ const MessageItem = memo(
               >
                 <Text style={styles.replyText}>
                   {item.replyTo.sender === thisUser.phoneNumber
-                    ? "Bạn"
+                    ? `trả lời`
                     : otherUser.fullName}
                 </Text>
                 <Text style={styles.replyMessage}>{item.replyTo.message}</Text>
@@ -2656,7 +2656,7 @@ const getStyles = (themeColors) =>
       width: "auto",
     },
     replyText: {
-      fontSize: 13,
+      fontSize: 10,
       color: "#fff",
       fontWeight: "bold",
     },
