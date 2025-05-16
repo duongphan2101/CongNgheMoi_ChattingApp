@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 
 class Message {
-    constructor(chatRoomId, sender, receiver, message, type) {
+    constructor(chatRoomId, sender, receiver, message, type, isDeletedBy) {
         this.chatRoomId = chatRoomId;  // Partition Key
         this.timestamp = Date.now();   // Sort Key
         this.messageId = crypto.randomUUID();
@@ -10,6 +10,7 @@ class Message {
         this.message = message;   
         this.type = type;
         this.reactions = {};
+        this.isDeletedBy = isDeletedBy || [];
     }
 }
 
