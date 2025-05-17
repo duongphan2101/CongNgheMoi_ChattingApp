@@ -998,3 +998,21 @@ audio {
     border-radius: 50%;
     object-fit: cover;
 }
+
+.system-message-container {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+}
+
+.system-message {
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 12px;
+    color: #666;
+}
+
+.system-message:hover {
+    background-color: rgba(0, 0, 0, 0.15);
+}

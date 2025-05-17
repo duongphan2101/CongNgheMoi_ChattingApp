@@ -1008,13 +1008,17 @@ function View({ setIsLoggedIn }) {
   //   setUserChatting(usersData); // Dù là group, vẫn truyền danh sách còn lại
   // };
 
-  const updateLastMessage = (chatRoomId, message) => {
+  const updateLastMessage = (chatRoomId, message, lastMessageAt) => {
     setUserChatList((prevList) => {
       const updatedList = prevList.map((conversation) => {
         if (!conversation || !conversation.chatRoomId) return conversation;
 
         if (conversation.chatRoomId === chatRoomId) {
-          return { ...conversation, lastMessage: message };
+          return {
+            ...conversation,
+            lastMessage: message || "Chưa có tin nhắn",
+            lastMessageAt: lastMessageAt || conversation.lastMessageAt,
+          };
         }
         return conversation;
       });
