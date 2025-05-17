@@ -555,8 +555,9 @@ function Chat({
         delete updatedReactions[data.timestamp];
         return updatedReactions;
       });
-      if (data.lastMessage) {
-        updateLastMessage(data.sender, data.receiver, data.lastMessage);
+
+      if (data.lastMessage !== undefined) {
+        updateLastMessage(data.chatRoomId, data.lastMessage, data.lastMessageAt);
       }
     });
 
@@ -1413,6 +1414,33 @@ function Chat({
                 const isSentByCurrentUser = msg.sender === currentUserPhone;
                 const isHighlighted = highlightedMessageId === msg.timestamp;
                 const senderUser = userMap[msg.sender];
+
+                if (msg.type === "system") {
+                  return (
+                      <div 
+                          key={msg.timestamp} 
+                          className="system-message-container"
+                          style={{
+                              textAlign: 'center',
+                              margin: '10px 0',
+                              padding: '5px 0',
+                          }}
+                      >
+                          <span
+                              className="system-message"
+                              style={{
+                                  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                                  padding: '5px 10px',
+                                  borderRadius: '15px',
+                                  fontSize: '12px',
+                                  color: '#999'
+                              }}
+                          >
+                              {msg.message}
+                          </span>
+                      </div>
+                  );
+                }
 
                 return (
                   <div

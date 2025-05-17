@@ -76,7 +76,36 @@ const MessageItem = memo(
     const styles = getStyles(themeColors);
     const isHighlighted = highlightedMessageId === item.timestamp;
 
+    const isSystemMessage = item.type === "system";
+
     const renderMessageContent = () => {
+      if (isSystemMessage) {
+        return (
+          <View style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            paddingVertical: 10,
+            paddingHorizontal: 20,
+          }}>
+            <View style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.1)',
+              paddingHorizontal: 15,
+              paddingVertical: 8,
+              borderRadius: 15,
+              maxWidth: '80%'
+            }}>
+              <Text style={{
+                fontSize: 13,
+                color: '#666',
+                textAlign: 'center'
+              }}>
+                {item.message}
+              </Text>
+            </View>
+          </View>
+        );
+      }
       if (item.isRevoked) {
         return (
           <Text
@@ -203,16 +232,27 @@ const MessageItem = memo(
     const user = users;
 
     return (
-      <TouchableOpacity
-        style={[
-          styles.userChatting,
-          { justifyContent: isCurrentUser ? "flex-end" : "flex-start" },
-          isHighlighted && styles.highlightedMessage,
-        ]}
-        onLongPress={() => handleLongPressMessage(item)}
-        delayLongPress={500}
-        activeOpacity={0.8}
-      >
+      <>
+        {isSystemMessage ? (
+        <View style={{
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginVertical: 5,
+          width: '100%'
+        }}>
+          {renderMessageContent()}
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[
+            styles.userChatting,
+            { justifyContent: isCurrentUser ? "flex-end" : "flex-start" },
+            isHighlighted && styles.highlightedMessage,
+          ]}
+          onLongPress={() => handleLongPressMessage(item)}
+          delayLongPress={500}
+          activeOpacity={0.8}
+        >
         {!isCurrentUser && (
           <Image
             source={{ uri: user?.avatar }}
@@ -289,6 +329,8 @@ const MessageItem = memo(
           />
         )}
       </TouchableOpacity>
+      )}
+      </>
     );
   }
 );
@@ -412,7 +454,7 @@ export default function App({ navigation, route }) {
   const [selectedImageModal, setSelectedImageModal] = useState(null);
   const chatRoomId = phongChat?.chatRoomId;
   const [listMember, setListMember] = useState(chatRoom?.participants || []);
-
+  const [hasNewMessage, setHasNewMessage] = useState(false);
 
 
 
@@ -714,7 +756,7 @@ export default function App({ navigation, route }) {
     const fetchMessages = async () => {
       try {
         const res = await fetch(
-          `http://${BASE_URL}:3618/messages?chatRoomId=${chatRoom.chatRoomId}&currentUserPhone=${thisUser?.phoneNumber}`
+          `http://${BASE_URL}:3618/messages?chatRoomId=${chatRoom.chatRoomId}&currentUserPhone=${thisUser.phoneNumber}`,
         );
         const data = await res.json();
 
@@ -734,7 +776,6 @@ export default function App({ navigation, route }) {
     socket.emit("joinRoom", chatRoom.chatRoomId);
 
     const handleReceiveMessage = (newMessage) => {
-      // console.log("Tin nhắn mới:", newMessage);
       setMessages((prev) => {
         if (prev.some((msg) => msg.timestamp === newMessage.timestamp)) {
           return prev;
@@ -743,6 +784,7 @@ export default function App({ navigation, route }) {
           chatRoomId: chatRoom.chatRoomId,
           message: newMessage,
         });
+        setHasNewMessage(true);
         return [...prev, newMessage];
       });
     };
@@ -1439,21 +1481,75 @@ export default function App({ navigation, route }) {
 
   const [userMap, setUserMap] = useState({});
 
+  // useEffect(() => {
+  //   const fetchUsers = async () => {
+  //     try {
+  //       const map = {};
+  //         for (const msg of messages) {
+  //           if (!map[msg.sender]) {
+  //             const result = await getUserbySearch(msg.sender, "");
+  //             if (result.length > 0) {
+  //               map[msg.sender] = result[0];
+  //             }
+  //           }
+  //         }
+  //         setUserMap(map);
+  //     } catch (error) {
+  //       console.error("Lỗi khi fetch users:", error);
+  //     }
+  //   };
+
+  //   if (messages.length > 0) {
+  //     fetchUsers();
+  //   }
+  // }, [messages]);
+
   useEffect(() => {
     const fetchUsers = async () => {
-      const map = {};
-      for (const msg of messages) {
-        if (!map[msg.sender]) {
-          const result = await getUserbySearch(msg.sender, "");
-          if (result.length > 0) {
-            map[msg.sender] = result[0];
+      try {
+        const map = {};
+        for (const msg of messages) {
+          // Kiểm tra msg.sender hợp lệ
+          if (msg.sender && !map[msg.sender]) {
+            try {
+              const result = await getUserbySearch(msg.sender, "");
+              if (result && Array.isArray(result) && result.length > 0) {
+                map[msg.sender] = result[0];
+              } else {
+                console.warn(`Không tìm thấy user cho ${msg.sender}`);
+              }
+            } catch (error) {
+              console.error(`Lỗi khi lấy thông tin user ${msg.sender}:`, error);
+            }
+          }
+
+          // Xử lý tin nhắn hệ thống (nếu cần lấy số điện thoại từ nội dung)
+          if (msg.type === "system") {
+            const phoneRegex = /\b\d{10}\b/;
+            const match = msg.message.match(phoneRegex);
+            if (match && match[0] && !map[match[0]]) {
+              try {
+                const result = await getUserbySearch(match[0], "");
+                if (result && Array.isArray(result) && result.length > 0) {
+                  map[match[0]] = result[0];
+                } else {
+                  console.warn(`Không tìm thấy user cho ${match[0]}`);
+                }
+              } catch (error) {
+                console.error(`Lỗi khi lấy thông tin user ${match[0]}:`, error);
+              }
+            }
           }
         }
+        setUserMap(map);
+      } catch (error) {
+        console.error("Lỗi tổng quát khi fetch users:", error);
       }
-      setUserMap(map);
     };
 
-    fetchUsers();
+    if (messages.length > 0) {
+      fetchUsers();
+    }
   }, [messages]);
 
   const renderItem = ({ item }) => {
@@ -1577,9 +1673,10 @@ export default function App({ navigation, route }) {
       roomId: phongChat.chatRoomId,
       nameGroup: groupName,
       participants: uniqueList,
+      phone: thisUser.phoneNumber
     })
       .then((data) => {
-        console.log("Cập nhật nhóm thành công:", data);
+        // console.log("Cập nhật nhóm thành công:", data);
         Alert.alert("Thành công", "Nhóm đã được cập nhật.");
         handleCloseModalAdd();
         return;
@@ -1609,6 +1706,7 @@ export default function App({ navigation, route }) {
               prev.filter((user) => user.phoneNumber !== phoneToRemove)
             );
             Alert.alert("Thành công", "Đã xoá thành viên khỏi nhóm.");
+            handleCloseModalAdd();
             return;
           } catch (err) {
             Alert.alert("Lỗi", err.message || "Không thể xoá thành viên.");
@@ -1954,15 +2052,27 @@ export default function App({ navigation, route }) {
           initialNumToRender={10}
           maxToRenderPerBatch={5}
           windowSize={5}
+          inverted={false}
+          onEndReached={() => {
+            // Load more messages if needed
+          }}
+          onEndReachedThreshold={0.1}
           getItemLayout={(data, index) => ({
             length: 100,
             offset: 100 * index,
             index,
           })}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
-          onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => {
+            if (hasNewMessage) {
+              flatListRef.current?.scrollToEnd({ animated: true });
+              setHasNewMessage(false);
+            }
+          }}
+          onLayout={() => {
+            if (messages.length > 0 && !hasNewMessage) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
         />
 
         <MessageInput
@@ -2871,5 +2981,12 @@ const getStyles = (themeColors) =>
     zoomImage: {
       width: '100%',
       height: '80%',
+    },
+    systemMessageContainer: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      marginVertical: 5,
     },
   });
