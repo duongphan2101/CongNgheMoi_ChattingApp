@@ -714,7 +714,7 @@ export default function App({ navigation, route }) {
     const fetchMessages = async () => {
       try {
         const res = await fetch(
-          `http://${BASE_URL}:3618/messages?chatRoomId=${chatRoom.chatRoomId}`
+          `http://${BASE_URL}:3618/messages?chatRoomId=${chatRoom.chatRoomId}&currentUserPhone=${thisUser?.phoneNumber}`
         );
         const data = await res.json();
 

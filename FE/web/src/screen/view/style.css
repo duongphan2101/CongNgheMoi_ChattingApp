@@ -4,16 +4,23 @@
     font-family: Arial, sans-serif;
 } */
 
+.background-blur {
+    /* background: url('https://img.freepik.com/free-vector/white-blurred-background_1034-249.jpg'); */
+    background: url('https://img.freepik.com/free-photo/noisy-background_1194-7547.jpg');
+    background-size: cover;
+    background-position: center;
+}
+
 body.light {
-  background: linear-gradient(to right, #6a11cb, #2575fc);
-  color: white;
-  font-family: Arial, sans-serif;
+    background: linear-gradient(to right, #6a11cb, #2575fc);
+    color: white;
+    font-family: Arial, sans-serif;
 }
 
 body.dark {
-  background-color: #222;
-  color: white;
-  font-family: Arial, sans-serif;
+    background: #222;
+    color: white;
+    font-family: Arial, sans-serif;
 }
 
 * {
@@ -69,7 +76,7 @@ body.dark .sidebar {
 }
 
 
-.sidebar-bottom{
+.sidebar-bottom {
     background-color: transparent;
 }
 
@@ -113,7 +120,7 @@ body.dark .sidebar-header_search {
 }
 
 .user {
-    cursor: pointer ;
+    cursor: pointer;
 }
 
 .sidebar-bottom {
@@ -130,11 +137,11 @@ body.dark .sidebar-header_search {
 }
 
 .sidebar-bottom-btn {
-    transition: padding-bottom 0.3s ease; 
+    transition: padding-bottom 0.3s ease;
 }
 
 /* .sidebar-bottom-btn.active , */
-.sidebar-bottom-btn:hover{
+.sidebar-bottom-btn:hover {
     padding-bottom: 30px;
 }
 
@@ -149,7 +156,7 @@ body.dark .sidebar-header_search {
     font-weight: 900;
     font-size: 18px;
 }
-  
+
 /* 🖥 Responsive Tablet */
 @media screen and (max-width: 1024px) {
     .wrapper {
@@ -178,7 +185,7 @@ body.dark .sidebar-header_search {
         border-radius: 15px;
     }
 
-    .sidebar-bottom{
+    .sidebar-bottom {
         background-color: transparent;
     }
 
@@ -206,7 +213,8 @@ body.dark .sidebar-header_search {
     }
 }
 
-.form-check-label, .form-label {
+.form-check-label,
+.form-label {
     color: #fff;
 }
 
@@ -226,11 +234,13 @@ body.dark .sidebar-header_search {
     }
 
     .user-list {
-        display: none; /* Ẩn danh sách người dùng */
+        display: none;
+        /* Ẩn danh sách người dùng */
     }
 
     .sidebar-header {
-        display: none; /* Ẩn tìm kiếm */
+        display: none;
+        /* Ẩn tìm kiếm */
     }
 
     .sidebar-bottom {
@@ -246,7 +256,8 @@ body.dark .sidebar-header_search {
         overflow-y: auto;
         margin-bottom: 60px;
     }
-    .wrapper{
+
+    .wrapper {
         margin-top: 5px;
     }
 }
@@ -277,6 +288,7 @@ body.dark .sidebar-header_search {
         transform: translateY(-100%);
         opacity: 0;
     }
+
     to {
         transform: translateY(0);
         opacity: 1;
@@ -287,6 +299,7 @@ body.dark .sidebar-header_search {
     from {
         opacity: 1;
     }
+
     to {
         opacity: 0;
     }
@@ -330,10 +343,11 @@ body.dark .sidebar-header_search {
     position: relative;
     display: flex;
     align-items: center;
-    justify-content: flex-end; /* Đẩy dấu ba chấm về phía bên phải */
-  }
-  
-  .options-btn {
+    justify-content: flex-end;
+    /* Đẩy dấu ba chấm về phía bên phải */
+}
+
+.options-btn {
     background: none;
     border: none;
     color: #6c757d;
@@ -341,14 +355,15 @@ body.dark .sidebar-header_search {
     cursor: pointer;
     padding: 0;
     margin: 0;
-  }
-  
-  .options-btn:hover {
-    color: #495057; /* Màu khi hover */
-  }
-  
-  /* Menu tùy chọn hiển thị khi nhấn vào dấu ba chấm */
-  .options-menu {
+}
+
+.options-btn:hover {
+    color: #495057;
+    /* Màu khi hover */
+}
+
+/* Menu tùy chọn hiển thị khi nhấn vào dấu ba chấm */
+.options-menu {
     position: absolute;
     top: 100%;
     right: 0;
@@ -358,9 +373,9 @@ body.dark .sidebar-header_search {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     z-index: 10;
     min-width: 150px;
-  }
-  
-  .options-menu button {
+}
+
+.options-menu button {
     display: block;
     width: 100%;
     padding: 8px 12px;
@@ -369,8 +384,8 @@ body.dark .sidebar-header_search {
     border: none;
     color: #dc3545;
     cursor: pointer;
-  }
-  
-  .options-menu button:hover {
+}
+
+.options-menu button:hover {
     background: #f8d7da;
-  }
+}

@@ -275,7 +275,7 @@ function View({ setIsLoggedIn }) {
           if (!str) return new Date(0); // fallback cho item không có thời gian
           const [time, date] = str.split(" ");
           const [h, m, s] = time.split(":").map(Number);
-          const [d, mo, y] = date.split("/").map(Number);
+          const [d, mo, y] = date?.split("/").map(Number);
           return new Date(y, mo - 1, d, h, m, s);
         };
 
@@ -1557,6 +1557,7 @@ function View({ setIsLoggedIn }) {
 
   return (
     <div className="wrapper">
+      <div className="background-blur"></div>
       {/* Sidebar */}
       <div className="sidebar">
         <div
