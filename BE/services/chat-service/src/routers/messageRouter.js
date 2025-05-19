@@ -154,11 +154,10 @@ module.exports = (io, redisPublisher) => {
       const { chatRoomId, messageId } = req.body;
 
       if (!chatRoomId || !messageId) {
-        return res
-          .status(400)
-          .json({ error: "Thiếu chatRoomId hoặc messageId!" });
+        return res.status(400).json({ error: "Thiếu chatRoomId hoặc messageId!" });
       }
 
+      // Lấy tin nhắn cần thu hồi
       const getParams = {
         TableName: TABLE_MESSAGE_NAME,
         Key: {
@@ -174,7 +173,7 @@ module.exports = (io, redisPublisher) => {
         return res.status(404).json({ error: "Không tìm thấy tin nhắn!" });
       }
 
-      // Xóa file từ S3 nếu là file hoặc audio
+      // Xử lý xóa file nếu là tin nhắn file/audio
       if (message && (message.type === "file" || message.type === "audio")) {
         try {
           const fileUrl = message.message;
@@ -185,20 +184,18 @@ module.exports = (io, redisPublisher) => {
             key = key.split("amazonaws.com/")[1];
           }
 
-          console.log("Đang xóa file với key:", key);
-
           const deleteParams = {
             Bucket: BUCKET_NAME,
             Key: key,
           };
 
           await s3.deleteObject(deleteParams).promise();
-          console.log("✅ Đã xóa file từ S3 thành công");
         } catch (fileError) {
           console.error("❌ Lỗi khi xóa file từ S3:", fileError);
         }
       }
 
+      // Cập nhật tin nhắn thành đã thu hồi
       const updateParams = {
         TableName: TABLE_MESSAGE_NAME,
         Key: {
@@ -229,21 +226,37 @@ module.exports = (io, redisPublisher) => {
       }
 
       const updatedMessage = await dynamoDB.update(updateParams).promise();
-      console.log("Đã thu hồi tin nhắn:", messageId);
 
-      // Tìm tin nhắn cuối cùng không bị thu hồi
+      // Lấy tất cả tin nhắn và sắp xếp theo thời gian
       const messagesParams = {
         TableName: TABLE_MESSAGE_NAME,
-        KeyConditionExpression: "chatRoomId = :chatRoomId",
+        FilterExpression: "chatRoomId = :chatRoomId",
         ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
-        ScanIndexForward: false,
-        Limit: 10,
       };
 
-      const messagesResult = await dynamoDB.query(messagesParams).promise();
-      const messages = messagesResult.Items || [];
+      const messagesResult = await dynamoDB.scan(messagesParams).promise();
+      const messages = messagesResult.Items;
+      messages.sort((a, b) => parseInt(b.timestamp) - parseInt(a.timestamp));
 
-      let lastMessageContent = "Chưa có tin nhắn";
+      // Tìm chatId từ bảng Conversations dựa trên chatRoomId
+      const conversationParams = {
+        TableName: TABLE_CONVERSATION_NAME,
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
+      };
+
+      const conversationResult = await dynamoDB.scan(conversationParams).promise();
+      if (!conversationResult.Items || conversationResult.Items.length === 0) {
+        return res.status(404).json({ error: "Không tìm thấy cuộc trò chuyện!" });
+      }
+
+      const chatId = conversationResult.Items[0].chatId;
+
+      // Tìm tin nhắn mới nhất không bị thu hồi
+      const latestValidMessage = messages.find((msg) => !msg.isRevoked);
+
+      // Chuẩn bị nội dung lastMessage
+      let lastMessageContent = "Tin nhắn đã được thu hồi";
       let lastMessageAt = new Date().toLocaleDateString("vi-VN", {
         year: "numeric",
         month: "2-digit",
@@ -253,42 +266,36 @@ module.exports = (io, redisPublisher) => {
         second: "2-digit",
       });
 
-      // Tìm tin nhắn không bị thu hồi mới nhất
-      const latestNonRevoked = messages.find((msg) => !msg.isRevoked);
-      if (latestNonRevoked) {
+      const lastMessage = messages[0];
+      if (lastMessage && lastMessage.timestamp === messageId) {
+        // Nếu là tin nhắn cuối cùng, giữ nguyên "Tin nhắn đã được thu hồi"
+        lastMessageContent = "Tin nhắn đã được thu hồi";
+      } else {
+        // Nếu không phải tin nhắn cuối cùng, giữ nguyên tin nhắn cuối
         lastMessageContent =
-          latestNonRevoked.type === "audio"
+          lastMessage.type === "audio"
             ? "Tin nhắn thoại"
-            : latestNonRevoked.type === "file"
-            ? JSON.stringify({
-                name: latestNonRevoked.fileInfo?.name || "File",
-                url: latestNonRevoked.fileInfo?.url || "",
-                size: latestNonRevoked.fileInfo?.size || 0,
-                type: latestNonRevoked.fileInfo?.type || "file",
-              })
-            : latestNonRevoked.message;
-        lastMessageAt = new Date(
-          parseInt(latestNonRevoked.timestamp)
-        ).toLocaleDateString("vi-VN", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        });
+            : lastMessage.type === "file"
+              ? "File đính kèm"
+              : lastMessage.message;
+        lastMessageAt = new Date(parseInt(lastMessage.timestamp)).toLocaleDateString(
+          "vi-VN",
+          {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          },
+        );
       }
 
-      // Cập nhật lastMessage trong bảng Conversations
-      const sender = message.sender;
-      const receiver = message.receiver;
-      const chatId = [sender, receiver].sort().join("_");
-
+      // Cập nhật Conversation
       const updateConversationParams = {
         TableName: TABLE_CONVERSATION_NAME,
         Key: { chatId },
-        UpdateExpression:
-          "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
+        UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
         ExpressionAttributeValues: {
           ":lastMessage": lastMessageContent,
           ":lastMessageAt": lastMessageAt,
@@ -296,21 +303,21 @@ module.exports = (io, redisPublisher) => {
       };
 
       await dynamoDB.update(updateConversationParams).promise();
-      console.log(`✅ Đã cập nhật lastMessage cho chatId: ${chatId}`);
 
-      // Gửi dữ liệu qua socket
-      const socketData = {
+      // Gửi thông tin cập nhật qua socket
+      io.to(chatRoomId).emit("messageRevoked", {
         ...updatedMessage.Attributes,
         lastMessage: lastMessageContent,
         lastMessageAt: lastMessageAt,
-        sender,
-        receiver,
+        chatId,
         chatRoomId,
-      };
+      });
 
-      io.to(chatRoomId).emit("messageRevoked", socketData);
-
-      res.status(200).json({ message: "Thu hồi tin nhắn thành công!" });
+      res.status(200).json({
+        message: "Thu hồi tin nhắn thành công!",
+        lastMessage: lastMessageContent,
+        lastMessageAt: lastMessageAt,
+      });
     } catch (error) {
       console.error("Lỗi khi thu hồi tin nhắn:", error);
       res.status(500).json({ error: "Lỗi server!" });

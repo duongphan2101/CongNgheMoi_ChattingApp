@@ -1012,7 +1012,6 @@ function View({ setIsLoggedIn }) {
     setUserChatList((prevList) => {
       const updatedList = prevList.map((conversation) => {
         if (!conversation || !conversation.chatRoomId) return conversation;
-
         if (conversation.chatRoomId === chatRoomId) {
           return {
             ...conversation,
@@ -1023,9 +1022,17 @@ function View({ setIsLoggedIn }) {
         return conversation;
       });
 
-      const updated = updatedList.find((c) => c?.chatRoomId === chatRoomId);
-      const others = updatedList.filter((c) => c?.chatRoomId !== chatRoomId);
-      return updated ? [updated, ...others] : updatedList;
+      // Sắp xếp lại danh sách để hội thoại có tin nhắn mới nhất lên đầu
+      return updatedList.sort((a, b) => {
+        const parseTime = (str) => {
+          if (!str) return new Date(0);
+          const [time, date] = str.split(" ");
+          const [h, m, s] = time.split(":").map(Number);
+          const [d, mo, y] = date.split("/").map(Number);
+          return new Date(y, mo - 1, d, h, m, s);
+        };
+        return parseTime(b.lastMessageAt) - parseTime(a.lastMessageAt);
+      });
     });
   };
 
@@ -1062,6 +1069,28 @@ function View({ setIsLoggedIn }) {
 
   //   return lastMessage;
   // };
+
+  // Trong useEffect của component View
+  useEffect(() => {
+    socket.on("messageRevoked", (data) => {
+      setUserChatList(prev => 
+        prev.map(chat => {
+          if (chat.chatRoomId === data.chatRoomId || chat.chatId === data.chatId) {
+            return {
+              ...chat,
+              lastMessage: data.lastMessage,
+              lastMessageAt: data.lastMessageAt
+            };
+          }
+          return chat;
+        })
+      );
+    });
+
+    return () => {
+      socket.off("messageRevoked");
+    };
+  }, []);
 
   const loadConversations = async (phoneNumber) => {
     const data = await getConversations();
