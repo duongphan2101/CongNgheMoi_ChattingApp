@@ -49,7 +49,7 @@ function Login({ setIsLoggedIn }) {
         />
         <p
           className="text-end mt-2"
-          style={{ cursor: "pointer", color: "blue" }}
+          style={{ cursor: "pointer", color: "white", fontWeight: 'bold' }}
           onClick={() => navigate("/send-reset-link")}
         >
           {t.forgotPassword}
@@ -62,7 +62,7 @@ function Login({ setIsLoggedIn }) {
           <span
             onClick={() => navigate("/register")}
             className="link"
-            style={{ cursor: "pointer", color: "blue" }}
+            style={{ cursor: "pointer", color: "white", fontWeight: 'bold' }}
           >
             {t.register}
           </span>

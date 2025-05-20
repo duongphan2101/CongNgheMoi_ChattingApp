@@ -1,5 +1,5 @@
 import getIp from "../utils/getIp_notPORT";
-const updateChatRoom = async ({ roomId, nameGroup, participants }) => {
+const updateChatRoom = async ({ roomId, nameGroup, participants, phone }) => {
   try {
     const BASE_URL = getIp();
     if (!BASE_URL) throw new Error("Không thể xác định BASE_URL");
@@ -10,7 +10,8 @@ const updateChatRoom = async ({ roomId, nameGroup, participants }) => {
       },
       body: JSON.stringify({
         nameGroup,
-        participants
+        participants,
+        phone
       })
     });
 

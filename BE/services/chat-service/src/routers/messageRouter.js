@@ -11,6 +11,7 @@ const s3 = new AWS.S3();
 const TABLE_MESSAGE_NAME = "Message";
 const TABLE_CONVERSATION_NAME = "Conversations";
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "lab2s3aduong";
+const { createSystemMessage } = require("../utils/utils");
 
 const ffmpegPath = require("ffmpeg-static");
 const ffmpeg = require("fluent-ffmpeg");
@@ -153,11 +154,10 @@ module.exports = (io, redisPublisher) => {
       const { chatRoomId, messageId } = req.body;
 
       if (!chatRoomId || !messageId) {
-        return res
-          .status(400)
-          .json({ error: "Thiếu chatRoomId hoặc messageId!" });
+        return res.status(400).json({ error: "Thiếu chatRoomId hoặc messageId!" });
       }
 
+      // Lấy tin nhắn cần thu hồi
       const getParams = {
         TableName: TABLE_MESSAGE_NAME,
         Key: {
@@ -173,7 +173,7 @@ module.exports = (io, redisPublisher) => {
         return res.status(404).json({ error: "Không tìm thấy tin nhắn!" });
       }
 
-      // Nếu là tin nhắn file hoặc audio, xóa file từ S3
+      // Xử lý xóa file nếu là tin nhắn file/audio
       if (message && (message.type === "file" || message.type === "audio")) {
         try {
           const fileUrl = message.message;
@@ -184,20 +184,18 @@ module.exports = (io, redisPublisher) => {
             key = key.split("amazonaws.com/")[1];
           }
 
-          console.log("Đang xóa file với key:", key);
-
           const deleteParams = {
             Bucket: BUCKET_NAME,
             Key: key,
           };
 
           await s3.deleteObject(deleteParams).promise();
-          console.log("✅ Đã xóa file từ S3 thành công");
         } catch (fileError) {
           console.error("❌ Lỗi khi xóa file từ S3:", fileError);
         }
       }
 
+      // Cập nhật tin nhắn thành đã thu hồi
       const updateParams = {
         TableName: TABLE_MESSAGE_NAME,
         Key: {
@@ -221,20 +219,15 @@ module.exports = (io, redisPublisher) => {
         ReturnValues: "ALL_NEW",
       };
 
-      if (
-        message.type == "text" ||
-        message.type == "file" ||
-        message.type == "audio"
-      ) {
+      if (message.type === "text" || message.type === "file" || message.type === "audio") {
         updateParams.UpdateExpression += ", #type = :type";
         updateParams.ExpressionAttributeNames["#type"] = "type";
         updateParams.ExpressionAttributeValues[":type"] = "revoked";
       }
 
       const updatedMessage = await dynamoDB.update(updateParams).promise();
-      console.log("Đã thu hồi tin nhắn:", messageId);
 
-      // Kiểm tra xem tin nhắn được thu hồi có phải là tin nhắn cuối cùng không
+      // Lấy tất cả tin nhắn và sắp xếp theo thời gian
       const messagesParams = {
         TableName: TABLE_MESSAGE_NAME,
         FilterExpression: "chatRoomId = :chatRoomId",
@@ -243,15 +236,26 @@ module.exports = (io, redisPublisher) => {
 
       const messagesResult = await dynamoDB.scan(messagesParams).promise();
       const messages = messagesResult.Items;
-
-      // Sắp xếp tin nhắn theo thời gian, mới nhất đầu tiên
       messages.sort((a, b) => parseInt(b.timestamp) - parseInt(a.timestamp));
 
-      // Chuẩn bị dữ liệu để gửi qua socket
-      const sender = message.sender;
-      const receiver = message.receiver;
-      const chatId = [sender, receiver].sort().join("_");
+      // Tìm chatId từ bảng Conversations dựa trên chatRoomId
+      const conversationParams = {
+        TableName: TABLE_CONVERSATION_NAME,
+        FilterExpression: "chatRoomId = :chatRoomId",
+        ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
+      };
 
+      const conversationResult = await dynamoDB.scan(conversationParams).promise();
+      if (!conversationResult.Items || conversationResult.Items.length === 0) {
+        return res.status(404).json({ error: "Không tìm thấy cuộc trò chuyện!" });
+      }
+
+      const chatId = conversationResult.Items[0].chatId;
+
+      // Tìm tin nhắn mới nhất không bị thu hồi
+      const latestValidMessage = messages.find((msg) => !msg.isRevoked);
+
+      // Chuẩn bị nội dung lastMessage
       let lastMessageContent = "Tin nhắn đã được thu hồi";
       let lastMessageAt = new Date().toLocaleDateString("vi-VN", {
         year: "numeric",
@@ -262,73 +266,58 @@ module.exports = (io, redisPublisher) => {
         second: "2-digit",
       });
 
-      if (messages.length > 0 && messages[0].timestamp === messageId) {
-        // Tin nhắn bị thu hồi là tin nhắn mới nhất
-        const updateConversationParams = {
-          TableName: TABLE_CONVERSATION_NAME,
-          Key: { chatId },
-          UpdateExpression:
-            "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
-          ExpressionAttributeValues: {
-            ":lastMessage": lastMessageContent,
-            ":lastMessageAt": lastMessageAt,
-          },
-        };
-
-        await dynamoDB.update(updateConversationParams).promise();
-        console.log(`✅ Đã cập nhật lastMessage cho chatId: ${chatId}`);
-      } else if (messages.length > 1) {
-        // Có tin nhắn khác, lấy tin nhắn mới nhất không bị thu hồi
-        const latestNonRevoked = messages.find((msg) => !msg.isRevoked);
-        if (latestNonRevoked) {
-          lastMessageContent =
-            latestNonRevoked.type === "audio"
-              ? "Tin nhắn thoại"
-              : latestNonRevoked.type === "file"
-              ? JSON.stringify({
-                  name: latestNonRevoked.fileInfo?.name || "File",
-                  url: latestNonRevoked.fileInfo?.url || "",
-                  size: latestNonRevoked.fileInfo?.size || 0,
-                  type: latestNonRevoked.fileInfo?.type || "file",
-                })
-              : latestNonRevoked.message;
-          lastMessageAt = new Date(
-            parseInt(latestNonRevoked.timestamp)
-          ).toLocaleDateString("vi-VN", {
+      const lastMessage = messages[0];
+      if (lastMessage && lastMessage.timestamp === messageId) {
+        // Nếu là tin nhắn cuối cùng, giữ nguyên "Tin nhắn đã được thu hồi"
+        lastMessageContent = "Tin nhắn đã được thu hồi";
+      } else {
+        // Nếu không phải tin nhắn cuối cùng, giữ nguyên tin nhắn cuối
+        lastMessageContent =
+          lastMessage.type === "audio"
+            ? "Tin nhắn thoại"
+            : lastMessage.type === "file"
+              ? "File đính kèm"
+              : lastMessage.message;
+        lastMessageAt = new Date(parseInt(lastMessage.timestamp)).toLocaleDateString(
+          "vi-VN",
+          {
             year: "numeric",
             month: "2-digit",
             day: "2-digit",
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
-          });
-
-          const updateConversationParams = {
-            TableName: TABLE_CONVERSATION_NAME,
-            Key: { chatId },
-            UpdateExpression:
-              "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
-            ExpressionAttributeValues: {
-              ":lastMessage": lastMessageContent,
-              ":lastMessageAt": lastMessageAt,
-            },
-          };
-
-          await dynamoDB.update(updateConversationParams).promise();
-          console.log(`✅ Đã cập nhật lastMessage cho chatId: ${chatId}`);
-        }
+          },
+        );
       }
 
-      // Gửi tin nhắn đã thu hồi và thông tin lastMessage cho người dùng
+      // Cập nhật Conversation
+      const updateConversationParams = {
+        TableName: TABLE_CONVERSATION_NAME,
+        Key: { chatId },
+        UpdateExpression: "SET lastMessage = :lastMessage, lastMessageAt = :lastMessageAt",
+        ExpressionAttributeValues: {
+          ":lastMessage": lastMessageContent,
+          ":lastMessageAt": lastMessageAt,
+        },
+      };
+
+      await dynamoDB.update(updateConversationParams).promise();
+
+      // Gửi thông tin cập nhật qua socket
       io.to(chatRoomId).emit("messageRevoked", {
         ...updatedMessage.Attributes,
         lastMessage: lastMessageContent,
         lastMessageAt: lastMessageAt,
-        sender,
-        receiver,
+        chatId,
+        chatRoomId,
       });
 
-      res.status(200).json({ message: "Thu hồi tin nhắn thành công!" });
+      res.status(200).json({
+        message: "Thu hồi tin nhắn thành công!",
+        lastMessage: lastMessageContent,
+        lastMessageAt: lastMessageAt,
+      });
     } catch (error) {
       console.error("Lỗi khi thu hồi tin nhắn:", error);
       res.status(500).json({ error: "Lỗi server!" });
@@ -664,32 +653,27 @@ module.exports = (io, redisPublisher) => {
   router.post("/updateGroupAvatar", upload.single("avatar"), async (req, res) => {
     try {
       const { chatRoomId } = req.body;
-      
       if (!req.file || !chatRoomId) {
         return res.status(400).json({ error: "Thiếu file hoặc chatRoomId!" });
       }
 
       const fileContent = await fs.readFile(req.file.path);
       const fileName = `group-avatar-${Date.now()}${path.extname(req.file.originalname)}`;
-      
       const uploadParams = {
         Bucket: BUCKET_NAME,
         Key: `group-avatars/${fileName}`,
         Body: fileContent,
         ContentType: req.file.mimetype,
-        ACL: "public-read"
+        ACL: "public-read",
       };
-  
+
       const uploadResult = await s3.upload(uploadParams).promise();
       const avatarUrl = uploadResult.Location;
-  
-      // lấy thông tin conversation để cập nhật cả 2 bảng
+
       const conversationsResult = await dynamoDB.scan({
         TableName: TABLE_CONVERSATION_NAME,
         FilterExpression: "chatRoomId = :chatRoomId",
-        ExpressionAttributeValues: {
-          ":chatRoomId": chatRoomId
-        }
+        ExpressionAttributeValues: { ":chatRoomId": chatRoomId },
       }).promise();
 
       if (!conversationsResult.Items || conversationsResult.Items.length === 0) {
@@ -704,16 +688,24 @@ module.exports = (io, redisPublisher) => {
           TableName: TABLE_CONVERSATION_NAME,
           Key: { chatId },
           UpdateExpression: "SET avatar = :avatarUrl",
-          ExpressionAttributeValues: { ":avatarUrl": avatarUrl }
+          ExpressionAttributeValues: { ":avatarUrl": avatarUrl },
         }).promise(),
-        
         dynamoDB.update({
           TableName: "ChatRooms",
-          Key: { chatRoomId },
+          Key: { chatRoomId: chatRoomId },
           UpdateExpression: "SET avatar = :avatarUrl",
-          ExpressionAttributeValues: { ":avatarUrl": avatarUrl }
-        }).promise()
+          ExpressionAttributeValues: { ":avatarUrl": avatarUrl },
+        }).promise(),
       ]);
+
+      // Tạo tin nhắn hệ thống
+      const systemMessage = await createSystemMessage(
+        chatRoomId,
+        conversation.participants,
+        "Avatar nhóm đã được thay đổi",
+        "CHANGE_AVATAR"
+      );
+      io.to(chatRoomId).emit("receiveMessage", systemMessage);
 
       await fs.unlink(req.file.path);
 
@@ -721,20 +713,17 @@ module.exports = (io, redisPublisher) => {
         chatRoomId,
         chatId,
         newAvatarUrl: avatarUrl,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
 
       res.status(200).json({
         message: "Cập nhật avatar thành công!",
         avatarUrl,
         chatId,
-        chatRoomId
+        chatRoomId,
       });
-  
     } catch (error) {
-      if (req.file) {
-        await fs.unlink(req.file.path).catch(console.error);
-      }
+      if (req.file) await fs.unlink(req.file.path).catch(console.error);
       console.error("Lỗi khi cập nhật avatar:", error);
       res.status(500).json({ error: "Lỗi server!" });
     }

@@ -137,13 +137,16 @@ export default function App({ navigation, route }) {
 
     socket.on('newChatRoom', al);
 
+    socket.on('newChatRoom_Private', al)
+
     socket.on("updateChatRoom", al);
 
     return () => {
       socket.off('groupCreated');
-      socket.off('newChatRoom');
-      socket.off('updateChatRoom');
-      socket.off('groupAvatarUpdated')
+      socket.off('newChatRoom', al);
+      socket.off('updateChatRoom', al);
+      socket.off('groupAvatarUpdated', al);
+      socket.on('newChatRoom_Private', al);
     };
   }, [thisUser?.phoneNumber]);
 

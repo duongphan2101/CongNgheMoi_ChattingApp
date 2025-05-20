@@ -139,6 +139,8 @@ function View({ setIsLoggedIn }) {
       }
     };
 
+
+
     // Lắng nghe sự kiện cập nhật nhóm
     socket.on("updateChatRoom", handleUpdateChatRoom);
     socket.on("updateChatRoom_rmMem", handleUpdateChatRoom);
@@ -275,7 +277,7 @@ function View({ setIsLoggedIn }) {
           if (!str) return new Date(0); // fallback cho item không có thời gian
           const [time, date] = str.split(" ");
           const [h, m, s] = time.split(":").map(Number);
-          const [d, mo, y] = date.split("/").map(Number);
+          const [d, mo, y] = date?.split("/").map(Number);
           return new Date(y, mo - 1, d, h, m, s);
         };
 
@@ -295,13 +297,14 @@ function View({ setIsLoggedIn }) {
 
     const handleNewChatRoom = async (data) => {
 
-      if (data.createdBy !== thisUser.phoneNumber) {
+      if (data.createdBy !== thisUser.phoneNumber && data.type !== 'PRIVATE_CHAT_CREATED') {
         const u = await getUserbySearch(data.createdBy, "");
         playNotificationSound();
         toast.success(
           `${u[0]?.fullName || "Ai đó"} đã thêm bạn vào nhóm ${data.groupName}`
         );
       }
+
 
       const newChatRoom = {
         name: data.groupName || "Nhóm mới", // hoặc data.nameGroup
@@ -336,6 +339,7 @@ function View({ setIsLoggedIn }) {
     };
 
     socket.on("newChatRoom", handleNewChatRoom);
+    socket.on("newChatRoom_Private", handleNewChatRoom);
 
     socket.on("groupAvatarUpdated", (data) => {
       setUserChatList(prevList =>
@@ -363,6 +367,7 @@ function View({ setIsLoggedIn }) {
 
     return () => {
       socket.off("newChatRoom", handleNewChatRoom);
+      socket.off("newChatRoom_Private", handleNewChatRoom);
       socket.off("groupAvatarUpdated");
     };
   }, [thisUser?.phoneNumber, chatRoom?.chatRoomId, chatRoom?.chatId]);
@@ -1008,20 +1013,31 @@ function View({ setIsLoggedIn }) {
   //   setUserChatting(usersData); // Dù là group, vẫn truyền danh sách còn lại
   // };
 
-  const updateLastMessage = (chatRoomId, message) => {
+  const updateLastMessage = (chatRoomId, message, lastMessageAt) => {
     setUserChatList((prevList) => {
       const updatedList = prevList.map((conversation) => {
         if (!conversation || !conversation.chatRoomId) return conversation;
-
         if (conversation.chatRoomId === chatRoomId) {
-          return { ...conversation, lastMessage: message };
+          return {
+            ...conversation,
+            lastMessage: message || "Chưa có tin nhắn",
+            lastMessageAt: lastMessageAt || conversation.lastMessageAt,
+          };
         }
         return conversation;
       });
 
-      const updated = updatedList.find((c) => c?.chatRoomId === chatRoomId);
-      const others = updatedList.filter((c) => c?.chatRoomId !== chatRoomId);
-      return updated ? [updated, ...others] : updatedList;
+      // Sắp xếp lại danh sách để hội thoại có tin nhắn mới nhất lên đầu
+      return updatedList.sort((a, b) => {
+        const parseTime = (str) => {
+          if (!str) return new Date(0);
+          const [time, date] = str.split(" ");
+          const [h, m, s] = time.split(":").map(Number);
+          const [d, mo, y] = date.split("/").map(Number);
+          return new Date(y, mo - 1, d, h, m, s);
+        };
+        return parseTime(b.lastMessageAt) - parseTime(a.lastMessageAt);
+      });
     });
   };
 
@@ -1058,6 +1074,28 @@ function View({ setIsLoggedIn }) {
 
   //   return lastMessage;
   // };
+
+  // Trong useEffect của component View
+  useEffect(() => {
+    socket.on("messageRevoked", (data) => {
+      setUserChatList(prev =>
+        prev.map(chat => {
+          if (chat.chatRoomId === data.chatRoomId || chat.chatId === data.chatId) {
+            return {
+              ...chat,
+              lastMessage: data.lastMessage,
+              lastMessageAt: data.lastMessageAt
+            };
+          }
+          return chat;
+        })
+      );
+    });
+
+    return () => {
+      socket.off("messageRevoked");
+    };
+  }, []);
 
   const loadConversations = async (phoneNumber) => {
     const data = await getConversations();
@@ -1557,6 +1595,7 @@ function View({ setIsLoggedIn }) {
 
   return (
     <div className="wrapper">
+      <div className="background-blur"></div>
       {/* Sidebar */}
       <div className="sidebar">
         <div
@@ -1704,7 +1743,15 @@ function View({ setIsLoggedIn }) {
                       {user?.isGroup ? user?.name || "Loading..." : user?.fullName || "Loading..."}
                     </strong>
                     <br />
-                    <small className={user?.isUnreadBy ? "bold-message" : ""}>
+                    <small className={user?.isUnreadBy ? "bold-message" : ""}
+                      style={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "block",
+                        maxWidth: "200px", // hoặc cụ thể như '200px'
+                      }}
+                    >
                       {renderLastMessage(user?.lastMessage)}
                     </small>
                   </div>

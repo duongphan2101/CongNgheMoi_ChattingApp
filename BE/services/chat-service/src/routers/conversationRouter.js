@@ -8,6 +8,10 @@ const TABLE_NAME = "Conversations";
 const CHATROOM_TABLE = "ChatRooms";
 const MESSAGE_TABLE = "Message";
 
+const getInfo = require('../utils/getInfobyPhone');
+
+// const getInfo = require('../utils/getInfobyPhone')
+
 module.exports = (io) => {
 
   router.get("/conversations", verifyToken, async (req, res) => {
@@ -196,11 +200,10 @@ module.exports = (io) => {
       await dynamoDB.put(conversationParams).promise();
 
       if (shouldEmit) {
-        // Lấy thông tin của cả 2 user trước khi emit
         const usersInfo = await Promise.all(
           participants.map(async (phone) => {
-            const userResult = await getUserbySearch(phone, phone);
-            return userResult[0];
+            const userResult = await getInfo(phone);
+            return userResult;
           })
         );
 
