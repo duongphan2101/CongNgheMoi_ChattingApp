@@ -68,7 +68,7 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
         </div>
       </div>
       <div className="settings">
-        <div className="setting-item">
+        {/* <div className="setting-item">
           <label>{t.notifications}</label>
           <label className="switch">
             <input
@@ -78,7 +78,7 @@ function Setting({ setIsLoggedIn, setCurrentView }) {
             />
             <span className="slider round"></span>
           </label>
-        </div>
+        </div> */}
         <div className="setting-item">
           <label>{t.language}</label>
           <select

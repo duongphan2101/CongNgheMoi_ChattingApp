@@ -1073,7 +1073,7 @@ function View({ setIsLoggedIn }) {
   // Trong useEffect của component View
   useEffect(() => {
     socket.on("messageRevoked", (data) => {
-      setUserChatList(prev => 
+      setUserChatList(prev =>
         prev.map(chat => {
           if (chat.chatRoomId === data.chatRoomId || chat.chatId === data.chatId) {
             return {
@@ -1738,7 +1738,15 @@ function View({ setIsLoggedIn }) {
                       {user?.isGroup ? user?.name || "Loading..." : user?.fullName || "Loading..."}
                     </strong>
                     <br />
-                    <small className={user?.isUnreadBy ? "bold-message" : ""}>
+                    <small className={user?.isUnreadBy ? "bold-message" : ""}
+                      style={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "block",
+                        maxWidth: "200px", // hoặc cụ thể như '200px'
+                      }}
+                    >
                       {renderLastMessage(user?.lastMessage)}
                     </small>
                   </div>

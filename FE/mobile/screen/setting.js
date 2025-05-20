@@ -111,8 +111,8 @@ const App = ({ navigation }) => {
           </View>
         </Modal>
 
-        {/* Chọn Ngôn Ngữ */}
-        <View style={styles.optionContainer}>
+
+        {/* <View style={styles.optionContainer}>
           <Text style={styles.optionText}>{t("Ngôn ngữ")}</Text>
           <TouchableOpacity
             onPress={() => setLanguageModalVisible(true)}
@@ -124,7 +124,7 @@ const App = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Modal chọn ngôn ngữ */}
+
         <Modal visible={languageModalVisible} transparent animationType="fade">
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
@@ -150,7 +150,7 @@ const App = ({ navigation }) => {
           </View>
         </Modal>
 
-        {/* Tắt Thông Báo */}
+
         <View style={styles.optionContainer}>
           <Text style={styles.optionText}>Tắt Thông Báo</Text>
           <Switch
@@ -159,7 +159,7 @@ const App = ({ navigation }) => {
             onValueChange={toggleSwitch}
             value={isEnabled}
           />
-        </View>
+        </View> */}
 
         <TouchableOpacity
           style={styles.changePassButton}
