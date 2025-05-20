@@ -197,6 +197,23 @@ module.exports = (io, redisPublisher) => {
 
       await dynamoDB.put(params).promise();
 
+      const notificationMessage = {
+        type: "PRIVATE_CHAT_CREATED",
+        chatRoomId,
+        participants,
+      };
+
+      // Gửi socket đến cả 2 người tham gia chat
+      participants.forEach((phoneNumber) => {
+        if (phoneNumber && typeof phoneNumber === "string" && phoneNumber.trim()) {
+          io.to(phoneNumber).emit("newChatRoom_Private", notificationMessage);
+          console.log(`Notification sent to ${phoneNumber}`);
+        } else {
+          console.error(`Invalid phone number: ${phoneNumber}`);
+        }
+      });
+
+
       res.status(201).json({
         message: "ChatRoom đã được tạo thành công!",
         chatRoomId,
@@ -423,7 +440,8 @@ module.exports = (io, redisPublisher) => {
       const oldParticipants = oldChatRoom.Item.participants;
       const addedMembers = participants.filter((p) => !oldParticipants.includes(p));
       const removedMembers = oldParticipants.filter((p) => !participants.includes(p));
-      const otherUser = await getFullName(addedMembers.join(", "));
+      const otherUser = (await getFullName(addedMembers.join(", "))) ?? 'nhiều người';
+
       const rmUser = await getFullName(removedMembers.join(", "));
       if (addedMembers.length > 0) {
         const systemMessage = await createSystemMessage(
@@ -570,6 +588,9 @@ module.exports = (io, redisPublisher) => {
       }
       const fullName = await getFullName(phoneNumber);
       // Tạo tin nhắn hệ thống
+      if (fullName === null) {
+        fullName = 'nhiều người';
+      }
       const systemMessage = await createSystemMessage(
         chatRoomId,
         updatedParticipants,

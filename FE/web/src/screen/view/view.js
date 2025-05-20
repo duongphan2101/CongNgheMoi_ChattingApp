@@ -139,6 +139,8 @@ function View({ setIsLoggedIn }) {
       }
     };
 
+
+
     // Lắng nghe sự kiện cập nhật nhóm
     socket.on("updateChatRoom", handleUpdateChatRoom);
     socket.on("updateChatRoom_rmMem", handleUpdateChatRoom);
@@ -295,13 +297,14 @@ function View({ setIsLoggedIn }) {
 
     const handleNewChatRoom = async (data) => {
 
-      if (data.createdBy !== thisUser.phoneNumber) {
+      if (data.createdBy !== thisUser.phoneNumber && data.type !== 'PRIVATE_CHAT_CREATED') {
         const u = await getUserbySearch(data.createdBy, "");
         playNotificationSound();
         toast.success(
           `${u[0]?.fullName || "Ai đó"} đã thêm bạn vào nhóm ${data.groupName}`
         );
       }
+
 
       const newChatRoom = {
         name: data.groupName || "Nhóm mới", // hoặc data.nameGroup
@@ -336,6 +339,7 @@ function View({ setIsLoggedIn }) {
     };
 
     socket.on("newChatRoom", handleNewChatRoom);
+    socket.on("newChatRoom_Private", handleNewChatRoom);
 
     socket.on("groupAvatarUpdated", (data) => {
       setUserChatList(prevList =>
@@ -363,6 +367,7 @@ function View({ setIsLoggedIn }) {
 
     return () => {
       socket.off("newChatRoom", handleNewChatRoom);
+      socket.off("newChatRoom_Private", handleNewChatRoom);
       socket.off("groupAvatarUpdated");
     };
   }, [thisUser?.phoneNumber, chatRoom?.chatRoomId, chatRoom?.chatId]);
