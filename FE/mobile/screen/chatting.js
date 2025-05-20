@@ -109,7 +109,7 @@ const MessageItem = memo(
     //   );
     //   return member?.fullName || phoneNumber; // Fallback để debug
     // };
-    
+
     const renderMessageContent = () => {
       if (item.isRevoked) {
         return (
@@ -134,62 +134,63 @@ const MessageItem = memo(
           </Text>
         );
       } else if (item.type === "text") {
-      let renderedText = item.message;
+        let renderedText = item.message;
 
-    // Hàm escape regex
-    const escapeRegExp = (string) => {
-      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    };
+        // Hàm escape regex
+        const escapeRegExp = (string) => {
+          return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        };
 
-    // Thay thế số điện thoại bằng tên
-    (chatRoom?.participantsInfo || []).forEach((member) => {
-      const escapedPhone = escapeRegExp(member.phoneNumber);
-      const pattern = `\\[@${escapedPhone}\\]`; // Thêm escape cho dấu []
-      const tagRegex = new RegExp(pattern, 'g');
-      
-      // Sử dụng tên hiển thị ưu tiên từ các trường khác nhau
-      const displayName = member.fullName || member.name || member.phoneNumber;
-      renderedText = renderedText.replace(tagRegex, `[@${displayName}]`);
-    });
+        // Thay thế số điện thoại bằng tên
+        (chatRoom?.participantsInfo || []).forEach((member) => {
+          const escapedPhone = escapeRegExp(member.phoneNumber);
+          const pattern = `\\[@${escapedPhone}\\]`; // Thêm escape cho dấu []
+          const tagRegex = new RegExp(pattern, "g");
 
-    // Xử lý @all (case insensitive)
-    if (chatRoom.isGroup) {
-      renderedText = renderedText.replace(/@all/gi, (match) => {
-        return match === '@all' ? '[@All]' : '[@ALL]'; // Giữ nguyên cách viết hoa
-      });
-    }
+          // Sử dụng tên hiển thị ưu tiên từ các trường khác nhau
+          const displayName =
+            member.fullName || member.name || member.phoneNumber;
+          renderedText = renderedText.replace(tagRegex, `[@${displayName}]`);
+        });
 
-    // Tách các phần tag và text
-    const parts = renderedText.split(/(\[@[^\]]+\])/g);
-    
-    const renderedParts = parts.map((part, index) => {
-      if (part.startsWith("[@") && part.endsWith("]")) {
-        const tagContent = part.slice(2, -1);
-        
-        // Kiểm tra xem có phải là tag đặc biệt không
-        const isSpecialTag = tagContent.toLowerCase() === 'all';
-        
-        return (
-          <Text 
-            key={`tag-${index}`} 
-            style={[
-              styles.tagText,
-              isSpecialTag && styles.specialTag // Thêm style đặc biệt cho @all
-            ]}
-          >
-            @{tagContent}
-          </Text>
-        );
-      }
-      
-      return (
-        <Text key={`text-${index}`} style={styles.normalText}>
-          {part}
-        </Text>
-      );
-    });
+        // Xử lý @all (case insensitive)
+        if (chatRoom.isGroup) {
+          renderedText = renderedText.replace(/@all/gi, (match) => {
+            return match === "@all" ? "[@All]" : "[@ALL]"; // Giữ nguyên cách viết hoa
+          });
+        }
 
-    return <View style={styles.messageBubble}>{renderedParts}</View>;
+        // Tách các phần tag và text
+        const parts = renderedText.split(/(\[@[^\]]+\])/g);
+
+        const renderedParts = parts.map((part, index) => {
+          if (part.startsWith("[@") && part.endsWith("]")) {
+            const tagContent = part.slice(2, -1);
+
+            // Kiểm tra xem có phải là tag đặc biệt không
+            const isSpecialTag = tagContent.toLowerCase() === "all";
+
+            return (
+              <Text
+                key={`tag-${index}`}
+                style={[
+                  styles.tagText,
+                  isSpecialTag && styles.specialTag, // Thêm style đặc biệt cho @all
+                ]}
+              >
+                @{tagContent}
+              </Text>
+            );
+          }
+
+          return (
+            <Text key={`text-${index}`} style={styles.normalText}>
+              {part}
+            </Text>
+          );
+        });
+
+        return <View style={styles.messageBubble}>{renderedParts}</View>;
       } else if (item.type === "audio") {
         return (
           <TouchableOpacity
@@ -349,7 +350,7 @@ const MessageItem = memo(
                 <Text style={styles.replyText}>
                   {item.replyTo.sender === thisUser.phoneNumber
                     ? "Bạn"
-                  : otherUser.fullName}
+                    : otherUser.fullName}
                 </Text>
                 <Text style={styles.replyMessage}>{item.replyTo.message}</Text>
               </TouchableOpacity>
@@ -435,19 +436,19 @@ const MessageInput = memo(
       }
     };
 
-    // Xử lý khi chọn một gợi ý
+    
     const handleSelectSuggestion = (member) => {
       const lastAt = message.lastIndexOf("@");
       const beforeTag = message.slice(0, lastAt);
-      const tagPhoneNumber = member.phoneNumber;
-      const newText = `${beforeTag}[@${tagPhoneNumber}] `;
+      const tagName = member.fullName || member.phoneNumber;
+      const newText = `${beforeTag}[@${tagName}] `;
       setMessage(newText);
-      setTaggedUsers((prev) => [...prev, tagPhoneNumber]);
+      setTaggedUsers((prev) => [...prev, member.phoneNumber]);
       setShowSuggestions(false);
       setSuggestions([]);
     };
 
-    // Render danh sách gợi ý
+
     const renderSuggestionItem = ({ item }) => (
       <TouchableOpacity
         style={styles.suggestionItem}
@@ -482,7 +483,10 @@ const MessageInput = memo(
       (members || []).forEach((member) => {
         const tagText = `[@${member.phoneNumber}]`;
         const tagRegex = new RegExp(tagText, "g");
-        displayText = displayText.replace(tagRegex, `[@${member.fullName || member.phoneNumber}]`);
+        displayText = displayText.replace(
+          tagRegex,
+          `[@${member.fullName || member.phoneNumber}]`
+        );
       });
 
       if (isGroup) {
@@ -1742,33 +1746,33 @@ export default function App({ navigation, route }) {
   // Khi listMember thay đổi => gọi API lấy thông tin user
   useEffect(() => {
     const fetchParticipantsInfo = async () => {
-  try {
-    const results = await Promise.all(
-      listMember.map(async (phone) => {
-        const res = await getUserbySearch(phone, "");
-        // Kiểm tra cả 'fullName' và 'name'
-        return res && res.length > 0 
-          ? { 
-              ...res[0], 
-              fullName: res[0].fullName || res[0].name || phone 
-            }
-          : { 
-              phoneNumber: phone, 
-              fullName: phone, 
-              avatar: null 
-            };
-      })
-    );
-    const validUsers = results.filter((user) => user && user.phoneNumber);
-    setParticipantsInfo(validUsers);
-    setPhongChat((prev) => ({
-      ...prev,
-      participantsInfo: validUsers,
-    }));
-  } catch (error) {
-    console.error("Lỗi khi fetch thông tin thành viên:", error);
-  }
-};
+      try {
+        const results = await Promise.all(
+          listMember.map(async (phone) => {
+            const res = await getUserbySearch(phone, "");
+            // Kiểm tra cả 'fullName' và 'name'
+            return res && res.length > 0
+              ? {
+                  ...res[0],
+                  fullName: res[0].fullName || res[0].name || phone,
+                }
+              : {
+                  phoneNumber: phone,
+                  fullName: phone,
+                  avatar: null,
+                };
+          })
+        );
+        const validUsers = results.filter((user) => user && user.phoneNumber);
+        setParticipantsInfo(validUsers);
+        setPhongChat((prev) => ({
+          ...prev,
+          participantsInfo: validUsers,
+        }));
+      } catch (error) {
+        console.error("Lỗi khi fetch thông tin thành viên:", error);
+      }
+    };
 
     if (listMember.length > 0) fetchParticipantsInfo();
   }, [listMember]);
