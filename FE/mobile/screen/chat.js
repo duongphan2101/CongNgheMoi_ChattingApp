@@ -1,7 +1,9 @@
-import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList, Alert, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { useTheme } from "../contexts/themeContext";
+import { SwipeListView } from 'react-native-swipe-list-view';
 import colors from "../themeColors";
+import Icon from 'react-native-vector-icons/FontAwesome';
 import getConversations from "../api/api_getConversation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import getUserbySearch from "../api/api_searchUSer";
@@ -22,6 +24,7 @@ export default function App({ navigation, route }) {
   const [usersInfo, setUsersInfo] = useState({}); // lưu user theo số điện thoại
   const [thisUser, setThisUser] = useState();
   const { hideSearch } = useSearch(); // Lấy hàm hideSearch từ đối tượng trả về
+  const [selectedChatRoomId, setSelectedChatRoomId] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -110,6 +113,44 @@ export default function App({ navigation, route }) {
     });
   };
 
+  const handleDeleteConversation = async (chatRoomId) => {
+    try {
+      const userJson = await AsyncStorage.getItem("user");
+      const user = userJson ? JSON.parse(userJson) : null;
+      if (!user || !user.phoneNumber) {
+        Alert.alert("Lỗi", "Không tìm thấy thông tin người dùng!");
+        return;
+      }
+
+      const response = await fetch(
+        `http://${BASE_URL}:3618/deleteConversation/${chatRoomId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userPhone: user.phoneNumber,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Xóa hội thoại thất bại");
+      }
+
+      // Load lại danh sách hội thoại giống khi đăng nhập
+      await fetchData();
+
+      setConversations(prev => prev.filter(conv => conv.chatRoomId !== chatRoomId));
+
+      Alert.alert("Thành công", "Đã xóa hội thoại!");
+    } catch (error) {
+      console.error("Lỗi khi xóa hội thoại:", error);
+      Alert.alert("Lỗi", "Không thể xóa hội thoại!");
+    }
+  };
+
   useEffect(() => {
     if (route.params?.refresh) {
       fetchData();
@@ -164,15 +205,28 @@ export default function App({ navigation, route }) {
     }
   }, [route.params?.refresh, route.params?.timestamp]);
 
+  // useEffect(() => {
+  //   // Lắng nghe sự kiện "refreshConversations"
+  //   const listener = eventEmitter.on("refreshConversations", () => {
+  //     fetchData();
+  //   });
+
+  //   // Cleanup listener khi component unmount
+  //   return () => {
+  //     listener.remove();
+  //   };
+  // }, []);
+
   useEffect(() => {
     // Lắng nghe sự kiện "refreshConversations"
-    const listener = eventEmitter.on("refreshConversations", () => {
+    const handler = () => {
       fetchData();
-    });
+    };
+    eventEmitter.on("refreshConversations", handler);
 
     // Cleanup listener khi component unmount
     return () => {
-      listener.remove();
+      eventEmitter.off("refreshConversations", handler);
     };
   }, []);
 
@@ -189,50 +243,55 @@ export default function App({ navigation, route }) {
   const styles = getStyles(themeColors);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.listChattingUsers}>
-        <FlatList
-          data={conversations}
-          keyExtractor={(item) => item.chatId.toString()}
-          renderItem={({ item }) => {
-            const otherPhone = item.participants.find(
-              (phone) => phone !== currentUserPhone
-            );
-            const otherUser = usersInfo[otherPhone];
-            // Format hiển thị thời gian tin nhắn cuối cùng
-            let lastMessageDisplay = item.lastMessage || "Chưa có tin nhắn nào";
+    <TouchableWithoutFeedback onPress={() => setSelectedChatRoomId(null)}>
+      <View style={styles.container}>
+        <View style={styles.listChattingUsers}>
+          <SwipeListView
+            data={conversations}
+            keyExtractor={(item) => item.chatId.toString()}
+            renderItem={({ item }) => {
+              const otherPhone = item.participants.find(
+                (phone) => phone !== currentUserPhone
+              );
+              const otherUser = usersInfo[otherPhone];
+              let lastMessageDisplay = item.lastMessage || "Chưa có tin nhắn nào";
 
-            // Định dạng thời gian nếu cần
-            // let lastMessageTime = '';
-            // if (item.lastMessageTime) {
-            //   const date = new Date(item.lastMessageTime);
-            //   lastMessageTime = `${date.getHours()}:${date.getMinutes()}`;
-            // }
-
-            return (
-              <TouchableOpacity
-                style={styles.user}
-                onPress={() => navigation.navigate('chatting', { otherUser: otherUser, chatRoom: item, thisUser: thisUser })}
-              >
-                <Image
-                  source={{
-                    uri: item.isGroup ? item.avatar : otherUser?.avatar,
-                  }}
-                  style={styles.avatar}
-                />
-                <View style={styles.userInfo}>
-                  <Text style={styles.text}>{item.isGroup ? item.fullName : otherUser?.fullName || 'Đang tải...'}</Text>
-                  <Text style={styles.mess} numberOfLines={1} ellipsizeMode="tail">
-                    {lastMessageDisplay}
-                  </Text>
-                </View>
-                {/* <Text style={styles.time}>{lastMessageTime}</Text> */}
-              </TouchableOpacity>
-            );
-          }}
-        />
+              return (
+                <TouchableOpacity
+                  style={styles.user}
+                  onPress={() => navigation.navigate('chatting', { otherUser: otherUser, chatRoom: item, thisUser: thisUser })}
+                  activeOpacity={0.7}
+                >
+                  <Image
+                    source={{
+                      uri: item.isGroup ? item.avatar : otherUser?.avatar,
+                    }}
+                    style={styles.avatar}
+                  />
+                  <View style={styles.userInfo}>
+                    <Text style={styles.text}>{item.isGroup ? item.fullName : otherUser?.fullName || 'Đang tải...'}</Text>
+                    <Text style={styles.mess} numberOfLines={1} ellipsizeMode="tail">
+                      {lastMessageDisplay}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            renderHiddenItem={({ item }) => (
+              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', backgroundColor: themeColors.background }}>
+                <TouchableOpacity
+                  style={styles.deleteIconContainer}
+                  onPress={() => handleDeleteConversation(item.chatRoomId)}
+                >
+                  <Icon name="trash" size={28} color="red" style={styles.deleteIcon} />
+                </TouchableOpacity>
+              </View>
+            )}
+            rightOpenValue={-75}
+          />
+        </View>
       </View>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -261,6 +320,8 @@ const getStyles = (themeColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
     flexDirection: 'row',
+    width: '100%', // Thêm dòng này
+    backgroundColor: themeColors.background, // Thêm dòng này
   },
   text: {
     fontSize: 20,
@@ -281,5 +342,14 @@ const getStyles = (themeColors) => StyleSheet.create({
     fontSize: 12,
     alignSelf: 'flex-start',
     marginTop: 5
-  }
+  },
+  deleteIconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  deleteIcon: {
+    fontSize: 24,
+    color: 'red',
+  },
 });
