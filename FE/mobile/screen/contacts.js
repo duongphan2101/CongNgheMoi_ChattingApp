@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList, TouchableWithoutFeedback, Keyboard, Alert } from 'react-native';
-import React, {useState, useEffect, useCallback, useRef} from 'react';
+import { StyleSheet, Text, View, Image, TouchableOpacity, FlatList, TouchableWithoutFeedback, Keyboard, Alert, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from "../contexts/themeContext";
 import colors from "../themeColors";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,15 +13,20 @@ const BASE_URL = getIp();
 
 const socket = io(`http://${BASE_URL}:3824`);
 
-export default function App({navigation}) {
+export default function App({ navigation }) {
   const { theme, toggleTheme } = useTheme();
   const themeColors = colors[theme];
   const [contacts, setContacts] = useState([]);
   const [thisUser, setThisUser] = useState(null);
   const [friendRequests, setFriendRequests] = useState([]);
   const { hideSearch } = useSearch();
+  const [searchTerm, setSearchTerm] = useState('');
   const fetchFriendsIntervalRef = useRef(null);
   const fetchFriendRequestsIntervalRef = useRef(null);
+
+  const filteredContacts = contacts.filter(contact =>
+    contact.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const fetchFriends = useCallback(async () => {
     try {
@@ -30,18 +35,18 @@ export default function App({navigation}) {
         Alert.alert("Lỗi", "Không tìm thấy token!");
         return;
       }
-  
+
       const response = await fetch(`http://${BASE_URL}:3824/user/friends`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-  
+
       // if (!response.ok) {
       //   throw new Error('Lỗi khi lấy danh sách bạn bè!');
       // }
-  
+
       const data = await response.json();
       const updatedContacts = data.map(friend => ({
         id: friend.phoneNumber,
@@ -50,7 +55,7 @@ export default function App({navigation}) {
         phone: friend.phoneNumber,
         status: 'offline'
       }));
-  
+
       // Cập nhật danh sách bạn bè
       setContacts(updatedContacts);
     } catch (error) {
@@ -159,7 +164,7 @@ export default function App({navigation}) {
         Alert.alert("Lỗi", "Vui lòng đăng nhập!");
         return;
       }
-  
+
       const response = await axios.post(
         `http://${BASE_URL}:3824/user/unfriend`,
         { friendPhone },
@@ -170,17 +175,17 @@ export default function App({navigation}) {
           },
         }
       );
-  
+
       if (response.data.message === "Đã hủy kết bạn thành công!") {
         // Cập nhật danh sách bạn bè
         const updatedContacts = contacts.filter((contact) => contact.phone !== friendPhone);
         setContacts(updatedContacts);
-  
+
         // Nếu danh sách bạn bè rỗng, đồng bộ lại từ server
         if (updatedContacts.length === 0) {
           await fetchFriends();
         }
-  
+
         Alert.alert("Thành công", "Đã hủy kết bạn!");
       }
     } catch (error) {
@@ -249,8 +254,8 @@ export default function App({navigation}) {
 
   const renderContact = ({ item }) => (
     <View style={styles.contactItemContainer}>
-      <TouchableOpacity 
-        style={styles.contactItem} 
+      <TouchableOpacity
+        style={styles.contactItem}
         onPress={() => navigation.navigate('router', {
           screen: 'chatScr',
           params: {
@@ -260,20 +265,20 @@ export default function App({navigation}) {
         })}
       >
         <View style={styles.avatarContainer}>
-          <Image source={{uri: item.avatar}} style={styles.avatar}/>
+          <Image source={{ uri: item.avatar }} style={styles.avatar} />
           <View style={[
-            styles.statusIndicator, 
-            {backgroundColor: item.status === 'online' ? '#4CAF50' : '#757575'}
-          ]}/>
+            styles.statusIndicator,
+            { backgroundColor: item.status === 'online' ? '#4CAF50' : '#757575' }
+          ]} />
         </View>
-        
+
         <View style={styles.contactInfo}>
           <Text style={styles.name}>{item.name}</Text>
           <Text style={styles.phone}>{item.phone}</Text>
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.unfriendButton}
         onPress={() => handleUnfriend(item.phone)}
       >
@@ -288,13 +293,13 @@ export default function App({navigation}) {
         <Text style={styles.friendRequestText}>Lời mời kết bạn từ: {item.senderPhone}</Text>
       </View>
       <View style={styles.friendRequestActions}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.friendRequestButton, styles.acceptButton]}
           onPress={() => handleAcceptFriendRequest(item.RequestId)}
         >
           <Text style={styles.buttonText}>Chấp nhận</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.friendRequestButton, styles.rejectButton]}
           onPress={() => handleRejectFriendRequest(item.RequestId)}
         >
@@ -320,12 +325,32 @@ export default function App({navigation}) {
 
         <View style={styles.contactsSection}>
           <Text style={styles.sectionTitle}>Danh sách bạn bè</Text>
+          {/* Ô tìm kiếm với icon */}
+          <View style={{ position: 'relative', justifyContent: 'center' }}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Tìm bạn bè..."
+              placeholderTextColor="#888"
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+            />
+          </View>
+          <FlatList
+            data={filteredContacts}
+            keyExtractor={(item) => item.id}
+            renderItem={renderContact}
+          />
+        </View>
+
+        {/* <View style={styles.contactsSection}>
+          <Text style={styles.sectionTitle}>Danh sách bạn bè</Text>
           <FlatList
             data={contacts}
             keyExtractor={(item) => item.id}
             renderItem={renderContact}
           />
-        </View>
+        </View> */}
       </View>
     </TouchableWithoutFeedback>
   );
@@ -445,5 +470,30 @@ const getStyles = (themeColors) => StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '500',
+  },
+  searchInput: {
+    backgroundColor: '#f5f6fa',
+    borderRadius: 20,
+    paddingHorizontal: 40,
+    paddingVertical: 10,
+    marginHorizontal: 15,
+    marginBottom: 15,
+    color: '#222',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: 28,
+    top: 13,
+    zIndex: 1,
+    color: '#888',
+    fontSize: 18,
   },
 });

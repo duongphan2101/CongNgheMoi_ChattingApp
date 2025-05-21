@@ -20,6 +20,12 @@ function Contacts({
   const t = locales[language];
   const contacts = [];
 
+  const filteredFriends = friends.filter((friend) =>
+    (friend.fullName || "")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+  );
+
   const filteredContacts = contacts.filter((contact) =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -120,8 +126,8 @@ function Contacts({
       {/* Hiển thị danh sách bạn bè */}
       <div className="friends-list mt-4">
         <h5 className="text-light">{t.listFriend}</h5>
-        {friends.length > 0 ? (
-          friends.map((friend) => (
+        {filteredFriends.length > 0 ? (
+          filteredFriends.map((friend) => (
             <div key={friend.phoneNumber} className="contact-item">
               <div className="d-flex align-items-center">
                 <div className="contact-avatar">
